@@ -84,30 +84,17 @@ class SuricataController:
     
     def stop(self, force: bool = False) -> Dict[str, Any]:
         try:
-            process = self._find_suricata_process()
-            if not process:
-                return {'success': False, 'message': 'Suricata is not running'}
-            
-            try:
-                psutil_process = psutil.Process(process.pid)
-                if force:
-                    psutil_process.kill()
-                else:
-                    psutil_process.terminate()
-                
-                # Wait for process to stop
-                psutil_process.wait(timeout=10)
+            cmd = ['systemctl', 'stop', 'suricata']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+
+            if result.returncode == 0:
                 self._current_process = None
-                return {'success': True, 'message': 'Suricata stopped successfully'}
-                
-            except psutil.TimeoutExpired:
-                if not force:
-                    psutil_process.kill()
-                    psutil_process.wait(timeout=5)
-                    return {'success': True, 'message': 'Suricata force-stopped successfully'}
-                else:
-                    return {'success': False, 'message': 'Failed to stop Suricata process'}
-                    
+                return {'success': True, 'message': 'Suricata service stopped successfully'}
+            else:
+                return {'success': False, 'message': f'Failed to stop Suricata service: {result.stderr}'}
+
+        except subprocess.TimeoutExpired:
+            return {'success': False, 'message': 'Stop command timed out'}
         except Exception as e:
             return {'success': False, 'message': f'Error stopping Suricata: {e}'}
     
