@@ -160,7 +160,7 @@ class DatabaseManager:
                 dest_ip=alert_data.get('dest_ip'),
                 dest_port=alert_data.get('dest_port'),
                 payload=alert_data.get('payload'),
-                metadata=json.dumps(alert_data.get('metadata', {}))
+                extra_data=json.dumps(alert_data.get('extra_data', {}))
             )
             session.add(alert)
             session.commit()
@@ -235,7 +235,7 @@ class DatabaseManager:
                 log_level=log_data.get('log_level'),
                 message=log_data.get('message'),
                 source=log_data.get('source'),
-                metadata=json.dumps(log_data.get('metadata', {}))
+                extra_data=json.dumps(log_data.get('extra_data', {}))
             )
             session.add(log)
             session.commit()
@@ -277,7 +277,7 @@ class DatabaseManager:
                 metric_value=stat_data.get('metric_value'),
                 metric_type=stat_data.get('metric_type', 'gauge'),
                 category=stat_data.get('category'),
-                metadata=json.dumps(stat_data.get('metadata', {}))
+                extra_data=json.dumps(stat_data.get('extra_data', {}))
             )
             session.add(stat)
             session.commit()

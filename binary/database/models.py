@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, Float, Boolean
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from datetime import datetime
 
 Base = declarative_base()
@@ -20,7 +20,7 @@ class Alert(Base):
     dest_ip = Column(String(45), index=True)
     dest_port = Column(Integer)
     payload = Column(Text, nullable=True)
-    metadata = Column(Text, nullable=True)  # JSON string for additional data
+    extra_data = Column(Text, nullable=True)  # JSON string for additional data
 
     def __repr__(self):
         return f"<Alert(id={self.id}, signature='{self.signature}', timestamp={self.timestamp})>"
@@ -39,7 +39,7 @@ class Alert(Base):
             'dest_ip': self.dest_ip,
             'dest_port': self.dest_port,
             'payload': self.payload,
-            'metadata': self.metadata
+            'extra_data': self.extra_data
         }
 
 
@@ -53,7 +53,7 @@ class Log(Base):
     log_level = Column(String(20))
     message = Column(Text)
     source = Column(String(100))
-    metadata = Column(Text, nullable=True)  # JSON string
+    extra_data = Column(Text, nullable=True)  # JSON string
 
     def __repr__(self):
         return f"<Log(id={self.id}, event_type='{self.event_type}', timestamp={self.timestamp})>"
@@ -66,7 +66,7 @@ class Log(Base):
             'log_level': self.log_level,
             'message': self.message,
             'source': self.source,
-            'metadata': self.metadata
+            'extra_data': self.extra_data
         }
 
 
@@ -80,7 +80,7 @@ class Statistics(Base):
     metric_value = Column(Float)
     metric_type = Column(String(50))  # e.g., 'counter', 'gauge', 'rate'
     category = Column(String(50), index=True)  # e.g., 'ssh', 'http', 'dns', 'total'
-    metadata = Column(Text, nullable=True)  # JSON string
+    extra_data = Column(Text, nullable=True)  # JSON string
 
     def __repr__(self):
         return f"<Statistics(id={self.id}, metric_name='{self.metric_name}', value={self.metric_value})>"
@@ -93,5 +93,5 @@ class Statistics(Base):
             'metric_value': self.metric_value,
             'metric_type': self.metric_type,
             'category': self.category,
-            'metadata': self.metadata
+            'extra_data': self.extra_data
         }
