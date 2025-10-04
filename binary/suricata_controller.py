@@ -24,14 +24,29 @@ class SuricataController:
     
     def get_status(self) -> Dict[str, Any]:
         try:
-            process = self._find_suricata_process()
-            if process:
-                self._current_process = process
+            # Check service status using systemctl
+            cmd = ['systemctl', 'is-active', 'suricata']
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.stdout.strip() == 'active':
+                # Get more details
+                cmd_status = ['systemctl', 'status', 'suricata']
+                status_result = subprocess.run(cmd_status, capture_output=True, text=True)
+
+                # Try to extract PID from status output
+                pid = None
+                for line in status_result.stdout.split('\n'):
+                    if 'Main PID:' in line:
+                        pid_part = line.split('Main PID:')[1].strip().split()[0]
+                        try:
+                            pid = int(pid_part)
+                        except ValueError:
+                            pass
+                        break
+
                 return {
                     'status': 'running',
-                    'pid': process.pid,
-                    'uptime': process.uptime,
-                    'cmdline': ' '.join(process.cmdline)
+                    'pid': pid if pid else 'N/A'
                 }
             else:
                 self._current_process = None
