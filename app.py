@@ -65,6 +65,11 @@ def api_rules():
 def config():
     return render_template('config.html')
 
+@app.route('/services')
+def services():
+    status = controller.get_status()
+    return render_template('services.html', status=status)
+
 @app.route('/api/config')
 def api_config():
     try:

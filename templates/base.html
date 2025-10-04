@@ -80,21 +80,8 @@
         <a class="nav-link" href="{{ url_for('config') }}">
             <i class="fas fa-cog"></i> Config
         </a>
-
-        <div style="padding: 10px 20px; margin-top: 20px; border-top: 1px solid #343a40;">
-            <small class="text-muted">SERVICES</small>
-        </div>
-        <a class="nav-link service-action" href="#" id="sidebar-start-btn">
-            <i class="fas fa-play"></i> Start Service
-        </a>
-        <a class="nav-link service-action" href="#" id="sidebar-stop-btn">
-            <i class="fas fa-stop"></i> Stop Service
-        </a>
-        <a class="nav-link service-action" href="#" id="sidebar-restart-btn">
-            <i class="fas fa-redo"></i> Restart Service
-        </a>
-        <a class="nav-link service-action" href="#" id="sidebar-reload-rules-btn">
-            <i class="fas fa-sync"></i> Reload Rules
+        <a class="nav-link" href="{{ url_for('services') }}">
+            <i class="fas fa-server"></i> Services
         </a>
     </div>
 
@@ -131,47 +118,6 @@
         overlay.addEventListener('click', () => {
             sidebar.classList.remove('active');
             overlay.classList.remove('active');
-        });
-
-        // Service control buttons in sidebar
-        $('#sidebar-start-btn').click(function(e) {
-            e.preventDefault();
-            $.post('/api/start', function(data) {
-                alert(data.message);
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-                if (typeof updateStatus === 'function') updateStatus();
-            });
-        });
-
-        $('#sidebar-stop-btn').click(function(e) {
-            e.preventDefault();
-            $.post('/api/stop', function(data) {
-                alert(data.message);
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-                if (typeof updateStatus === 'function') updateStatus();
-            });
-        });
-
-        $('#sidebar-restart-btn').click(function(e) {
-            e.preventDefault();
-            $.post('/api/restart', function(data) {
-                alert(data.message);
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-                if (typeof updateStatus === 'function') updateStatus();
-            });
-        });
-
-        $('#sidebar-reload-rules-btn').click(function(e) {
-            e.preventDefault();
-            $.post('/api/reload-rules', function(data) {
-                alert(data.message);
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-                if (typeof updateStatus === 'function') updateStatus();
-            });
         });
     </script>
     {% block scripts %}{% endblock %}

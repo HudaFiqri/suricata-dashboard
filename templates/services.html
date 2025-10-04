@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-server"></i> Service Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="status-info">
+                    {% if status.status == 'running' %}
+                        <p><strong>Status:</strong> <span class="status-running"><i class="fas fa-play-circle"></i> Running</span></p>
+                        <p><strong>PID:</strong> {{ status.pid }}</p>
+                    {% elif status.status == 'stopped' %}
+                        <p><strong>Status:</strong> <span class="status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span></p>
+                    {% else %}
+                        <p><strong>Status:</strong> <span class="status-error"><i class="fas fa-exclamation-circle"></i> Error</span></p>
+                        <p><strong>Message:</strong> {{ status.message }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-cogs"></i> Service Control</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" id="start-btn">
+                        <i class="fas fa-play"></i> Start Service
+                    </button>
+                    <button class="btn btn-danger btn-lg" id="stop-btn">
+                        <i class="fas fa-stop"></i> Stop Service
+                    </button>
+                    <button class="btn btn-warning btn-lg" id="restart-btn">
+                        <i class="fas fa-redo"></i> Restart Service
+                    </button>
+                    <button class="btn btn-info btn-lg" id="reload-rules-btn">
+                        <i class="fas fa-sync"></i> Reload Rules
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="alertModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Operation Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modal-message">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAlert(message, isSuccess = true) {
+    $('#modal-message').html('<div class="alert alert-' + (isSuccess ? 'success' : 'danger') + '">' + message + '</div>');
+    $('#alertModal').modal('show');
+    setTimeout(() => updateStatus(), 1000);
+}
+
+function updateStatus() {
+    $.get('/api/status', function(data) {
+        let statusHtml = '';
+        if (data.status === 'running') {
+            statusHtml = `
+                <p><strong>Status:</strong> <span class="status-running"><i class="fas fa-play-circle"></i> Running</span></p>
+                <p><strong>PID:</strong> ${data.pid}</p>
+            `;
+        } else if (data.status === 'stopped') {
+            statusHtml = '<p><strong>Status:</strong> <span class="status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span></p>';
+        } else {
+            statusHtml = `
+                <p><strong>Status:</strong> <span class="status-error"><i class="fas fa-exclamation-circle"></i> Error</span></p>
+                <p><strong>Message:</strong> ${data.message}</p>
+            `;
+        }
+        $('#status-info').html(statusHtml);
+    });
+}
+
+$('#start-btn').click(function() {
+    $.post('/api/start', function(data) {
+        showAlert(data.message, data.success);
+    });
+});
+
+$('#stop-btn').click(function() {
+    $.post('/api/stop', function(data) {
+        showAlert(data.message, data.success);
+    });
+});
+
+$('#restart-btn').click(function() {
+    $.post('/api/restart', function(data) {
+        showAlert(data.message, data.success);
+    });
+});
+
+$('#reload-rules-btn').click(function() {
+    $.post('/api/reload-rules', function(data) {
+        showAlert(data.message, data.success);
+    });
+});
+
+// Update status every 1 second
+setInterval(updateStatus, 1000);
+</script>
+{% endblock %}
