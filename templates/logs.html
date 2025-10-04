@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Logs - Suricata Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-file-alt"></i> Suricata Logs</h5>
+                <div>
+                    <button class="btn btn-sm btn-primary" id="refresh-logs">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                    <button class="btn btn-sm btn-secondary" id="auto-refresh" data-auto="false">
+                        <i class="fas fa-play"></i> Auto Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="log-container p-3" id="log-display">
+                    Loading logs...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-filter"></i> Log Filters</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Log Level</label>
+                    <select class="form-select" id="log-level-filter">
+                        <option value="">All Levels</option>
+                        <option value="1">Alert</option>
+                        <option value="2">Critical</option>
+                        <option value="3">Error</option>
+                        <option value="4">Warning</option>
+                        <option value="5">Notice</option>
+                        <option value="6">Info</option>
+                        <option value="7">Debug</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Search</label>
+                    <input type="text" class="form-control" id="log-search" placeholder="Search in logs...">
+                </div>
+                <button class="btn btn-primary" id="apply-filters">Apply Filters</button>
+                <button class="btn btn-secondary" id="clear-filters">Clear</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-bar"></i> Log Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h4 class="text-danger" id="alert-count">0</h4>
+                        <p>Alerts</p>
+                    </div>
+                    <div class="col-4">
+                        <h4 class="text-warning" id="warning-count">0</h4>
+                        <p>Warnings</p>
+                    </div>
+                    <div class="col-4">
+                        <h4 class="text-info" id="info-count">0</h4>
+                        <p>Info</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let autoRefreshInterval;
+let originalLogs = [];
+
+function loadLogs() {
+    $.get('/api/logs', function(data) {
+        if (data.logs) {
+            originalLogs = data.logs;
+            displayLogs(data.logs);
+            updateLogStats(data.logs);
+        } else if (data.error) {
+            $('#log-display').html('<div class="text-danger">Error loading logs: ' + data.error + '</div>');
+        }
+    }).fail(function() {
+        $('#log-display').html('<div class="text-danger">Failed to load logs</div>');
+    });
+}
+
+function displayLogs(logs) {
+    if (logs.length === 0) {
+        $('#log-display').html('<div class="text-muted">No logs available</div>');
+        return;
+    }
+    
+    let html = '';
+    logs.forEach(function(log) {
+        let logClass = '';
+        if (log.toLowerCase().includes('alert')) logClass = 'text-danger';
+        else if (log.toLowerCase().includes('warning')) logClass = 'text-warning';
+        else if (log.toLowerCase().includes('error')) logClass = 'text-danger';
+        else if (log.toLowerCase().includes('info')) logClass = 'text-info';
+        
+        html += '<div class="' + logClass + '">' + escapeHtml(log) + '</div>';
+    });
+    
+    $('#log-display').html(html);
+    $('#log-display').scrollTop($('#log-display')[0].scrollHeight);
+}
+
+function updateLogStats(logs) {
+    let alertCount = 0;
+    let warningCount = 0;
+    let infoCount = 0;
+    
+    logs.forEach(function(log) {
+        const logLower = log.toLowerCase();
+        if (logLower.includes('alert')) alertCount++;
+        else if (logLower.includes('warning')) warningCount++;
+        else if (logLower.includes('info')) infoCount++;
+    });
+    
+    $('#alert-count').text(alertCount);
+    $('#warning-count').text(warningCount);
+    $('#info-count').text(infoCount);
+}
+
+function filterLogs() {
+    const levelFilter = $('#log-level-filter').val();
+    const searchFilter = $('#log-search').val().toLowerCase();
+    
+    let filteredLogs = originalLogs;
+    
+    if (searchFilter) {
+        filteredLogs = filteredLogs.filter(log => 
+            log.toLowerCase().includes(searchFilter)
+        );
+    }
+    
+    if (levelFilter) {
+        const levelMap = {
+            '1': 'alert',
+            '2': 'critical', 
+            '3': 'error',
+            '4': 'warning',
+            '5': 'notice',
+            '6': 'info',
+            '7': 'debug'
+        };
+        const levelName = levelMap[levelFilter];
+        filteredLogs = filteredLogs.filter(log => 
+            log.toLowerCase().includes(levelName)
+        );
+    }
+    
+    displayLogs(filteredLogs);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+$('#refresh-logs').click(loadLogs);
+
+$('#auto-refresh').click(function() {
+    const isAuto = $(this).data('auto');
+    if (!isAuto) {
+        autoRefreshInterval = setInterval(loadLogs, 3000);
+        $(this).html('<i class="fas fa-pause"></i> Stop Auto Refresh');
+        $(this).data('auto', true);
+    } else {
+        clearInterval(autoRefreshInterval);
+        $(this).html('<i class="fas fa-play"></i> Auto Refresh');
+        $(this).data('auto', false);
+    }
+});
+
+$('#apply-filters').click(filterLogs);
+
+$('#clear-filters').click(function() {
+    $('#log-level-filter').val('');
+    $('#log-search').val('');
+    displayLogs(originalLogs);
+});
+
+loadLogs();
+</script>
+{% endblock %}

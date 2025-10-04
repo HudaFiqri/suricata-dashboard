@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Rules - Suricata Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-shield-alt"></i> Suricata Rules</h5>
+                <button class="btn btn-success" id="add-rule-btn">
+                    <i class="fas fa-plus"></i> Add Rule
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="rules-container">
+                    Loading rules...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="ruleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ruleModalTitle">Edit Rule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="ruleForm">
+                    <div class="mb-3">
+                        <label class="form-label">Rule File</label>
+                        <input type="text" class="form-control" id="rule-filename" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rule Content</label>
+                        <textarea class="form-control" id="rule-content" rows="15" style="font-family: monospace;"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-rule-btn">Save Rule</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentRules = [];
+
+function loadRules() {
+    $.get('/api/rules', function(data) {
+        if (data.rules) {
+            currentRules = data.rules;
+            displayRules(data.rules);
+        } else if (data.error) {
+            $('#rules-container').html('<div class="alert alert-danger">Error loading rules: ' + data.error + '</div>');
+        }
+    }).fail(function() {
+        $('#rules-container').html('<div class="alert alert-danger">Failed to load rules</div>');
+    });
+}
+
+function displayRules(rules) {
+    if (rules.length === 0) {
+        $('#rules-container').html('<div class="alert alert-info">No rules found</div>');
+        return;
+    }
+    
+    let html = '<div class="accordion" id="rulesAccordion">';
+    
+    rules.forEach(function(rule, index) {
+        const ruleCount = (rule.content.match(/^(alert|pass|drop|reject)/gm) || []).length;
+        
+        html += `
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading${index}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                            data-bs-target="#collapse${index}">
+                        <div class="d-flex justify-content-between w-100 me-3">
+                            <span><i class="fas fa-file-code"></i> ${rule.filename}</span>
+                            <span class="badge bg-primary">${ruleCount} rules</span>
+                        </div>
+                    </button>
+                </h2>
+                <div id="collapse${index}" class="accordion-collapse collapse" data-bs-parent="#rulesAccordion">
+                    <div class="accordion-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <div>
+                                <small class="text-muted">File: ${rule.filename}</small>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary edit-rule-btn" data-index="${index}">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </div>
+                        </div>
+                        <pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto;"><code>${escapeHtml(rule.content.substring(0, 1000))}${rule.content.length > 1000 ? '...' : ''}</code></pre>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    $('#rules-container').html(html);
+    
+    $('.edit-rule-btn').click(function() {
+        const index = $(this).data('index');
+        editRule(currentRules[index]);
+    });
+}
+
+function editRule(rule) {
+    $('#ruleModalTitle').text('Edit Rule: ' + rule.filename);
+    $('#rule-filename').val(rule.filename);
+    $('#rule-content').val(rule.content);
+    $('#ruleModal').modal('show');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+$('#add-rule-btn').click(function() {
+    $('#ruleModalTitle').text('Add New Rule');
+    $('#rule-filename').val('').removeAttr('readonly');
+    $('#rule-content').val('');
+    $('#ruleModal').modal('show');
+});
+
+$('#save-rule-btn').click(function() {
+    const filename = $('#rule-filename').val();
+    const content = $('#rule-content').val();
+    
+    if (!filename || !content) {
+        alert('Please provide both filename and content');
+        return;
+    }
+    
+    // Here you would implement the save functionality
+    alert('Save functionality would be implemented here');
+    $('#ruleModal').modal('hide');
+});
+
+loadRules();
+</script>
+{% endblock %}

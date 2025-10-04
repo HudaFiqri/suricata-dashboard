@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Suricata Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="status-info">
+                    {% if status.status == 'running' %}
+                        <p><strong>Status:</strong> <span class="status-running"><i class="fas fa-play-circle"></i> Running</span></p>
+                        <p><strong>PID:</strong> {{ status.pid }}</p>
+                        {% if status.uptime %}
+                        <p><strong>Uptime:</strong> {{ status.uptime }}</p>
+                        {% endif %}
+                    {% elif status.status == 'stopped' %}
+                        <p><strong>Status:</strong> <span class="status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span></p>
+                    {% else %}
+                        <p><strong>Status:</strong> <span class="status-error"><i class="fas fa-exclamation-circle"></i> Error</span></p>
+                        <p><strong>Message:</strong> {{ status.message }}</p>
+                    {% endif %}
+                </div>
+                <button class="btn btn-success" id="start-btn">
+                    <i class="fas fa-play"></i> Start
+                </button>
+                <button class="btn btn-danger" id="stop-btn">
+                    <i class="fas fa-stop"></i> Stop
+                </button>
+                <button class="btn btn-warning" id="restart-btn">
+                    <i class="fas fa-redo"></i> Restart
+                </button>
+                <button class="btn btn-info" id="reload-rules-btn">
+                    <i class="fas fa-sync"></i> Reload Rules
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line"></i> Quick Stats</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h3 class="text-primary" id="alerts-count">-</h3>
+                        <p>Alerts</p>
+                    </div>
+                    <div class="col-4">
+                        <h3 class="text-warning" id="rules-count">-</h3>
+                        <p>Rules</p>
+                    </div>
+                    <div class="col-4">
+                        <h3 class="text-info" id="uptime-display">-</h3>
+                        <p>Uptime</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-exclamation-triangle"></i> Recent Alerts</h5>
+            </div>
+            <div class="card-body">
+                <div id="recent-alerts">
+                    <p class="text-muted">Loading recent alerts...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="alertModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Operation Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modal-message">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAlert(message, isSuccess = true) {
+    $('#modal-message').html('<div class="alert alert-' + (isSuccess ? 'success' : 'danger') + '">' + message + '</div>');
+    $('#alertModal').modal('show');
+    setTimeout(() => updateStatus(), 1000);
+}
+
+function updateStatus() {
+    $.get('/api/status', function(data) {
+        let statusHtml = '';
+        if (data.status === 'running') {
+            statusHtml = `
+                <p><strong>Status:</strong> <span class="status-running"><i class="fas fa-play-circle"></i> Running</span></p>
+                <p><strong>PID:</strong> ${data.pid}</p>
+            `;
+        } else if (data.status === 'stopped') {
+            statusHtml = '<p><strong>Status:</strong> <span class="status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span></p>';
+        } else {
+            statusHtml = `
+                <p><strong>Status:</strong> <span class="status-error"><i class="fas fa-exclamation-circle"></i> Error</span></p>
+                <p><strong>Message:</strong> ${data.message}</p>
+            `;
+        }
+        $('#status-info').html(statusHtml);
+    });
+}
+
+$('#start-btn').click(function() {
+    $.post('/api/start', function(data) {
+        showAlert(data.message, data.success);
+    });
+});
+
+$('#stop-btn').click(function() {
+    $.post('/api/stop', function(data) {
+        showAlert(data.message, data.success);
+    });
+});
+
+$('#restart-btn').click(function() {
+    $.post('/api/restart', function(data) {
+        showAlert(data.message, data.success);
+    });
+});
+
+$('#reload-rules-btn').click(function() {
+    $.post('/api/reload-rules', function(data) {
+        showAlert(data.message, data.success);
+    });
+});
+
+setInterval(updateStatus, 5000);
+</script>
+{% endblock %}

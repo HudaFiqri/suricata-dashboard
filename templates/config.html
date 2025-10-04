@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration - Suricata Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-cog"></i> Suricata Configuration</h5>
+                <div>
+                    <button class="btn btn-primary" id="save-config-btn">
+                        <i class="fas fa-save"></i> Save Config
+                    </button>
+                    <button class="btn btn-secondary" id="reload-config-btn">
+                        <i class="fas fa-sync"></i> Reload
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Warning:</strong> Modifying the configuration requires careful attention. 
+                        Invalid configurations may prevent Suricata from starting.
+                    </div>
+                </div>
+                <textarea id="config-editor" class="form-control" rows="25" style="font-family: monospace;">
+Loading configuration...
+                </textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configuration Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="config-modal-message">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadConfig() {
+    $.get('/api/config', function(data) {
+        if (data.config !== undefined) {
+            $('#config-editor').val(data.config);
+        } else if (data.error) {
+            $('#config-editor').val('Error loading configuration: ' + data.error);
+        }
+    }).fail(function() {
+        $('#config-editor').val('Failed to load configuration');
+    });
+}
+
+function showConfigResult(message, isSuccess = true) {
+    $('#config-modal-message').html('<div class="alert alert-' + (isSuccess ? 'success' : 'danger') + '">' + message + '</div>');
+    $('#configModal').modal('show');
+}
+
+$('#save-config-btn').click(function() {
+    const config = $('#config-editor').val();
+    
+    $.ajax({
+        url: '/api/config',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({config: config}),
+        success: function(data) {
+            showConfigResult(data.message, data.success);
+        },
+        error: function() {
+            showConfigResult('Failed to save configuration', false);
+        }
+    });
+});
+
+$('#reload-config-btn').click(function() {
+    if (confirm('Reload configuration from file? Any unsaved changes will be lost.')) {
+        loadConfig();
+    }
+});
+
+// Add syntax highlighting for YAML (basic)
+$('#config-editor').on('input', function() {
+    // Basic validation could be added here
+});
+
+loadConfig();
+</script>
+{% endblock %}
