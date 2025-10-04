@@ -2,6 +2,7 @@ from .suricata_config import SuricataConfig
 from .suricata_rule_manager import SuricataRuleManager
 from .suricata_log_manager import SuricataLogManager
 from .suricata_process import SuricataProcess
+from .suricata_rrd_manager import SuricataRRDManager
 from .controllers import SuricataBackendController, SuricataFrontendController
 
 __all__ = [
@@ -9,6 +10,7 @@ __all__ = [
     'SuricataRuleManager',
     'SuricataLogManager',
     'SuricataProcess',
+    'SuricataRRDManager',
     'SuricataBackendController',
     'SuricataFrontendController'
 ]

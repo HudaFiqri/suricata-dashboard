@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, jsonify
-from binary import SuricataFrontendController
+from flask import Flask, render_template, request, jsonify, send_file
+from binary import SuricataFrontendController, SuricataRRDManager
 from config import Config
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -11,6 +13,24 @@ controller = SuricataFrontendController(
     rules_directory=Config.SURICATA_RULES_DIR,
     log_directory=Config.SURICATA_LOG_DIR
 )
+
+# Initialize RRD Manager
+rrd_manager = SuricataRRDManager(
+    log_directory=Config.SURICATA_LOG_DIR
+)
+
+# Background thread to update RRD metrics
+def update_rrd_metrics():
+    while True:
+        try:
+            rrd_manager.update_metrics()
+        except Exception as e:
+            print(f"Error updating RRD metrics: {e}")
+        time.sleep(60)  # Update every minute
+
+# Start background thread
+rrd_thread = threading.Thread(target=update_rrd_metrics, daemon=True)
+rrd_thread.start()
 
 @app.route('/')
 def index():
@@ -70,6 +90,10 @@ def services():
     status = controller.get_status()
     return render_template('services.html', status=status)
 
+@app.route('/monitor')
+def monitor():
+    return render_template('monitor.html')
+
 @app.route('/api/config')
 def api_config():
     try:
@@ -92,6 +116,21 @@ def api_save_config():
         return jsonify({'success': True, 'message': 'Configuration saved successfully'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/monitor/data')
+def api_monitor_data():
+    metric = request.args.get('metric', 'ssh')
+    timespan = request.args.get('timespan', '1h')
+    result = rrd_manager.get_graph_data(metric, timespan)
+    return jsonify(result)
+
+@app.route('/api/monitor/graph/<metric>/<timespan>')
+def api_monitor_graph(metric, timespan):
+    result = rrd_manager.generate_graph(metric, timespan)
+    if result.get('success'):
+        return send_file(result['graph_path'], mimetype='image/png')
+    else:
+        return jsonify(result), 400
 
 if __name__ == '__main__':
     app.run(debug=Config.FLASK_DEBUG, host=Config.FLASK_HOST, port=Config.FLASK_PORT)

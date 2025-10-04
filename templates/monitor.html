@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-chart-line"></i> Alert Monitoring</h5>
+                <div>
+                    <select class="form-select form-select-sm d-inline-block w-auto me-2" id="metric-select">
+                        <option value="ssh">SSH Alerts</option>
+                        <option value="http">HTTP Alerts</option>
+                        <option value="dns">DNS Alerts</option>
+                        <option value="total">Total Alerts</option>
+                    </select>
+                    <select class="form-select form-select-sm d-inline-block w-auto" id="timespan-select">
+                        <option value="1h">Last Hour</option>
+                        <option value="6h">Last 6 Hours</option>
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="alertChart" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-shield-alt fa-3x text-primary mb-2"></i>
+                <h3 id="ssh-count">-</h3>
+                <p class="text-muted">SSH Alerts</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-globe fa-3x text-success mb-2"></i>
+                <h3 id="http-count">-</h3>
+                <p class="text-muted">HTTP Alerts</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-network-wired fa-3x text-info mb-2"></i>
+                <h3 id="dns-count">-</h3>
+                <p class="text-muted">DNS Alerts</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-exclamation-triangle fa-3x text-warning mb-2"></i>
+                <h3 id="total-count">-</h3>
+                <p class="text-muted">Total Alerts</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+let alertChart = null;
+let currentMetric = 'ssh';
+let currentTimespan = '1h';
+
+function initChart() {
+    const ctx = document.getElementById('alertChart').getContext('2d');
+    alertChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Alerts',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'minute'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            }
+        }
+    });
+}
+
+function updateChart() {
+    const metric = $('#metric-select').val();
+    const timespan = $('#timespan-select').val();
+
+    $.get(`/api/monitor/data?metric=${metric}&timespan=${timespan}`, function(response) {
+        if (response.success && response.data) {
+            const labels = response.data.map(d => new Date(d.timestamp * 1000));
+            const values = response.data.map(d => d.value);
+
+            alertChart.data.labels = labels;
+            alertChart.data.datasets[0].data = values;
+            alertChart.data.datasets[0].label = `${metric.toUpperCase()} Alerts`;
+
+            // Update chart color based on metric
+            const colors = {
+                'ssh': { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' },
+                'http': { border: 'rgb(75, 192, 192)', bg: 'rgba(75, 192, 192, 0.2)' },
+                'dns': { border: 'rgb(153, 102, 255)', bg: 'rgba(153, 102, 255, 0.2)' },
+                'total': { border: 'rgb(255, 159, 64)', bg: 'rgba(255, 159, 64, 0.2)' }
+            };
+
+            const color = colors[metric] || colors['ssh'];
+            alertChart.data.datasets[0].borderColor = color.border;
+            alertChart.data.datasets[0].backgroundColor = color.bg;
+
+            alertChart.update();
+        }
+    });
+}
+
+function updateCounts() {
+    // Get latest counts for all metrics
+    const metrics = ['ssh', 'http', 'dns', 'total'];
+
+    metrics.forEach(metric => {
+        $.get(`/api/monitor/data?metric=${metric}&timespan=1h`, function(response) {
+            if (response.success && response.data && response.data.length > 0) {
+                // Get the last data point
+                const lastValue = response.data[response.data.length - 1].value;
+                $(`#${metric}-count`).text(Math.round(lastValue));
+            } else {
+                $(`#${metric}-count`).text('0');
+            }
+        });
+    });
+}
+
+// Initialize chart on page load
+$(document).ready(function() {
+    initChart();
+    updateChart();
+    updateCounts();
+
+    // Update chart when selectors change
+    $('#metric-select, #timespan-select').change(function() {
+        updateChart();
+    });
+
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        updateChart();
+        updateCounts();
+    }, 30000);
+});
+</script>
+{% endblock %}
