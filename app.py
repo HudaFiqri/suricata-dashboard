@@ -1,13 +1,11 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
-import os
-import json
-from binary import SuricataController
+from flask import Flask, render_template, request, jsonify
+from binary import SuricataFrontendController
 from config import Config
 
 app = Flask(__name__)
 
-# Initialize Suricata Controller with config
-controller = SuricataController(
+# Initialize Suricata Frontend Controller with config
+controller = SuricataFrontendController(
     binary_path=Config.SURICATA_BINARY_PATH,
     config_path=Config.SURICATA_CONFIG_PATH,
     rules_directory=Config.SURICATA_RULES_DIR,

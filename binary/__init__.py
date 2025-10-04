@@ -1,15 +1,16 @@
-from .suricata_controller import SuricataController
 from .suricata_config import SuricataConfig
 from .suricata_rule_manager import SuricataRuleManager
 from .suricata_log_manager import SuricataLogManager
 from .suricata_process import SuricataProcess
+from .controllers import SuricataBackendController, SuricataFrontendController
 
 __all__ = [
-    'SuricataController',
-    'SuricataConfig', 
+    'SuricataConfig',
     'SuricataRuleManager',
     'SuricataLogManager',
-    'SuricataProcess'
+    'SuricataProcess',
+    'SuricataBackendController',
+    'SuricataFrontendController'
 ]
 
 __version__ = '1.0.0'

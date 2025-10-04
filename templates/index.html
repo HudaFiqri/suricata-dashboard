@@ -22,18 +22,6 @@
                         <p><strong>Message:</strong> {{ status.message }}</p>
                     {% endif %}
                 </div>
-                <button class="btn btn-success" id="start-btn">
-                    <i class="fas fa-play"></i> Start
-                </button>
-                <button class="btn btn-danger" id="stop-btn">
-                    <i class="fas fa-stop"></i> Stop
-                </button>
-                <button class="btn btn-warning" id="restart-btn">
-                    <i class="fas fa-redo"></i> Restart
-                </button>
-                <button class="btn btn-info" id="reload-rules-btn">
-                    <i class="fas fa-sync"></i> Reload Rules
-                </button>
             </div>
         </div>
     </div>
@@ -122,30 +110,6 @@ function updateStatus() {
         $('#status-info').html(statusHtml);
     });
 }
-
-$('#start-btn').click(function() {
-    $.post('/api/start', function(data) {
-        showAlert(data.message, data.success);
-    });
-});
-
-$('#stop-btn').click(function() {
-    $.post('/api/stop', function(data) {
-        showAlert(data.message, data.success);
-    });
-});
-
-$('#restart-btn').click(function() {
-    $.post('/api/restart', function(data) {
-        showAlert(data.message, data.success);
-    });
-});
-
-$('#reload-rules-btn').click(function() {
-    $.post('/api/reload-rules', function(data) {
-        showAlert(data.message, data.success);
-    });
-});
 
 // Update status every 1 second
 setInterval(updateStatus, 1000);
