@@ -1,9 +1,17 @@
+# Core dependencies
 Flask==2.3.3
 psutil==5.9.5
 PyYAML==6.0.1
 Werkzeug==2.3.7
 python-dotenv==1.0.0
-rrdtool==0.1.16
+
+# Database dependencies
 SQLAlchemy==2.0.23
 PyMySQL==1.1.0
 psycopg2-binary==2.9.9
+
+# Optional: RRDtool (requires system librrd-dev)
+# Install with: apt-get install librrd-dev (Debian/Ubuntu)
+# or: yum install rrdtool-devel (RHEL/CentOS)
+# then: pip install rrdtool==0.1.16
+# If not installed, monitoring features will be disabled but app will still work
