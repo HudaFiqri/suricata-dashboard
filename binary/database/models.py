@@ -1,0 +1,97 @@
+from sqlalchemy import Column, Integer, String, DateTime, Text, Float, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
+
+Base = declarative_base()
+
+class Alert(Base):
+    """Model for Suricata alerts"""
+    __tablename__ = 'alerts'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    signature = Column(String(255), index=True)
+    signature_id = Column(Integer)
+    category = Column(String(100), index=True)
+    severity = Column(Integer)
+    protocol = Column(String(20), index=True)
+    src_ip = Column(String(45), index=True)
+    src_port = Column(Integer)
+    dest_ip = Column(String(45), index=True)
+    dest_port = Column(Integer)
+    payload = Column(Text, nullable=True)
+    metadata = Column(Text, nullable=True)  # JSON string for additional data
+
+    def __repr__(self):
+        return f"<Alert(id={self.id}, signature='{self.signature}', timestamp={self.timestamp})>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'signature': self.signature,
+            'signature_id': self.signature_id,
+            'category': self.category,
+            'severity': self.severity,
+            'protocol': self.protocol,
+            'src_ip': self.src_ip,
+            'src_port': self.src_port,
+            'dest_ip': self.dest_ip,
+            'dest_port': self.dest_port,
+            'payload': self.payload,
+            'metadata': self.metadata
+        }
+
+
+class Log(Base):
+    """Model for general Suricata logs"""
+    __tablename__ = 'logs'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    event_type = Column(String(50), index=True)
+    log_level = Column(String(20))
+    message = Column(Text)
+    source = Column(String(100))
+    metadata = Column(Text, nullable=True)  # JSON string
+
+    def __repr__(self):
+        return f"<Log(id={self.id}, event_type='{self.event_type}', timestamp={self.timestamp})>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'event_type': self.event_type,
+            'log_level': self.log_level,
+            'message': self.message,
+            'source': self.source,
+            'metadata': self.metadata
+        }
+
+
+class Statistics(Base):
+    """Model for Suricata statistics metrics"""
+    __tablename__ = 'statistics'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    metric_name = Column(String(100), index=True)
+    metric_value = Column(Float)
+    metric_type = Column(String(50))  # e.g., 'counter', 'gauge', 'rate'
+    category = Column(String(50), index=True)  # e.g., 'ssh', 'http', 'dns', 'total'
+    metadata = Column(Text, nullable=True)  # JSON string
+
+    def __repr__(self):
+        return f"<Statistics(id={self.id}, metric_name='{self.metric_name}', value={self.metric_value})>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'metric_name': self.metric_name,
+            'metric_value': self.metric_value,
+            'metric_type': self.metric_type,
+            'category': self.category,
+            'metadata': self.metadata
+        }

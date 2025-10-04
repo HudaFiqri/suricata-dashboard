@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, send_file
-from binary import SuricataFrontendController, SuricataRRDManager
+from binary import SuricataFrontendController, SuricataRRDManager, DatabaseManager
 from config import Config
 import threading
 import time
@@ -16,8 +16,32 @@ controller = SuricataFrontendController(
 
 # Initialize RRD Manager
 rrd_manager = SuricataRRDManager(
+    rrd_directory=Config.RRD_DIR,
     log_directory=Config.SURICATA_LOG_DIR
 )
+
+# Initialize Database Manager
+db_config = {}
+if Config.DB_TYPE == 'sqlite':
+    db_config = {'path': Config.DB_PATH}
+elif Config.DB_TYPE == 'mysql':
+    db_config = {
+        'host': Config.DB_HOST,
+        'port': Config.DB_PORT,
+        'user': Config.DB_USER,
+        'password': Config.DB_PASSWORD,
+        'database': Config.DB_NAME
+    }
+elif Config.DB_TYPE == 'postgresql':
+    db_config = {
+        'host': Config.DB_HOST,
+        'port': Config.DB_PORT,
+        'user': Config.DB_USER,
+        'password': Config.DB_PASSWORD,
+        'database': Config.DB_NAME
+    }
+
+db_manager = DatabaseManager(db_type=Config.DB_TYPE, db_config=db_config)
 
 # Background thread to update RRD metrics
 def update_rrd_metrics():
@@ -131,6 +155,22 @@ def api_monitor_graph(metric, timespan):
         return send_file(result['graph_path'], mimetype='image/png')
     else:
         return jsonify(result), 400
+
+@app.route('/api/database/info')
+def api_database_info():
+    return jsonify(db_manager.get_db_info())
+
+@app.route('/api/database/alerts')
+def api_database_alerts():
+    limit = request.args.get('limit', 100, type=int)
+    category = request.args.get('category', None)
+    alerts = db_manager.get_alerts(limit=limit, category=category)
+    return jsonify({'alerts': [alert.to_dict() for alert in alerts]})
+
+@app.route('/api/database/stats')
+def api_database_stats():
+    stats = db_manager.get_latest_stats()
+    return jsonify(stats)
 
 if __name__ == '__main__':
     app.run(debug=Config.FLASK_DEBUG, host=Config.FLASK_HOST, port=Config.FLASK_PORT)

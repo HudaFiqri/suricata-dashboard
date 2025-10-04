@@ -4,15 +4,31 @@ import subprocess
 from typing import Dict, Any, List
 import json
 
+try:
+    import rrdtool
+    HAS_RRDTOOL = True
+except ImportError:
+    HAS_RRDTOOL = False
+    print("WARNING: python-rrdtool not installed. Monitoring features will be disabled.")
+
 class SuricataRRDManager:
     """Manager for RRDtool-based metrics collection and graphing"""
 
     def __init__(self, rrd_directory: str = "/var/lib/suricata/rrd", log_directory: str = "/var/log/suricata"):
         self.rrd_directory = rrd_directory
         self.log_directory = log_directory
+        self.enabled = HAS_RRDTOOL
+
+        if not self.enabled:
+            return
 
         # Create RRD directory if not exists
-        os.makedirs(self.rrd_directory, exist_ok=True)
+        try:
+            os.makedirs(self.rrd_directory, exist_ok=True)
+        except Exception as e:
+            print(f"Error creating RRD directory: {e}")
+            self.enabled = False
+            return
 
         # RRD file paths
         self.ssh_rrd = os.path.join(self.rrd_directory, "ssh_alerts.rrd")
@@ -25,6 +41,9 @@ class SuricataRRDManager:
 
     def _init_rrd_databases(self):
         """Initialize RRD databases if they don't exist"""
+        if not self.enabled:
+            return
+
         rrd_files = {
             'ssh': self.ssh_rrd,
             'http': self.http_rrd,
@@ -37,10 +56,13 @@ class SuricataRRDManager:
                 self._create_rrd(rrd_file, name)
 
     def _create_rrd(self, rrd_file: str, name: str):
-        """Create a new RRD database"""
+        """Create a new RRD database using Python rrdtool"""
+        if not self.enabled:
+            return
+
         try:
-            cmd = [
-                'rrdtool', 'create', rrd_file,
+            rrdtool.create(
+                rrd_file,
                 '--step', '60',  # 1 minute intervals
                 'DS:alerts:GAUGE:120:0:U',  # Data source: alerts count
                 'RRA:AVERAGE:0.5:1:1440',   # 1 min avg for 24 hours
@@ -49,16 +71,16 @@ class SuricataRRDManager:
                 'RRA:MAX:0.5:1:1440',       # 1 min max for 24 hours
                 'RRA:MAX:0.5:5:2016',       # 5 min max for 7 days
                 'RRA:MAX:0.5:60:744'        # 1 hour max for 31 days
-            ]
-            subprocess.run(cmd, check=True, capture_output=True)
+            )
             print(f"Created RRD database: {rrd_file}")
-        except subprocess.CalledProcessError as e:
-            print(f"Error creating RRD {rrd_file}: {e.stderr.decode()}")
         except Exception as e:
             print(f"Error creating RRD {rrd_file}: {e}")
 
     def update_metrics(self):
         """Update RRD databases with current metrics from logs"""
+        if not self.enabled:
+            return {'success': False, 'message': 'RRDtool not available'}
+
         try:
             # Count alerts from eve.json
             eve_log = os.path.join(self.log_directory, "eve.json")
@@ -103,10 +125,6 @@ class SuricataRRDManager:
                     if event.get('event_type') != 'alert':
                         continue
 
-                    # Check timestamp
-                    timestamp_str = event.get('timestamp', '')
-                    # Parse timestamp if needed (simplified here)
-
                     counts['total'] += 1
 
                     # Categorize by protocol/signature
@@ -129,17 +147,20 @@ class SuricataRRDManager:
         return counts
 
     def _update_rrd(self, rrd_file: str, timestamp: str, value: int):
-        """Update a single RRD database"""
+        """Update a single RRD database using Python rrdtool"""
+        if not self.enabled:
+            return
+
         try:
-            cmd = ['rrdtool', 'update', rrd_file, f'{timestamp}:{value}']
-            subprocess.run(cmd, check=True, capture_output=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Error updating RRD {rrd_file}: {e.stderr.decode()}")
+            rrdtool.update(rrd_file, f'{timestamp}:{value}')
         except Exception as e:
             print(f"Error updating RRD {rrd_file}: {e}")
 
     def generate_graph(self, metric: str = 'ssh', timespan: str = '1h') -> Dict[str, Any]:
-        """Generate a graph for a specific metric"""
+        """Generate a graph for a specific metric using Python rrdtool"""
+        if not self.enabled:
+            return {'success': False, 'message': 'RRDtool not available'}
+
         rrd_files = {
             'ssh': self.ssh_rrd,
             'http': self.http_rrd,
@@ -156,19 +177,19 @@ class SuricataRRDManager:
         graph_file = os.path.join(self.rrd_directory, f'{metric}_{timespan}.png')
 
         try:
-            # Map timespan to rrdtool format
+            # Map timespan to seconds
             timespan_map = {
-                '1h': '3600',
-                '6h': '21600',
-                '24h': '86400',
-                '7d': '604800',
-                '30d': '2592000'
+                '1h': 3600,
+                '6h': 21600,
+                '24h': 86400,
+                '7d': 604800,
+                '30d': 2592000
             }
 
-            seconds = timespan_map.get(timespan, '3600')
+            seconds = timespan_map.get(timespan, 3600)
 
-            cmd = [
-                'rrdtool', 'graph', graph_file,
+            rrdtool.graph(
+                graph_file,
                 '--start', f'-{seconds}',
                 '--end', 'now',
                 '--width', '800',
@@ -180,19 +201,18 @@ class SuricataRRDManager:
                 'GPRINT:alerts:LAST:Current\\:%8.0lf',
                 'GPRINT:alerts:AVERAGE:Average\\:%8.0lf',
                 'GPRINT:alerts:MAX:Maximum\\:%8.0lf'
-            ]
-
-            subprocess.run(cmd, check=True, capture_output=True)
+            )
 
             return {'success': True, 'graph_path': graph_file}
 
-        except subprocess.CalledProcessError as e:
-            return {'success': False, 'message': f'Error generating graph: {e.stderr.decode()}'}
         except Exception as e:
-            return {'success': False, 'message': str(e)}
+            return {'success': False, 'message': f'Error generating graph: {e}'}
 
     def get_graph_data(self, metric: str = 'ssh', timespan: str = '1h') -> Dict[str, Any]:
-        """Get data points for graphing (alternative to RRD graph)"""
+        """Get data points for graphing using Python rrdtool"""
+        if not self.enabled:
+            return {'success': False, 'message': 'RRDtool not available'}
+
         rrd_files = {
             'ssh': self.ssh_rrd,
             'http': self.http_rrd,
@@ -207,42 +227,38 @@ class SuricataRRDManager:
 
         try:
             timespan_map = {
-                '1h': '3600',
-                '6h': '21600',
-                '24h': '86400',
-                '7d': '604800',
-                '30d': '2592000'
+                '1h': 3600,
+                '6h': 21600,
+                '24h': 86400,
+                '7d': 604800,
+                '30d': 2592000
             }
 
-            seconds = timespan_map.get(timespan, '3600')
+            seconds = timespan_map.get(timespan, 3600)
 
-            cmd = [
-                'rrdtool', 'fetch', rrd_file, 'AVERAGE',
+            # Fetch data from RRD
+            result = rrdtool.fetch(
+                rrd_file,
+                'AVERAGE',
                 '--start', f'-{seconds}',
                 '--end', 'now'
-            ]
+            )
 
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            # Parse result: (start, end, step), (data_source_names,), data_points
+            (start_time, end_time, step), ds_names, data_points = result
 
-            # Parse output
-            lines = result.stdout.strip().split('\n')
-            data_points = []
+            data = []
+            current_time = start_time
 
-            for line in lines[1:]:  # Skip header
-                parts = line.split()
-                if len(parts) >= 2:
-                    timestamp = int(parts[0].rstrip(':'))
-                    value = parts[1]
+            for point in data_points:
+                if point[0] is not None:  # Skip None values
+                    data.append({
+                        'timestamp': int(current_time),
+                        'value': float(point[0])
+                    })
+                current_time += step
 
-                    if value != 'nan':
-                        data_points.append({
-                            'timestamp': timestamp,
-                            'value': float(value)
-                        })
+            return {'success': True, 'data': data}
 
-            return {'success': True, 'data': data_points}
-
-        except subprocess.CalledProcessError as e:
-            return {'success': False, 'message': f'Error fetching data: {e.stderr.decode()}'}
         except Exception as e:
-            return {'success': False, 'message': str(e)}
+            return {'success': False, 'message': f'Error fetching data: {e}'}

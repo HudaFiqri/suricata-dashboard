@@ -9,12 +9,24 @@ class Config:
     SURICATA_CONFIG_PATH = os.getenv('SURICATA_CONFIG_PATH', '/etc/suricata/suricata.yaml')
     SURICATA_RULES_DIR = os.getenv('SURICATA_RULES_DIR', '/etc/suricata/rules')
     SURICATA_LOG_DIR = os.getenv('SURICATA_LOG_DIR', '/var/log/suricata')
-    
+
+    # RRD settings
+    RRD_DIR = os.getenv('RRD_DIR', '/var/lib/suricata/rrd')
+
+    # Database settings
+    DB_TYPE = os.getenv('DB_TYPE', 'sqlite')  # sqlite, mysql, postgresql
+    DB_HOST = os.getenv('DB_HOST', 'localhost')
+    DB_PORT = int(os.getenv('DB_PORT', 3306))  # MySQL default
+    DB_USER = os.getenv('DB_USER', 'root')
+    DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+    DB_NAME = os.getenv('DB_NAME', 'suricata')
+    DB_PATH = os.getenv('DB_PATH', 'suricata.db')  # For SQLite
+
     # Flask settings
     FLASK_HOST = os.getenv('FLASK_HOST', '0.0.0.0')
     FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
     FLASK_DEBUG = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
-    
+
     # Dashboard settings
     AUTO_REFRESH_INTERVAL = int(os.getenv('AUTO_REFRESH_INTERVAL', 5000))
     LOG_LINES_LIMIT = int(os.getenv('LOG_LINES_LIMIT', 100))
