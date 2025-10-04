@@ -10,26 +10,88 @@
         .status-running { color: #28a745; }
         .status-stopped { color: #dc3545; }
         .status-error { color: #ffc107; }
-        .log-container { 
-            background: #1e1e1e; 
-            color: #fff; 
-            font-family: monospace; 
-            height: 400px; 
-            overflow-y: auto; 
+        .log-container {
+            background: #1e1e1e;
+            color: #fff;
+            font-family: monospace;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .hamburger {
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 10px;
+            color: white;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -250px;
+            width: 250px;
+            height: 100%;
+            background: #212529;
+            transition: left 0.3s ease;
+            z-index: 1050;
+            padding-top: 60px;
+        }
+        .sidebar.active {
+            left: 0;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,.8);
+            padding: 15px 20px;
+            display: block;
+            text-decoration: none;
+        }
+        .sidebar .nav-link:hover {
+            background: #343a40;
+            color: white;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            z-index: 1040;
+        }
+        .overlay.active {
+            display: block;
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="fas fa-shield-alt"></i> Suricata Dashboard
-            </a>
-            <div class="navbar-nav">
-                <a class="nav-link" href="{{ url_for('index') }}">Dashboard</a>
-                <a class="nav-link" href="{{ url_for('logs') }}">Logs</a>
-                <a class="nav-link" href="{{ url_for('rules') }}">Rules</a>
-                <a class="nav-link" href="{{ url_for('config') }}">Config</a>
+    <!-- Overlay -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <a class="nav-link" href="{{ url_for('index') }}">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </a>
+        <a class="nav-link" href="{{ url_for('logs') }}">
+            <i class="fas fa-file-alt"></i> Logs
+        </a>
+        <a class="nav-link" href="{{ url_for('rules') }}">
+            <i class="fas fa-list"></i> Rules
+        </a>
+        <a class="nav-link" href="{{ url_for('config') }}">
+            <i class="fas fa-cog"></i> Config
+        </a>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center">
+                <span class="hamburger" id="hamburger">
+                    <i class="fas fa-bars"></i>
+                </span>
+                <a class="navbar-brand ms-2" href="{{ url_for('index') }}">
+                    <i class="fas fa-shield-alt"></i> Suricata Dashboard
+                </a>
             </div>
         </div>
     </nav>
@@ -40,6 +102,21 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        const hamburger = document.getElementById('hamburger');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+
+        hamburger.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        });
+
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
