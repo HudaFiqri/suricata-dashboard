@@ -477,27 +477,46 @@ def api_monitor_data():
         icmp_count = 0
         alert_count = 0
         flow_count = 0
+        total_events = 0
 
         with open(eve_log_path, 'r') as f:
             for line in f:
+                if not line.strip():
+                    continue
+
                 try:
                     event = json.loads(line.strip())
+                    total_events += 1
 
-                    # Parse timestamp
+                    # Parse timestamp with timezone awareness
                     timestamp_str = event.get('timestamp', '')
+                    skip_event = False
+
                     if timestamp_str:
                         try:
-                            # Handle different timestamp formats
-                            if 'Z' in timestamp_str or '+' in timestamp_str:
+                            # Parse timestamp with timezone
+                            if 'Z' in timestamp_str:
                                 event_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                            elif '+' in timestamp_str:
+                                event_time = datetime.fromisoformat(timestamp_str)
                             else:
                                 event_time = datetime.strptime(timestamp_str, '%Y-%m-%dT%H:%M:%S.%f')
+                                # Make it timezone aware (UTC)
+                                from datetime import timezone
+                                event_time = event_time.replace(tzinfo=timezone.utc)
 
-                            if event_time < cutoff_time:
-                                continue
+                            # Compare with cutoff time (make cutoff timezone aware)
+                            from datetime import timezone
+                            cutoff_aware = cutoff_time.replace(tzinfo=timezone.utc)
+
+                            if event_time < cutoff_aware:
+                                skip_event = True
                         except (ValueError, AttributeError):
-                            # If can't parse timestamp, include the event anyway
+                            # If can't parse timestamp, include the event
                             pass
+
+                    if skip_event:
+                        continue
 
                     event_type = event.get('event_type', '')
                     proto = event.get('proto', '').upper()
@@ -516,7 +535,7 @@ def api_monitor_data():
                     if event_type == 'alert':
                         alert_count += 1
 
-                except (json.JSONDecodeError, ValueError, KeyError):
+                except (json.JSONDecodeError, ValueError, KeyError) as e:
                     continue
 
         return jsonify({
@@ -526,6 +545,7 @@ def api_monitor_data():
             'icmp_traffic': icmp_count,
             'total_alerts': alert_count,
             'total_flows': flow_count,
+            'total_events': total_events,
             'timespan': timespan,
             'path': eve_log_path
         })
@@ -663,6 +683,57 @@ def api_database_check():
             'connected': False,
             'message': f'Database check error: {str(e)}'
         })
+
+@app.route('/api/debug/eve')
+def api_debug_eve():
+    """Debug endpoint to check eve.json"""
+    import json
+
+    eve_log_path = f"{Config.SURICATA_LOG_DIR}/eve.json"
+
+    debug_info = {
+        'eve_path': eve_log_path,
+        'exists': os.path.exists(eve_log_path),
+        'readable': False,
+        'line_count': 0,
+        'sample_events': [],
+        'event_types': {},
+        'protocols': {}
+    }
+
+    try:
+        if os.path.exists(eve_log_path):
+            debug_info['readable'] = True
+
+            with open(eve_log_path, 'r') as f:
+                lines = f.readlines()
+                debug_info['line_count'] = len(lines)
+
+                # Get last 10 lines
+                for line in lines[-10:]:
+                    try:
+                        event = json.loads(line.strip())
+                        event_type = event.get('event_type', 'unknown')
+                        proto = event.get('proto', 'none')
+
+                        # Count event types
+                        debug_info['event_types'][event_type] = debug_info['event_types'].get(event_type, 0) + 1
+
+                        # Count protocols
+                        if proto != 'none':
+                            debug_info['protocols'][proto] = debug_info['protocols'].get(proto, 0) + 1
+
+                        debug_info['sample_events'].append({
+                            'event_type': event_type,
+                            'proto': proto,
+                            'timestamp': event.get('timestamp', '')
+                        })
+                    except json.JSONDecodeError:
+                        continue
+    except Exception as e:
+        debug_info['error'] = str(e)
+
+    return jsonify(debug_info)
 
 if __name__ == '__main__':
     app.run(debug=Config.FLASK_DEBUG, host=Config.FLASK_HOST, port=Config.FLASK_PORT, use_debugger=False, use_reloader=True)
