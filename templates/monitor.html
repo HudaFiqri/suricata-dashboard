@@ -213,17 +213,62 @@ let allAlerts = [];
 
 function loadAlerts() {
     const category = $('#alert-category').val();
-    const limit = 50;
 
-    $.get(`/api/database/alerts?limit=${limit}${category ? '&category=' + category : ''}`, function(response) {
-        if (response.alerts && response.alerts.length > 0) {
-            allAlerts = response.alerts;
-            displayAlerts(allAlerts);
+    // Get alerts from eve.json logs
+    $.get('/api/logs', function(response) {
+        if (response.logs && response.logs.length > 0) {
+            // Parse logs to extract alert information
+            const parsedAlerts = [];
+
+            response.logs.forEach(function(log) {
+                // Parse ALERT logs
+                if (log.startsWith('[ALERT]')) {
+                    const alertMatch = log.match(/\[ALERT\]\s+(.+?)\s+-\s+(.+?)\s+\|\s+(.+?)\s+->\s+(.+?)\s+\[(\w+)\]\s+\(Severity:\s+(\d+)\)/);
+                    if (alertMatch) {
+                        const alert = {
+                            timestamp: alertMatch[1],
+                            signature: alertMatch[2],
+                            src_ip: alertMatch[3],
+                            dest_ip: alertMatch[4],
+                            protocol: alertMatch[5],
+                            severity: parseInt(alertMatch[6])
+                        };
+                        parsedAlerts.push(alert);
+                    }
+                }
+                // Parse FLOW logs with protocol filter
+                else if (log.startsWith('[FLOW]')) {
+                    const flowMatch = log.match(/\[FLOW\]\s+(.+?)\s+-\s+(.+?):(\d+)\s+->\s+(.+?):(\d+)\s+\[(\w+)\]/);
+                    if (flowMatch) {
+                        const protocol = flowMatch[6];
+
+                        // Apply category filter
+                        if (!category || category.toLowerCase() === protocol.toLowerCase()) {
+                            const alert = {
+                                timestamp: flowMatch[1],
+                                signature: 'Network Flow',
+                                src_ip: flowMatch[2],
+                                dest_ip: flowMatch[4],
+                                protocol: protocol,
+                                severity: 3
+                            };
+                            parsedAlerts.push(alert);
+                        }
+                    }
+                }
+            });
+
+            if (parsedAlerts.length > 0) {
+                allAlerts = parsedAlerts;
+                displayAlerts(allAlerts);
+            } else {
+                $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts found for selected filter</td></tr>');
+            }
         } else {
-            $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts in database. Alerts will appear here once Suricata detects threats.</td></tr>');
+            $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No logs available</td></tr>');
         }
-    }).fail(function(xhr, status, error) {
-        $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-warning">Database not configured or no alerts yet. Enable database in .env to store alerts.</td></tr>');
+    }).fail(function() {
+        $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-danger">Failed to load alerts</td></tr>');
     });
 }
 
@@ -236,14 +281,16 @@ function displayAlerts(alerts) {
     let html = '';
     alerts.forEach(alert => {
         const severityClass = alert.severity <= 1 ? 'text-danger' : alert.severity <= 2 ? 'text-warning' : 'text-info';
+        const timestamp = alert.timestamp.includes('T') ? alert.timestamp : new Date(alert.timestamp).toISOString();
+
         html += `
             <tr>
-                <td>${new Date(alert.timestamp).toLocaleString()}</td>
+                <td><small>${timestamp.replace('T', ' ').split('.')[0]}</small></td>
                 <td>${alert.signature || 'Unknown'}</td>
-                <td><span class="${severityClass}">${alert.severity || 'N/A'}</span></td>
-                <td>${alert.src_ip || 'N/A'}</td>
-                <td>${alert.dest_ip || 'N/A'}</td>
-                <td>${alert.protocol || 'N/A'}</td>
+                <td><span class="badge bg-${severityClass === 'text-danger' ? 'danger' : severityClass === 'text-warning' ? 'warning' : 'info'}">${alert.severity || 'N/A'}</span></td>
+                <td><code>${alert.src_ip || 'N/A'}</code></td>
+                <td><code>${alert.dest_ip || 'N/A'}</code></td>
+                <td><span class="badge bg-secondary">${alert.protocol || 'N/A'}</span></td>
             </tr>
         `;
     });
