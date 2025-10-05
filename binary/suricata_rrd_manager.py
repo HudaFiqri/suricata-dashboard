@@ -145,25 +145,28 @@ class SuricataRRDManager:
                 timestamp = 'N'  # Use current time
 
                 # TCP Traffic
-                tcp_flows = stats.get('tcp_flows', 0)
-                tcp_packets = stats.get('tcp_packets', 0)
-                tcp_bytes = stats.get('tcp_bytes', 0)
+                tcp_data = stats.get('tcp', {})
+                tcp_flows = tcp_data.get('flow_count', 0)
+                tcp_packets = tcp_data.get('packet_count', 0)
+                tcp_bytes = tcp_data.get('byte_count', 0)
                 self._update_traffic_rrd(self.tcp_rrd, timestamp, tcp_flows, tcp_packets, tcp_bytes)
 
                 # UDP Traffic
-                udp_flows = stats.get('udp_flows', 0)
-                udp_packets = stats.get('udp_packets', 0)
-                udp_bytes = stats.get('udp_bytes', 0)
+                udp_data = stats.get('udp', {})
+                udp_flows = udp_data.get('flow_count', 0)
+                udp_packets = udp_data.get('packet_count', 0)
+                udp_bytes = udp_data.get('byte_count', 0)
                 self._update_traffic_rrd(self.udp_rrd, timestamp, udp_flows, udp_packets, udp_bytes)
 
                 # ICMP Traffic
-                icmp_flows = stats.get('icmp_flows', 0)
-                icmp_packets = stats.get('icmp_packets', 0)
-                icmp_bytes = stats.get('icmp_bytes', 0)
+                icmp_data = stats.get('icmp', {})
+                icmp_flows = icmp_data.get('flow_count', 0)
+                icmp_packets = icmp_data.get('packet_count', 0)
+                icmp_bytes = icmp_data.get('byte_count', 0)
                 self._update_traffic_rrd(self.icmp_rrd, timestamp, icmp_flows, icmp_packets, icmp_bytes)
 
-                # Total Alerts
-                total_alerts = stats.get('total_alerts', 0)
+                # Total Alerts (sum from all protocols)
+                total_alerts = tcp_data.get('alert_count', 0) + udp_data.get('alert_count', 0) + icmp_data.get('alert_count', 0)
                 self._update_rrd(self.alerts_rrd, timestamp, total_alerts)
 
                 return {
