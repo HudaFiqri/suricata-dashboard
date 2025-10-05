@@ -5,27 +5,6 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h5><i class="fas fa-server"></i> Service Status</h5>
-            </div>
-            <div class="card-body">
-                <div id="status-info">
-                    {% if status.status == 'running' %}
-                        <p><strong>Status:</strong> <span class="status-running"><i class="fas fa-play-circle"></i> Running</span></p>
-                        <p><strong>PID:</strong> {{ status.pid }}</p>
-                    {% elif status.status == 'stopped' %}
-                        <p><strong>Status:</strong> <span class="status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span></p>
-                    {% else %}
-                        <p><strong>Status:</strong> <span class="status-error"><i class="fas fa-exclamation-circle"></i> Error</span></p>
-                        <p><strong>Message:</strong> {{ status.message }}</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
                 <h5><i class="fas fa-cogs"></i> Service Control</h5>
             </div>
             <div class="card-body">
@@ -39,6 +18,24 @@
                     <button class="btn btn-warning" id="restart-btn">
                         <i class="fas fa-redo"></i> Restart
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-database"></i> Database Management</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-danger" id="reset-counter-btn">
+                        <i class="fas fa-trash-restore"></i> Reset Traffic Counter
+                    </button>
+                    <p class="text-muted small mb-0 mt-2">
+                        <i class="fas fa-info-circle"></i> This will delete all traffic statistics from the database
+                    </p>
                 </div>
             </div>
         </div>
@@ -103,27 +100,6 @@
 function showAlert(message, isSuccess = true) {
     $('#modal-message').html('<div class="alert alert-' + (isSuccess ? 'success' : 'danger') + '">' + message + '</div>');
     $('#alertModal').modal('show');
-    setTimeout(() => updateStatus(), 1000);
-}
-
-function updateStatus() {
-    $.get('/api/status', function(data) {
-        let statusHtml = '';
-        if (data.status === 'running') {
-            statusHtml = `
-                <p><strong>Status:</strong> <span class="status-running"><i class="fas fa-play-circle"></i> Running</span></p>
-                <p><strong>PID:</strong> ${data.pid}</p>
-            `;
-        } else if (data.status === 'stopped') {
-            statusHtml = '<p><strong>Status:</strong> <span class="status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span></p>';
-        } else {
-            statusHtml = `
-                <p><strong>Status:</strong> <span class="status-error"><i class="fas fa-exclamation-circle"></i> Error</span></p>
-                <p><strong>Message:</strong> ${data.message}</p>
-            `;
-        }
-        $('#status-info').html(statusHtml);
-    });
 }
 
 $('#start-btn').click(function() {
@@ -156,7 +132,14 @@ $('#reload-rules-cold-btn').click(function() {
     });
 });
 
-// Update status every 1 second
-setInterval(updateStatus, 1000);
+$('#reset-counter-btn').click(function() {
+    if (confirm('Are you sure you want to reset all traffic counters? This will delete all traffic statistics from the database.')) {
+        $.post('/api/database/reset-counter', function(data) {
+            showAlert(data.message, data.success);
+        }).fail(function() {
+            showAlert('Failed to reset counter', false);
+        });
+    }
+});
 </script>
 {% endblock %}

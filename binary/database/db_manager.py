@@ -415,3 +415,19 @@ class DatabaseManager:
             return {}
         finally:
             session.close()
+
+    def reset_traffic_stats(self) -> int:
+        """Reset all traffic statistics - delete all records"""
+        session = self.get_session()
+        try:
+            count = session.query(TrafficStats).count()
+            session.query(TrafficStats).delete()
+            session.commit()
+            print(f"[DB] Reset traffic stats: {count} records deleted")
+            return count
+        except Exception as e:
+            session.rollback()
+            print(f"Error resetting traffic stats: {e}")
+            raise
+        finally:
+            session.close()

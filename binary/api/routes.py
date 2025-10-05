@@ -46,6 +46,7 @@ class APIRoutes:
         self.app.add_url_rule('/api/database/check', 'api_database_check', self.check_database)
         self.app.add_url_rule('/api/database/traffic/latest', 'api_traffic_latest', self.get_latest_traffic)
         self.app.add_url_rule('/api/database/traffic/recent', 'api_traffic_recent', self.get_recent_traffic)
+        self.app.add_url_rule('/api/database/reset-counter', 'api_reset_counter', self.reset_counter, methods=['POST'])
 
         # Debug APIs
         self.app.add_url_rule('/api/debug/eve', 'api_debug_eve', self.debug_eve)
@@ -241,6 +242,10 @@ class APIRoutes:
                 'success': False,
                 'error': str(e)
             })
+
+    def reset_counter(self):
+        """Reset traffic counter"""
+        return jsonify(self.database_api.reset_counter())
 
     # ==================== Debug ====================
     def debug_eve(self):

@@ -41,3 +41,17 @@ class DatabaseAPI:
     def get_stats(self):
         """Get latest statistics from database"""
         return self.db_manager.get_latest_stats()
+
+    def reset_counter(self):
+        """Reset traffic counter - delete all traffic statistics"""
+        try:
+            result = self.db_manager.reset_traffic_stats()
+            return {
+                'success': True,
+                'message': f'Successfully reset traffic counter. Deleted {result} records.'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Failed to reset counter: {str(e)}'
+            }
