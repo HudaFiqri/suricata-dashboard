@@ -44,6 +44,8 @@ class APIRoutes:
         self.app.add_url_rule('/api/database/alerts', 'api_database_alerts', self.get_database_alerts)
         self.app.add_url_rule('/api/database/stats', 'api_database_stats', self.get_database_stats)
         self.app.add_url_rule('/api/database/check', 'api_database_check', self.check_database)
+        self.app.add_url_rule('/api/database/traffic/latest', 'api_traffic_latest', self.get_latest_traffic)
+        self.app.add_url_rule('/api/database/traffic/recent', 'api_traffic_recent', self.get_recent_traffic)
 
         # Debug APIs
         self.app.add_url_rule('/api/debug/eve', 'api_debug_eve', self.debug_eve)
@@ -196,6 +198,49 @@ class APIRoutes:
     def check_database(self):
         """Check database connection status"""
         return jsonify(self.database_api.check_connection())
+
+    def get_latest_traffic(self):
+        """Get latest traffic statistics from database"""
+        try:
+            # Access db_manager through database_api
+            stats = self.database_api.db_manager.get_latest_traffic_stats()
+            return jsonify({
+                'success': True,
+                'stats': stats
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            })
+
+    def get_recent_traffic(self):
+        """Get recent traffic statistics from database"""
+        try:
+            from datetime import datetime, timedelta
+
+            limit = request.args.get('limit', 20, type=int)
+            protocol = request.args.get('protocol', None)
+            hours = request.args.get('hours', 24, type=int)
+
+            start_time = datetime.utcnow() - timedelta(hours=hours)
+
+            # Access db_manager through database_api
+            stats = self.database_api.db_manager.get_traffic_stats(
+                protocol=protocol,
+                start_time=start_time,
+                limit=limit
+            )
+
+            return jsonify({
+                'success': True,
+                'stats': [stat.to_dict() for stat in stats]
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            })
 
     # ==================== Debug ====================
     def debug_eve(self):

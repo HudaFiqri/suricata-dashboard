@@ -22,6 +22,7 @@ class WebRoutes:
         self.app.add_url_rule('/config', 'config', self.config_page)
         self.app.add_url_rule('/services', 'services', self.services)
         self.app.add_url_rule('/monitor', 'monitor', self.monitor)
+        self.app.add_url_rule('/rrd', 'rrd', self.rrd_graphs)
 
     def _register_context_processor(self):
         """Register template context processor for global variables"""
@@ -56,3 +57,7 @@ class WebRoutes:
     def monitor(self):
         """Monitor page"""
         return render_template('monitor.html')
+
+    def rrd_graphs(self):
+        """RRD Graphs page"""
+        return render_template('rrd.html')
