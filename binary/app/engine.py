@@ -44,17 +44,18 @@ class AppEngine:
             log_directory=self.config.SURICATA_LOG_DIR
         )
 
-        # RRD Manager
-        self.rrd_manager = SuricataRRDManager(
-            rrd_directory=self.config.RRD_DIR,
-            log_directory=self.config.SURICATA_LOG_DIR
-        )
-
         # Database Manager
         db_config = self._get_db_config()
         self.db_manager = DatabaseManager(
             db_type=self.config.DB_TYPE,
             db_config=db_config
+        )
+
+        # RRD Manager (with database integration)
+        self.rrd_manager = SuricataRRDManager(
+            rrd_directory=self.config.RRD_DIR,
+            log_directory=self.config.SURICATA_LOG_DIR,
+            db_manager=self.db_manager
         )
 
     def _get_db_config(self):

@@ -14,9 +14,10 @@ except ImportError:
 class SuricataRRDManager:
     """Manager for RRDtool-based metrics collection and graphing"""
 
-    def __init__(self, rrd_directory: str = "/var/lib/suricata/rrd", log_directory: str = "/var/log/suricata"):
+    def __init__(self, rrd_directory: str = "/var/lib/suricata/rrd", log_directory: str = "/var/log/suricata", db_manager=None):
         self.rrd_directory = rrd_directory
         self.log_directory = log_directory
+        self.db_manager = db_manager
         self.enabled = HAS_RRDTOOL
 
         if not self.enabled:
@@ -30,11 +31,11 @@ class SuricataRRDManager:
             self.enabled = False
             return
 
-        # RRD file paths
-        self.ssh_rrd = os.path.join(self.rrd_directory, "ssh_alerts.rrd")
-        self.http_rrd = os.path.join(self.rrd_directory, "http_alerts.rrd")
-        self.dns_rrd = os.path.join(self.rrd_directory, "dns_alerts.rrd")
-        self.total_rrd = os.path.join(self.rrd_directory, "total_alerts.rrd")
+        # RRD file paths (protocol-based)
+        self.tcp_rrd = os.path.join(self.rrd_directory, "tcp_traffic.rrd")
+        self.udp_rrd = os.path.join(self.rrd_directory, "udp_traffic.rrd")
+        self.icmp_rrd = os.path.join(self.rrd_directory, "icmp_traffic.rrd")
+        self.alerts_rrd = os.path.join(self.rrd_directory, "alerts.rrd")
 
         # Initialize RRD databases
         self._init_rrd_databases()
@@ -45,10 +46,10 @@ class SuricataRRDManager:
             return
 
         rrd_files = {
-            'ssh': self.ssh_rrd,
-            'http': self.http_rrd,
-            'dns': self.dns_rrd,
-            'total': self.total_rrd
+            'tcp': self.tcp_rrd,
+            'udp': self.udp_rrd,
+            'icmp': self.icmp_rrd,
+            'alerts': self.alerts_rrd
         }
 
         for name, rrd_file in rrd_files.items():
@@ -61,45 +62,87 @@ class SuricataRRDManager:
             return
 
         try:
-            rrdtool.create(
-                rrd_file,
-                '--step', '60',  # 1 minute intervals
-                'DS:alerts:GAUGE:120:0:U',  # Data source: alerts count
-                'RRA:AVERAGE:0.5:1:1440',   # 1 min avg for 24 hours
-                'RRA:AVERAGE:0.5:5:2016',   # 5 min avg for 7 days
-                'RRA:AVERAGE:0.5:60:744',   # 1 hour avg for 31 days
-                'RRA:MAX:0.5:1:1440',       # 1 min max for 24 hours
-                'RRA:MAX:0.5:5:2016',       # 5 min max for 7 days
-                'RRA:MAX:0.5:60:744'        # 1 hour max for 31 days
-            )
+            if name == 'alerts':
+                # Alerts RRD: only count
+                rrdtool.create(
+                    rrd_file,
+                    '--step', '60',  # 1 minute intervals
+                    'DS:alerts:GAUGE:120:0:U',  # Data source: alerts count
+                    'RRA:AVERAGE:0.5:1:1440',   # 1 min avg for 24 hours
+                    'RRA:AVERAGE:0.5:5:2016',   # 5 min avg for 7 days
+                    'RRA:AVERAGE:0.5:60:744',   # 1 hour avg for 31 days
+                    'RRA:MAX:0.5:1:1440',       # 1 min max for 24 hours
+                    'RRA:MAX:0.5:5:2016',       # 5 min max for 7 days
+                    'RRA:MAX:0.5:60:744'        # 1 hour max for 31 days
+                )
+            else:
+                # Traffic RRD: flows, packets, bytes
+                rrdtool.create(
+                    rrd_file,
+                    '--step', '60',  # 1 minute intervals
+                    'DS:flows:GAUGE:120:0:U',    # Flow count
+                    'DS:packets:GAUGE:120:0:U',  # Packet count
+                    'DS:bytes:GAUGE:120:0:U',    # Byte count
+                    'RRA:AVERAGE:0.5:1:1440',    # 1 min avg for 24 hours
+                    'RRA:AVERAGE:0.5:5:2016',    # 5 min avg for 7 days
+                    'RRA:AVERAGE:0.5:60:744',    # 1 hour avg for 31 days
+                    'RRA:MAX:0.5:1:1440',        # 1 min max for 24 hours
+                    'RRA:MAX:0.5:5:2016',        # 5 min max for 7 days
+                    'RRA:MAX:0.5:60:744'         # 1 hour max for 31 days
+                )
             print(f"Created RRD database: {rrd_file}")
         except Exception as e:
             print(f"Error creating RRD {rrd_file}: {e}")
 
     def update_metrics(self):
-        """Update RRD databases with current metrics from logs"""
+        """Update RRD databases with current metrics from database"""
         if not self.enabled:
             return {'success': False, 'message': 'RRDtool not available'}
 
         try:
-            # Count alerts from eve.json
-            eve_log = os.path.join(self.log_directory, "eve.json")
+            # Get traffic stats from database
+            if self.db_manager:
+                stats = self.db_manager.get_latest_traffic_stats()
 
-            if not os.path.exists(eve_log):
-                return {'success': False, 'message': 'Eve log not found'}
+                if not stats:
+                    return {'success': False, 'message': 'No stats available'}
 
-            # Count alerts by type (last 60 seconds worth)
-            counts = self._count_recent_alerts(eve_log)
+                # Update RRD databases with protocol-specific data
+                timestamp = 'N'  # Use current time
 
-            # Update RRD databases
-            timestamp = 'N'  # Use current time
+                # TCP Traffic
+                tcp_flows = stats.get('tcp_flows', 0)
+                tcp_packets = stats.get('tcp_packets', 0)
+                tcp_bytes = stats.get('tcp_bytes', 0)
+                self._update_traffic_rrd(self.tcp_rrd, timestamp, tcp_flows, tcp_packets, tcp_bytes)
 
-            self._update_rrd(self.ssh_rrd, timestamp, counts.get('ssh', 0))
-            self._update_rrd(self.http_rrd, timestamp, counts.get('http', 0))
-            self._update_rrd(self.dns_rrd, timestamp, counts.get('dns', 0))
-            self._update_rrd(self.total_rrd, timestamp, counts.get('total', 0))
+                # UDP Traffic
+                udp_flows = stats.get('udp_flows', 0)
+                udp_packets = stats.get('udp_packets', 0)
+                udp_bytes = stats.get('udp_bytes', 0)
+                self._update_traffic_rrd(self.udp_rrd, timestamp, udp_flows, udp_packets, udp_bytes)
 
-            return {'success': True, 'counts': counts}
+                # ICMP Traffic
+                icmp_flows = stats.get('icmp_flows', 0)
+                icmp_packets = stats.get('icmp_packets', 0)
+                icmp_bytes = stats.get('icmp_bytes', 0)
+                self._update_traffic_rrd(self.icmp_rrd, timestamp, icmp_flows, icmp_packets, icmp_bytes)
+
+                # Total Alerts
+                total_alerts = stats.get('total_alerts', 0)
+                self._update_rrd(self.alerts_rrd, timestamp, total_alerts)
+
+                return {
+                    'success': True,
+                    'stats': {
+                        'tcp': {'flows': tcp_flows, 'packets': tcp_packets, 'bytes': tcp_bytes},
+                        'udp': {'flows': udp_flows, 'packets': udp_packets, 'bytes': udp_bytes},
+                        'icmp': {'flows': icmp_flows, 'packets': icmp_packets, 'bytes': icmp_bytes},
+                        'alerts': total_alerts
+                    }
+                }
+            else:
+                return {'success': False, 'message': 'No database manager configured'}
 
         except Exception as e:
             return {'success': False, 'message': str(e)}
@@ -147,7 +190,7 @@ class SuricataRRDManager:
         return counts
 
     def _update_rrd(self, rrd_file: str, timestamp: str, value: int):
-        """Update a single RRD database using Python rrdtool"""
+        """Update a single RRD database (for alerts) using Python rrdtool"""
         if not self.enabled:
             return
 
@@ -156,19 +199,29 @@ class SuricataRRDManager:
         except Exception as e:
             print(f"Error updating RRD {rrd_file}: {e}")
 
-    def generate_graph(self, metric: str = 'ssh', timespan: str = '1h') -> Dict[str, Any]:
+    def _update_traffic_rrd(self, rrd_file: str, timestamp: str, flows: int, packets: int, bytes_count: int):
+        """Update a traffic RRD database using Python rrdtool"""
+        if not self.enabled:
+            return
+
+        try:
+            rrdtool.update(rrd_file, f'{timestamp}:{flows}:{packets}:{bytes_count}')
+        except Exception as e:
+            print(f"Error updating traffic RRD {rrd_file}: {e}")
+
+    def generate_graph(self, metric: str = 'tcp', timespan: str = '1h') -> Dict[str, Any]:
         """Generate a graph for a specific metric using Python rrdtool"""
         if not self.enabled:
             return {'success': False, 'message': 'RRDtool not available'}
 
         rrd_files = {
-            'ssh': self.ssh_rrd,
-            'http': self.http_rrd,
-            'dns': self.dns_rrd,
-            'total': self.total_rrd
+            'tcp': self.tcp_rrd,
+            'udp': self.udp_rrd,
+            'icmp': self.icmp_rrd,
+            'alerts': self.alerts_rrd
         }
 
-        rrd_file = rrd_files.get(metric, self.ssh_rrd)
+        rrd_file = rrd_files.get(metric, self.tcp_rrd)
 
         if not os.path.exists(rrd_file):
             return {'success': False, 'message': 'RRD file not found'}
@@ -188,39 +241,67 @@ class SuricataRRDManager:
 
             seconds = timespan_map.get(timespan, 3600)
 
-            rrdtool.graph(
-                graph_file,
-                '--start', f'-{seconds}',
-                '--end', 'now',
-                '--width', '800',
-                '--height', '300',
-                '--title', f'{metric.upper()} Alerts - Last {timespan}',
-                '--vertical-label', 'Alerts/min',
-                f'DEF:alerts={rrd_file}:alerts:AVERAGE',
-                'LINE2:alerts#0000FF:Alerts',
-                'GPRINT:alerts:LAST:Current\\:%8.0lf',
-                'GPRINT:alerts:AVERAGE:Average\\:%8.0lf',
-                'GPRINT:alerts:MAX:Maximum\\:%8.0lf'
-            )
+            if metric == 'alerts':
+                # Alerts graph
+                rrdtool.graph(
+                    graph_file,
+                    '--start', f'-{seconds}',
+                    '--end', 'now',
+                    '--width', '800',
+                    '--height', '300',
+                    '--title', f'{metric.upper()} - Last {timespan}',
+                    '--vertical-label', 'Alerts/min',
+                    f'DEF:alerts={rrd_file}:alerts:AVERAGE',
+                    'LINE2:alerts#FF0000:Alerts',
+                    'GPRINT:alerts:LAST:Current\\:%8.0lf',
+                    'GPRINT:alerts:AVERAGE:Average\\:%8.0lf',
+                    'GPRINT:alerts:MAX:Maximum\\:%8.0lf'
+                )
+            else:
+                # Traffic graph (flows, packets, bytes)
+                rrdtool.graph(
+                    graph_file,
+                    '--start', f'-{seconds}',
+                    '--end', 'now',
+                    '--width', '800',
+                    '--height', '300',
+                    '--title', f'{metric.upper()} Traffic - Last {timespan}',
+                    '--vertical-label', 'Count',
+                    f'DEF:flows={rrd_file}:flows:AVERAGE',
+                    f'DEF:packets={rrd_file}:packets:AVERAGE',
+                    f'DEF:bytes={rrd_file}:bytes:AVERAGE',
+                    'LINE2:flows#0000FF:Flows',
+                    'GPRINT:flows:LAST:Current\\:%8.0lf',
+                    'GPRINT:flows:AVERAGE:Average\\:%8.0lf',
+                    'GPRINT:flows:MAX:Maximum\\:%8.0lf\\n',
+                    'LINE2:packets#00FF00:Packets',
+                    'GPRINT:packets:LAST:Current\\:%8.0lf',
+                    'GPRINT:packets:AVERAGE:Average\\:%8.0lf',
+                    'GPRINT:packets:MAX:Maximum\\:%8.0lf\\n',
+                    'LINE2:bytes#FF00FF:Bytes',
+                    'GPRINT:bytes:LAST:Current\\:%8.0lf',
+                    'GPRINT:bytes:AVERAGE:Average\\:%8.0lf',
+                    'GPRINT:bytes:MAX:Maximum\\:%8.0lf'
+                )
 
             return {'success': True, 'graph_path': graph_file}
 
         except Exception as e:
             return {'success': False, 'message': f'Error generating graph: {e}'}
 
-    def get_graph_data(self, metric: str = 'ssh', timespan: str = '1h') -> Dict[str, Any]:
+    def get_graph_data(self, metric: str = 'tcp', timespan: str = '1h') -> Dict[str, Any]:
         """Get data points for graphing using Python rrdtool"""
         if not self.enabled:
             return {'success': False, 'message': 'RRDtool not available'}
 
         rrd_files = {
-            'ssh': self.ssh_rrd,
-            'http': self.http_rrd,
-            'dns': self.dns_rrd,
-            'total': self.total_rrd
+            'tcp': self.tcp_rrd,
+            'udp': self.udp_rrd,
+            'icmp': self.icmp_rrd,
+            'alerts': self.alerts_rrd
         }
 
-        rrd_file = rrd_files.get(metric, self.ssh_rrd)
+        rrd_file = rrd_files.get(metric, self.tcp_rrd)
 
         if not os.path.exists(rrd_file):
             return {'success': False, 'message': 'RRD file not found'}
