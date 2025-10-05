@@ -92,6 +92,12 @@ class Config:
     DB_PASSWORD = _get_env('DB_PASSWORD', 'DATABASE_PASSWORD', default='')
     DB_NAME = _get_env('DB_NAME', 'DATABASE_NAME', default='suricata')
 
+    _retention_raw = _get_env('DB_RETENTION_DAYS', default='30')
+    try:
+        DB_RETENTION_DAYS = max(int(_retention_raw), 0)
+    except ValueError:
+        DB_RETENTION_DAYS = 30
+
     # Application storage paths
     APP_DATA_DIR = _get_env('APP_DATA_DIR', default='/opt/suricata_monitoring/data')
     APP_LOG_DIR = _get_env('APP_LOG_DIR', default='/opt/suricata_monitoring/log')

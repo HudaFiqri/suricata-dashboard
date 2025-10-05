@@ -1,10 +1,12 @@
-from sqlalchemy import create_engine, func, text
+from sqlalchemy import func, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
 
 from .models import Base, Alert, Log, Statistics
+from .mysql import create_mysql_engine
+from .postgresql import create_postgresql_engine
 
 
 class DatabaseManager:
@@ -33,45 +35,22 @@ class DatabaseManager:
         self.Session = scoped_session(sessionmaker(bind=self.engine))
         self._create_tables()
 
+    ENGINE_FACTORIES = {
+        'mysql': create_mysql_engine,
+        'postgresql': create_postgresql_engine,
+    }
+
     def _initialize_database(self):
         """Create an engine for the configured SQL backend."""
-        self.db_url = self._create_db_url()
+        factory = self.ENGINE_FACTORIES.get(self.db_type)
+        if not factory:
+            raise ValueError(f"Unsupported database type: {self.db_type}")
 
         try:
-            self.engine = create_engine(
-                self.db_url,
-                pool_pre_ping=True,
-                pool_recycle=3600,
-                echo=False,
-            )
-
-            with self.engine.connect() as conn:
-                conn.execute(text('SELECT 1'))
-
+            self.db_url, self.engine = factory(self.db_config)
             print(f"[OK] Database connected: {self.db_type.upper()}")
-
         except Exception as exc:
             raise RuntimeError(f"Failed to connect to {self.db_type.upper()}: {exc}") from exc
-
-    def _create_db_url(self) -> str:
-        """Create database URL based on type and config"""
-        if self.db_type == 'mysql':
-            host = self.db_config.get('host', 'localhost')
-            port = self.db_config.get('port', 3306)
-            user = self.db_config.get('user', 'root')
-            password = self.db_config.get('password', '')
-            database = self.db_config.get('database', 'suricata')
-            return f'mysql+pymysql://{user}:{password}@{host}:{port}/{database}?charset=utf8mb4'
-
-        if self.db_type == 'postgresql':
-            host = self.db_config.get('host', 'localhost')
-            port = self.db_config.get('port', 5432)
-            user = self.db_config.get('user', 'postgres')
-            password = self.db_config.get('password', '')
-            database = self.db_config.get('database', 'suricata')
-            return f'postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}'
-
-        raise ValueError(f"Unsupported database type: {self.db_type}")
 
     def _create_tables(self):
         """Create all tables"""

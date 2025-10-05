@@ -46,14 +46,15 @@ class SuricataBackendController:
 
                 return {
                     'status': 'running',
+                    'running': True,
                     'pid': pid if pid else 'N/A',
                     'uptime': uptime,
                     'uptime_seconds': uptime_seconds
                 }
             else:
-                return {'status': 'stopped'}
+                return {'status': 'stopped', 'running': False}
         except Exception as e:
-            return {'status': 'error', 'message': str(e)}
+            return {'status': 'error', 'message': str(e), 'running': False}
 
 
     @staticmethod

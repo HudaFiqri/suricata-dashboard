@@ -67,6 +67,7 @@ def update_rrd_metrics():
 def sync_alerts_to_database():
     """Import alerts from eve.json to database"""
     import json
+    import math
     from datetime import datetime
 
     last_position = 0
@@ -121,6 +122,118 @@ def sync_alerts_to_database():
 
         time.sleep(5)  # Check every 5 seconds
 
+# Statistics synchronization thread
+def sync_stats_to_database():
+    """Import statistics from Suricata stats.log into the database."""
+    import json
+    import math
+    from datetime import datetime
+
+    stats_log_path = os.path.join(Config.SURICATA_LOG_DIR, 'stats.log')
+    last_position = 0
+
+    def iter_metrics(prefix: str, payload):
+        if isinstance(payload, dict):
+            for key, value in payload.items():
+                new_prefix = f"{prefix}.{key}" if prefix else key
+                yield from iter_metrics(new_prefix, value)
+        elif isinstance(payload, list):
+            for index, value in enumerate(payload):
+                list_prefix = f"{prefix}.{index}" if prefix else str(index)
+                yield from iter_metrics(list_prefix, value)
+        elif isinstance(payload, (int, float)):
+            yield prefix, float(payload)
+
+    while True:
+        try:
+            if not os.path.exists(stats_log_path):
+                time.sleep(10)
+                continue
+
+            file_size = os.path.getsize(stats_log_path)
+            if file_size < last_position:
+                last_position = 0
+
+            with open(stats_log_path, 'r', encoding='utf-8') as stats_file:
+                stats_file.seek(last_position)
+
+                for raw_line in stats_file:
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    stats_payload = None
+                    if isinstance(event, dict):
+                        if isinstance(event.get('stats'), dict):
+                            stats_payload = event.get('stats')
+                        elif isinstance(event.get('event'), dict) and isinstance(event['event'].get('stats'), dict):
+                            stats_payload = event['event']['stats']
+
+                    if not isinstance(stats_payload, dict):
+                        continue
+
+                    timestamp_value = event.get('timestamp') or event.get('time')
+                    try:
+                        metric_timestamp = datetime.fromisoformat(timestamp_value.replace('Z', '+00:00')) if timestamp_value else datetime.utcnow()
+                    except (ValueError, AttributeError):
+                        metric_timestamp = datetime.utcnow()
+
+                    metric_type = event.get('event_type', 'stats')
+
+                    for metric_name, metric_value in iter_metrics('', stats_payload):
+                        if not metric_name:
+                            continue
+                        if not math.isfinite(metric_value):
+                            continue
+                        category = metric_name.split('.', 1)[0]
+
+                        db_manager.add_statistic({
+                            'timestamp': metric_timestamp,
+                            'metric_name': metric_name,
+                            'metric_value': metric_value,
+                            'metric_type': metric_type,
+                            'category': category,
+                            'extra_data': event,
+                        })
+
+                last_position = stats_file.tell()
+
+        except FileNotFoundError:
+            last_position = 0
+        except Exception as err:
+            print(f"[STATS-SYNC] Error processing stats.log: {err}")
+
+        time.sleep(10)
+
+
+# Database retention cleanup thread
+def database_retention_worker():
+    """Periodically purge old records based on configured retention."""
+    cleanup_interval = 3600  # one hour
+
+    while True:
+        try:
+            retention_days = getattr(Config, 'DB_RETENTION_DAYS', 0)
+            if retention_days and retention_days > 0:
+                result = db_manager.cleanup_old_data(days=retention_days)
+                if isinstance(result, dict):
+                    print(
+                        f"[DB-CLEANUP] Retention applied (>{retention_days}d): "
+                        f"alerts={result.get('alerts_deleted', 0)}, "
+                        f"logs={result.get('logs_deleted', 0)}, "
+                        f"statistics={result.get('statistics_deleted', 0)}"
+                    )
+        except Exception as err:
+            print(f"[DB-CLEANUP] Error: {err}")
+
+        time.sleep(cleanup_interval)
+
+
 # Auto-restart monitor thread
 def auto_restart_monitor():
     """Monitor Suricata and auto-restart if crashed"""
@@ -168,6 +281,18 @@ rrd_thread.start()
 alert_sync_thread = threading.Thread(target=sync_alerts_to_database, daemon=True)
 alert_sync_thread.start()
 print("[ALERT-SYNC] Alert synchronization enabled - Monitoring eve.json")
+
+# Start statistics sync thread
+stats_sync_thread = threading.Thread(target=sync_stats_to_database, daemon=True)
+stats_sync_thread.start()
+print("[STATS-SYNC] Statistics synchronization enabled - Monitoring stats.log")
+
+if Config.DB_RETENTION_DAYS > 0:
+    cleanup_thread = threading.Thread(target=database_retention_worker, daemon=True)
+    cleanup_thread.start()
+    print(f"[DB-CLEANUP] Retention worker active (retention: {Config.DB_RETENTION_DAYS} days)")
+else:
+    print("[DB-CLEANUP] Retention worker disabled (DB_RETENTION_DAYS=0)")
 
 if Config.AUTO_RESTART_ENABLED:
     restart_thread = threading.Thread(target=auto_restart_monitor, daemon=True)
