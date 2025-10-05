@@ -450,8 +450,17 @@ def api_monitor_data():
     metric = request.args.get('metric', 'tcp')
     timespan = request.args.get('timespan', '1h')
 
+    eve_log_path = f"{Config.SURICATA_LOG_DIR}/eve.json"
+
     try:
-        eve_log_path = f"{Config.SURICATA_LOG_DIR}/eve.json"
+        if not os.path.exists(eve_log_path):
+            return jsonify({
+                'success': False,
+                'tcp_traffic': 0,
+                'udp_traffic': 0,
+                'total_alerts': 0,
+                'error': f'eve.json not found at {eve_log_path}'
+            })
 
         # Parse timespan
         hours = 1
@@ -465,7 +474,9 @@ def api_monitor_data():
         # Count metrics
         tcp_count = 0
         udp_count = 0
+        icmp_count = 0
         alert_count = 0
+        flow_count = 0
 
         with open(eve_log_path, 'r') as f:
             for line in f:
@@ -475,30 +486,48 @@ def api_monitor_data():
                     # Parse timestamp
                     timestamp_str = event.get('timestamp', '')
                     if timestamp_str:
-                        event_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-                        if event_time < cutoff_time:
-                            continue
+                        try:
+                            # Handle different timestamp formats
+                            if 'Z' in timestamp_str or '+' in timestamp_str:
+                                event_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                            else:
+                                event_time = datetime.strptime(timestamp_str, '%Y-%m-%dT%H:%M:%S.%f')
 
-                    # Count by protocol
+                            if event_time < cutoff_time:
+                                continue
+                        except (ValueError, AttributeError):
+                            # If can't parse timestamp, include the event anyway
+                            pass
+
+                    event_type = event.get('event_type', '')
                     proto = event.get('proto', '').upper()
-                    if proto == 'TCP':
-                        tcp_count += 1
-                    elif proto == 'UDP':
-                        udp_count += 1
 
-                    # Count alerts
-                    if event.get('event_type') == 'alert':
+                    # Count by protocol for flow events
+                    if event_type == 'flow':
+                        flow_count += 1
+                        if proto == 'TCP':
+                            tcp_count += 1
+                        elif proto == 'UDP':
+                            udp_count += 1
+                        elif proto == 'ICMP':
+                            icmp_count += 1
+
+                    # Count alerts separately
+                    if event_type == 'alert':
                         alert_count += 1
 
-                except (json.JSONDecodeError, ValueError):
+                except (json.JSONDecodeError, ValueError, KeyError):
                     continue
 
         return jsonify({
             'success': True,
             'tcp_traffic': tcp_count,
             'udp_traffic': udp_count,
+            'icmp_traffic': icmp_count,
             'total_alerts': alert_count,
-            'timespan': timespan
+            'total_flows': flow_count,
+            'timespan': timespan,
+            'path': eve_log_path
         })
 
     except FileNotFoundError:
@@ -507,7 +536,15 @@ def api_monitor_data():
             'tcp_traffic': 0,
             'udp_traffic': 0,
             'total_alerts': 0,
-            'error': 'eve.json not found'
+            'error': f'eve.json not found at {eve_log_path}'
+        })
+    except PermissionError:
+        return jsonify({
+            'success': False,
+            'tcp_traffic': 0,
+            'udp_traffic': 0,
+            'total_alerts': 0,
+            'error': f'Permission denied reading {eve_log_path}'
         })
     except Exception as e:
         return jsonify({
@@ -515,7 +552,7 @@ def api_monitor_data():
             'tcp_traffic': 0,
             'udp_traffic': 0,
             'total_alerts': 0,
-            'error': str(e)
+            'error': f'{str(e)} (path: {eve_log_path})'
         })
 
 @app.route('/api/monitor/graph/<metric>/<timespan>')
@@ -540,8 +577,15 @@ def api_database_alerts():
     category = request.args.get('category', None)
     protocol = request.args.get('protocol', None)
 
+    eve_log_path = f"{Config.SURICATA_LOG_DIR}/eve.json"
+
     try:
-        eve_log_path = f"{Config.SURICATA_LOG_DIR}/eve.json"
+        if not os.path.exists(eve_log_path):
+            return jsonify({
+                'alerts': [],
+                'error': f'eve.json not found at {eve_log_path}. Please check if Suricata is running.'
+            })
+
         alerts = []
 
         with open(eve_log_path, 'r') as f:
@@ -585,12 +629,14 @@ def api_database_alerts():
         alerts.reverse()
         alerts = alerts[:limit]
 
-        return jsonify({'alerts': alerts})
+        return jsonify({'alerts': alerts, 'path': eve_log_path})
 
     except FileNotFoundError:
-        return jsonify({'alerts': [], 'error': 'eve.json not found'})
+        return jsonify({'alerts': [], 'error': f'eve.json not found at {eve_log_path}'})
+    except PermissionError:
+        return jsonify({'alerts': [], 'error': f'Permission denied reading {eve_log_path}. Check file permissions.'})
     except Exception as e:
-        return jsonify({'alerts': [], 'error': str(e)})
+        return jsonify({'alerts': [], 'error': f'{str(e)} (path: {eve_log_path})'})
 
 @app.route('/api/database/stats')
 def api_database_stats():

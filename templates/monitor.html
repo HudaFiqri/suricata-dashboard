@@ -200,16 +200,22 @@ function loadAlerts() {
     const category = $('#alert-category').val();
     const limit = 100;
 
-    // Get alerts from database
+    // Get alerts from eve.json
     $.get(`/api/database/alerts?limit=${limit}${category ? '&protocol=' + category.toUpperCase() : ''}`, function(response) {
-        if (response.alerts && response.alerts.length > 0) {
+        if (response.error) {
+            $('#alert-table-body').html(`<tr><td colspan="6" class="text-center text-warning">Error: ${response.error}. Check if Suricata is running and eve.json exists at /var/log/suricata/eve.json</td></tr>`);
+        } else if (response.alerts && response.alerts.length > 0) {
             allAlerts = response.alerts;
             displayAlerts(allAlerts);
         } else {
-            $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts found. Alerts are auto-synced from eve.json every 5 seconds.</td></tr>');
+            $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts found in eve.json. Make sure Suricata is running and generating alerts.</td></tr>');
         }
-    }).fail(function() {
-        $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-warning">Failed to load alerts from database. Check database configuration in .env</td></tr>');
+    }).fail(function(xhr) {
+        let errorMsg = 'Failed to load alerts from eve.json';
+        if (xhr.responseJSON && xhr.responseJSON.error) {
+            errorMsg += ': ' + xhr.responseJSON.error;
+        }
+        $('#alert-table-body').html(`<tr><td colspan="6" class="text-center text-warning">${errorMsg}</td></tr>`);
     });
 }
 
