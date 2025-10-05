@@ -38,12 +38,10 @@
                     <select class="form-select" id="log-level-filter">
                         <option value="">All Types</option>
                         <option value="alert">Alert</option>
+                        <option value="tcp">TCP</option>
+                        <option value="udp">UDP</option>
                         <option value="flow">Flow</option>
                         <option value="stats">Stats</option>
-                        <option value="http">HTTP</option>
-                        <option value="dns">DNS</option>
-                        <option value="tls">TLS</option>
-                        <option value="ssh">SSH</option>
                     </select>
                 </div>
                 <div class="mb-3">
@@ -128,8 +126,8 @@ function updateLogStats(logs) {
     logs.forEach(function(log) {
         const logLower = log.toLowerCase();
 
-        // Alerts: ALERT events with severity
-        if (logLower.startsWith('[alert]') && logLower.includes('severity:')) {
+        // Alerts: ALERT events with severity 1-2
+        if (logLower.startsWith('[alert]')) {
             const severityMatch = log.match(/severity:\s*(\d+)/i);
             if (severityMatch) {
                 const severity = parseInt(severityMatch[1]);
@@ -144,16 +142,15 @@ function updateLogStats(logs) {
                 alertCount++;
             }
         }
-        // Treat SSH, DNS, HTTP, TLS as warnings (security events)
-        else if (logLower.startsWith('[ssh]') ||
+        // Warnings: Application layer events (HTTP, DNS, SSH, TLS)
+        else if (logLower.startsWith('[http]') ||
                  logLower.startsWith('[dns]') ||
-                 logLower.startsWith('[http]') ||
+                 logLower.startsWith('[ssh]') ||
                  logLower.startsWith('[tls]')) {
             warningCount++;
         }
         // Info: FLOW and STATS
-        else if (logLower.startsWith('[flow]') ||
-                 logLower.startsWith('[stats]')) {
+        else if (logLower.startsWith('[flow]') || logLower.startsWith('[stats]')) {
             infoCount++;
         }
         // Default to info for unknown types

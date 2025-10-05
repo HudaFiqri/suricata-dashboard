@@ -158,7 +158,26 @@ def api_logs():
                     dest_ip = log.get('dest_ip', '')
                     dest_port = log.get('dest_port', '')
                     proto = log.get('proto', '')
-                    formatted_logs.append(f"[FLOW] {timestamp} - {src_ip}:{src_port} -> {dest_ip}:{dest_port} [{proto}]")
+
+                    # Detect common services by port
+                    service = ''
+                    if dest_port == 22 or src_port == 22:
+                        service = 'SSH'
+                    elif dest_port == 80 or src_port == 80:
+                        service = 'HTTP'
+                    elif dest_port == 443 or src_port == 443:
+                        service = 'HTTPS'
+                    elif dest_port == 53 or src_port == 53:
+                        service = 'DNS'
+                    elif dest_port == 67 or dest_port == 68 or src_port == 67 or src_port == 68:
+                        service = 'DHCP'
+                    elif dest_port == 21 or src_port == 21:
+                        service = 'FTP'
+                    elif dest_port == 25 or src_port == 25:
+                        service = 'SMTP'
+
+                    service_str = f" ({service})" if service else ''
+                    formatted_logs.append(f"[FLOW] {timestamp} - {src_ip}:{src_port} -> {dest_ip}:{dest_port} [{proto}]{service_str}")
                 elif event_type == 'http':
                     http = log.get('http', {})
                     hostname = http.get('hostname', '')
@@ -170,8 +189,6 @@ def api_logs():
                     formatted_logs.append(f"[DNS] {timestamp} - Query: {query}")
                 elif event_type == 'ssh':
                     ssh = log.get('ssh', {})
-                    client = ssh.get('client', {})
-                    server = ssh.get('server', {})
                     src_ip = log.get('src_ip', '')
                     dest_ip = log.get('dest_ip', '')
                     formatted_logs.append(f"[SSH] {timestamp} - {src_ip} -> {dest_ip}")
