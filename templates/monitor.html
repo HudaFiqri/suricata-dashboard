@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-chart-line"></i> Alert Monitoring</h5>
+                <div>
+                    <select class="form-select form-select-sm d-inline-block w-auto me-2" id="timespan-select">
+                        <option value="1h">Last Hour</option>
+                        <option value="6h">Last 6 Hours</option>
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" id="apply-config">
+                        <i class="fas fa-check"></i> Apply
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="alertChart" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-network-wired fa-3x text-primary mb-2"></i>
+                <h3 id="tcp-count">-</h3>
+                <p class="text-muted">TCP Traffic</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-exchange-alt fa-3x text-info mb-2"></i>
+                <h3 id="udp-count">-</h3>
+                <p class="text-muted">UDP Traffic</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-stream fa-3x text-warning mb-2"></i>
+                <h3 id="total-count">-</h3>
+                <p class="text-muted">Total Events</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-list"></i> Alert Details</h5>
+                <div>
+                    <input type="text" class="form-control form-control-sm d-inline-block w-auto me-2" id="alert-search" placeholder="Search alerts...">
+                    <select class="form-select form-select-sm d-inline-block w-auto me-2" id="alert-category">
+                        <option value="">All Categories</option>
+                        <option value="tcp">TCP</option>
+                        <option value="udp">UDP</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" id="refresh-alerts">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Signature</th>
+                                <th>Severity</th>
+                                <th>Source IP</th>
+                                <th>Dest IP</th>
+                                <th>Protocol</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alert-table-body">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading alerts...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+let alertChart = null;
+let currentMetric = 'ssh';
+let currentTimespan = '1h';
+
+function initChart() {
+    const ctx = document.getElementById('alertChart').getContext('2d');
+    alertChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Traffic & Alerts',
+                data: [],
+                backgroundColor: [
+                    'rgba(54, 162, 235, 0.5)',
+                    'rgba(75, 192, 192, 0.5)',
+                    'rgba(255, 159, 64, 0.5)'
+                ],
+                borderColor: [
+                    'rgb(54, 162, 235)',
+                    'rgb(75, 192, 192)',
+                    'rgb(255, 159, 64)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            }
+        }
+    });
+}
+
+function updateChart() {
+    const timespan = $('#timespan-select').val();
+
+    $.get(`/api/monitor/data?timespan=${timespan}`, function(response) {
+        if (response.success) {
+            alertChart.data.labels = ['TCP Traffic', 'UDP Traffic', 'Total Alerts'];
+            alertChart.data.datasets[0].data = [
+                response.tcp_traffic || 0,
+                response.udp_traffic || 0,
+                response.total_alerts || 0
+            ];
+            alertChart.data.datasets[0].label = `Traffic & Alerts (${timespan})`;
+            alertChart.update();
+        } else {
+            alertChart.data.labels = [];
+            alertChart.data.datasets[0].data = [];
+            alertChart.update();
+        }
+    }).fail(function() {
+        alertChart.data.labels = [];
+        alertChart.data.datasets[0].data = [];
+        alertChart.update();
+    });
+}
+
+function updateCounts() {
+    const timespan = $('#timespan-select').val();
+
+    $.get(`/api/monitor/data?timespan=${timespan}`, function(response) {
+        if (response.success) {
+            $('#tcp-count').text(response.tcp_traffic || 0);
+            $('#udp-count').text(response.udp_traffic || 0);
+            $('#total-count').text(response.total_alerts || 0);
+        } else {
+            $('#tcp-count').text('0');
+            $('#udp-count').text('0');
+            $('#total-count').text('0');
+        }
+    }).fail(function() {
+        $('#tcp-count').text('0');
+        $('#udp-count').text('0');
+        $('#total-count').text('0');
+    });
+}
+
+let allAlerts = [];
+
+function loadAlerts() {
+    const category = $('#alert-category').val();
+    const limit = 100;
+
+    // Get alerts from eve.json
+    $.get(`/api/database/alerts?limit=${limit}${category ? '&protocol=' + category.toUpperCase() : ''}`, function(response) {
+        if (response.error) {
+            $('#alert-table-body').html(`<tr><td colspan="6" class="text-center text-warning">Error: ${response.error}. Check if Suricata is running and eve.json exists at /var/log/suricata/eve.json</td></tr>`);
+        } else if (response.alerts && response.alerts.length > 0) {
+            allAlerts = response.alerts;
+            displayAlerts(allAlerts);
+        } else {
+            $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts found in eve.json. Make sure Suricata is running and generating alerts.</td></tr>');
+        }
+    }).fail(function(xhr) {
+        let errorMsg = 'Failed to load alerts from eve.json';
+        if (xhr.responseJSON && xhr.responseJSON.error) {
+            errorMsg += ': ' + xhr.responseJSON.error;
+        }
+        $('#alert-table-body').html(`<tr><td colspan="6" class="text-center text-warning">${errorMsg}</td></tr>`);
+    });
+}
+
+function displayAlerts(alerts) {
+    if (alerts.length === 0) {
+        $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts match your search</td></tr>');
+        return;
+    }
+
+    let html = '';
+    alerts.forEach(alert => {
+        const severityClass = alert.severity <= 1 ? 'text-danger' : alert.severity <= 2 ? 'text-warning' : 'text-info';
+        const timestamp = alert.timestamp.includes('T') ? alert.timestamp : new Date(alert.timestamp).toISOString();
+
+        html += `
+            <tr>
+                <td><small>${timestamp.replace('T', ' ').split('.')[0]}</small></td>
+                <td>${alert.signature || 'Unknown'}</td>
+                <td><span class="badge bg-${severityClass === 'text-danger' ? 'danger' : severityClass === 'text-warning' ? 'warning' : 'info'}">${alert.severity || 'N/A'}</span></td>
+                <td><code>${alert.src_ip || 'N/A'}</code></td>
+                <td><code>${alert.dest_ip || 'N/A'}</code></td>
+                <td><span class="badge bg-secondary">${alert.protocol || 'N/A'}</span></td>
+            </tr>
+        `;
+    });
+
+    $('#alert-table-body').html(html);
+}
+
+function filterAlerts() {
+    const searchTerm = $('#alert-search').val().toLowerCase();
+
+    if (!searchTerm) {
+        displayAlerts(allAlerts);
+        return;
+    }
+
+    const filtered = allAlerts.filter(alert => {
+        return (alert.signature && alert.signature.toLowerCase().includes(searchTerm)) ||
+               (alert.src_ip && alert.src_ip.includes(searchTerm)) ||
+               (alert.dest_ip && alert.dest_ip.includes(searchTerm)) ||
+               (alert.protocol && alert.protocol.toLowerCase().includes(searchTerm));
+    });
+
+    displayAlerts(filtered);
+}
+
+// Initialize chart on page load
+$(document).ready(function() {
+    initChart();
+    updateChart();
+    updateCounts();
+    loadAlerts();
+
+    // Apply button
+    $('#apply-config').click(function() {
+        updateChart();
+        updateCounts();
+    });
+
+    // Alert search and filter
+    $('#alert-search').on('input', filterAlerts);
+    $('#alert-category').on('change', loadAlerts);
+    $('#refresh-alerts').click(loadAlerts);
+
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        updateChart();
+        updateCounts();
+        loadAlerts();
+    }, 30000);
+});
+</script>
+{% endblock %}

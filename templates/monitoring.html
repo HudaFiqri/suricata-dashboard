@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Monitoring Dashboard - {{ dashboard_name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="fas fa-desktop"></i> Monitoring Dashboard</h2>
+        <p class="text-muted">Choose your monitoring view</p>
+    </div>
+</div>
+
+<!-- Monitoring Options Cards -->
+<div class="row g-4">
+    <!-- RRD Tools Card -->
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm hover-card">
+            <div class="card-body text-center p-5">
+                <div class="mb-4">
+                    <i class="fas fa-chart-area fa-5x text-primary"></i>
+                </div>
+                <h3 class="card-title mb-3">Traffic Graphs</h3>
+                <p class="card-text text-muted mb-4">
+                    Advanced traffic visualization using RRD tools. View historical traffic patterns,
+                    protocol statistics, and detailed network metrics over time.
+                </p>
+                <ul class="list-unstyled text-start mb-4">
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Historical graphs (5m to 30d)</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Protocol breakdown (TCP, UDP, ICMP)</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Database statistics table</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Traffic & packet analysis</li>
+                </ul>
+                <a href="{{ url_for('rrd') }}" class="btn btn-primary btn-lg w-100">
+                    <i class="fas fa-chart-line me-2"></i> Open Traffic Graphs
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Monitor Card -->
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm hover-card">
+            <div class="card-body text-center p-5">
+                <div class="mb-4">
+                    <i class="fas fa-chart-line fa-5x text-info"></i>
+                </div>
+                <h3 class="card-title mb-3">Alert Monitoring</h3>
+                <p class="card-text text-muted mb-4">
+                    Real-time alert monitoring and event tracking. Monitor live traffic,
+                    view security alerts, and analyze network events as they happen.
+                </p>
+                <ul class="list-unstyled text-start mb-4">
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Real-time event tracking</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Live traffic statistics</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Alert details & filtering</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Event search & categorization</li>
+                </ul>
+                <a href="{{ url_for('monitor') }}" class="btn btn-info btn-lg w-100">
+                    <i class="fas fa-bell me-2"></i> Open Alert Monitor
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<style>
+.hover-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2) !important;
+}
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 1.1rem;
+}
+</style>
+{% endblock %}
+
+
