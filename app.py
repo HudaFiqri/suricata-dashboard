@@ -132,10 +132,19 @@ def logs():
 @app.route('/api/logs')
 def api_logs():
     try:
+        # Try to get fast.log first
         logs = controller.log_manager.get_fast_log(100)
-        return jsonify({'logs': logs})
+
+        # If empty, try eve.json
+        if not logs:
+            eve_logs = controller.log_manager.get_eve_log(100)
+            if eve_logs:
+                # Convert eve.json to readable format
+                logs = [f"[{log.get('event_type', 'unknown')}] {log.get('timestamp', '')} - {log.get('alert', {}).get('signature', str(log))}" for log in eve_logs]
+
+        return jsonify({'logs': logs if logs else []})
     except Exception as e:
-        return jsonify({'error': str(e)})
+        return jsonify({'error': str(e), 'logs': []})
 
 @app.route('/rules')
 def rules():

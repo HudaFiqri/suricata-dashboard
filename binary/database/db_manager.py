@@ -43,7 +43,7 @@ class DatabaseManager:
                 echo=False
             )
 
-            print(f"✓ Using local storage: {self.db_url}")
+            print(f"✓ Database connected: local")
         else:
             # Create database URL
             self.db_url = self._create_db_url()
@@ -88,7 +88,7 @@ class DatabaseManager:
                     echo=False
                 )
 
-                print(f"✓ Using local storage: {self.db_url}")
+                print(f"✓ Database connected: local (fallback)")
 
         # Create session factory
         self.Session = scoped_session(sessionmaker(bind=self.engine))
