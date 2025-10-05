@@ -34,24 +34,22 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label">Log Level</label>
+                    <label class="form-label">Event Type</label>
                     <select class="form-select" id="log-level-filter">
-                        <option value="">All Levels</option>
-                        <option value="1">Alert</option>
-                        <option value="2">Critical</option>
-                        <option value="3">Error</option>
-                        <option value="4">Warning</option>
-                        <option value="5">Notice</option>
-                        <option value="6">Info</option>
-                        <option value="7">Debug</option>
+                        <option value="">All Types</option>
+                        <option value="alert">Alert</option>
+                        <option value="flow">Flow</option>
+                        <option value="stats">Stats</option>
+                        <option value="http">HTTP</option>
+                        <option value="dns">DNS</option>
+                        <option value="tls">TLS</option>
+                        <option value="ssh">SSH</option>
                     </select>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Search</label>
                     <input type="text" class="form-control" id="log-search" placeholder="Search in logs...">
                 </div>
-                <button class="btn btn-primary" id="apply-filters">Apply Filters</button>
-                <button class="btn btn-secondary" id="clear-filters">Clear</button>
             </div>
         </div>
     </div>
@@ -126,48 +124,69 @@ function updateLogStats(logs) {
     let alertCount = 0;
     let warningCount = 0;
     let infoCount = 0;
-    
+
     logs.forEach(function(log) {
         const logLower = log.toLowerCase();
-        if (logLower.includes('alert')) alertCount++;
-        else if (logLower.includes('warning')) warningCount++;
-        else if (logLower.includes('info')) infoCount++;
+
+        // Alerts: ALERT events with severity
+        if (logLower.startsWith('[alert]') && logLower.includes('severity:')) {
+            const severityMatch = log.match(/severity:\s*(\d+)/i);
+            if (severityMatch) {
+                const severity = parseInt(severityMatch[1]);
+                if (severity === 1 || severity === 2) {
+                    alertCount++;
+                } else if (severity === 3) {
+                    warningCount++;
+                } else {
+                    infoCount++;
+                }
+            } else {
+                alertCount++;
+            }
+        }
+        // Treat SSH, DNS, HTTP, TLS as warnings (security events)
+        else if (logLower.startsWith('[ssh]') ||
+                 logLower.startsWith('[dns]') ||
+                 logLower.startsWith('[http]') ||
+                 logLower.startsWith('[tls]')) {
+            warningCount++;
+        }
+        // Info: FLOW and STATS
+        else if (logLower.startsWith('[flow]') ||
+                 logLower.startsWith('[stats]')) {
+            infoCount++;
+        }
+        // Default to info for unknown types
+        else {
+            infoCount++;
+        }
     });
-    
+
     $('#alert-count').text(alertCount);
     $('#warning-count').text(warningCount);
     $('#info-count').text(infoCount);
 }
 
 function filterLogs() {
-    const levelFilter = $('#log-level-filter').val();
+    const eventTypeFilter = $('#log-level-filter').val();
     const searchFilter = $('#log-search').val().toLowerCase();
-    
+
     let filteredLogs = originalLogs;
-    
+
     if (searchFilter) {
-        filteredLogs = filteredLogs.filter(log => 
+        filteredLogs = filteredLogs.filter(log =>
             log.toLowerCase().includes(searchFilter)
         );
     }
-    
-    if (levelFilter) {
-        const levelMap = {
-            '1': 'alert',
-            '2': 'critical', 
-            '3': 'error',
-            '4': 'warning',
-            '5': 'notice',
-            '6': 'info',
-            '7': 'debug'
-        };
-        const levelName = levelMap[levelFilter];
-        filteredLogs = filteredLogs.filter(log => 
-            log.toLowerCase().includes(levelName)
+
+    if (eventTypeFilter) {
+        filteredLogs = filteredLogs.filter(log =>
+            log.toLowerCase().startsWith('[' + eventTypeFilter.toLowerCase() + ']')
         );
     }
-    
+
     displayLogs(filteredLogs);
+    updateLogStats(filteredLogs);
 }
 
 function escapeHtml(text) {
@@ -191,16 +210,7 @@ $('#auto-refresh').click(function() {
     }
 });
 
-$('#apply-filters').click(filterLogs);
-
-$('#clear-filters').click(function() {
-    $('#log-level-filter').val('');
-    $('#log-search').val('');
-    displayLogs(originalLogs);
-    updateLogStats(originalLogs);
-});
-
-// Real-time search
+// Real-time search and filter
 $('#log-search').on('input', filterLogs);
 $('#log-level-filter').on('change', filterLogs);
 

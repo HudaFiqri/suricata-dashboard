@@ -132,34 +132,60 @@ def logs():
 @app.route('/api/logs')
 def api_logs():
     try:
-        # Try to get fast.log first
-        logs = controller.log_manager.get_fast_log(100)
+        # Read directly from eve.json
+        eve_logs = controller.log_manager.get_eve_log(100)
 
-        # If empty, try eve.json
-        if not logs:
-            eve_logs = controller.log_manager.get_eve_log(100)
-            if eve_logs:
-                # Convert eve.json to readable format
-                formatted_logs = []
-                for log in eve_logs:
-                    event_type = log.get('event_type', 'unknown')
-                    timestamp = log.get('timestamp', '')
+        if eve_logs:
+            # Convert eve.json to readable format
+            formatted_logs = []
+            for log in eve_logs:
+                event_type = log.get('event_type', 'unknown')
+                timestamp = log.get('timestamp', '')
 
-                    if event_type == 'alert':
-                        alert = log.get('alert', {})
-                        signature = alert.get('signature', 'Unknown')
-                        severity = alert.get('severity', 0)
-                        src_ip = log.get('src_ip', '')
-                        dest_ip = log.get('dest_ip', '')
-                        formatted_logs.append(f"[ALERT] {timestamp} - {signature} | {src_ip} -> {dest_ip} (Severity: {severity})")
-                    elif event_type == 'stats':
-                        formatted_logs.append(f"[STATS] {timestamp} - Statistics Update")
-                    else:
-                        formatted_logs.append(f"[{event_type.upper()}] {timestamp}")
+                if event_type == 'alert':
+                    alert = log.get('alert', {})
+                    signature = alert.get('signature', 'Unknown')
+                    severity = alert.get('severity', 0)
+                    src_ip = log.get('src_ip', '')
+                    dest_ip = log.get('dest_ip', '')
+                    proto = log.get('proto', '')
+                    formatted_logs.append(f"[ALERT] {timestamp} - {signature} | {src_ip} -> {dest_ip} [{proto}] (Severity: {severity})")
+                elif event_type == 'stats':
+                    formatted_logs.append(f"[STATS] {timestamp} - Statistics Update")
+                elif event_type == 'flow':
+                    src_ip = log.get('src_ip', '')
+                    src_port = log.get('src_port', '')
+                    dest_ip = log.get('dest_ip', '')
+                    dest_port = log.get('dest_port', '')
+                    proto = log.get('proto', '')
+                    formatted_logs.append(f"[FLOW] {timestamp} - {src_ip}:{src_port} -> {dest_ip}:{dest_port} [{proto}]")
+                elif event_type == 'http':
+                    http = log.get('http', {})
+                    hostname = http.get('hostname', '')
+                    url = http.get('url', '')
+                    formatted_logs.append(f"[HTTP] {timestamp} - {hostname}{url}")
+                elif event_type == 'dns':
+                    dns = log.get('dns', {})
+                    query = dns.get('rrname', '')
+                    formatted_logs.append(f"[DNS] {timestamp} - Query: {query}")
+                elif event_type == 'ssh':
+                    ssh = log.get('ssh', {})
+                    client = ssh.get('client', {})
+                    server = ssh.get('server', {})
+                    src_ip = log.get('src_ip', '')
+                    dest_ip = log.get('dest_ip', '')
+                    formatted_logs.append(f"[SSH] {timestamp} - {src_ip} -> {dest_ip}")
+                elif event_type == 'tls':
+                    tls = log.get('tls', {})
+                    sni = tls.get('sni', '')
+                    formatted_logs.append(f"[TLS] {timestamp} - SNI: {sni}")
+                else:
+                    formatted_logs.append(f"[{event_type.upper()}] {timestamp}")
 
-                logs = formatted_logs
+            return jsonify({'logs': formatted_logs})
+        else:
+            return jsonify({'logs': []})
 
-        return jsonify({'logs': logs if logs else []})
     except Exception as e:
         return jsonify({'error': str(e), 'logs': []})
 
