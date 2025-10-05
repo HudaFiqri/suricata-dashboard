@@ -2,6 +2,7 @@
 Database API - Handles database connection checks and info
 """
 from flask import jsonify
+import hashlib
 
 
 class DatabaseAPI:
@@ -16,10 +17,13 @@ class DatabaseAPI:
             db_info = self.db_manager.get_db_info()
             is_connected = db_info.get('connected', False)
 
+            raw_type = db_info.get('type')
+            hashed_type = hashlib.md5(raw_type.encode()).hexdigest() if raw_type else None
+
             return {
                 'success': True,
                 'connected': is_connected,
-                'database_type': db_info.get('type'),
+                'database_type': hashed_type,
                 'database_url': db_info.get('url'),
                 'message': 'Database connected successfully' if is_connected else 'Database connection failed'
             }
