@@ -17,12 +17,13 @@ class WebRoutes:
     def _register_routes(self):
         """Register all web routes"""
         self.app.add_url_rule('/', 'index', self.index)
+        self.app.add_url_rule('/monitoring', 'monitoring', self.monitoring_dashboard)
+        self.app.add_url_rule('/monitor', 'monitor', self.monitor)
+        self.app.add_url_rule('/rrd', 'rrd', self.rrd_graphs)
         self.app.add_url_rule('/logs', 'logs', self.logs)
         self.app.add_url_rule('/rules', 'rules', self.rules)
         self.app.add_url_rule('/config', 'config', self.config_page)
         self.app.add_url_rule('/services', 'services', self.services)
-        self.app.add_url_rule('/monitor', 'monitor', self.monitor)
-        self.app.add_url_rule('/rrd', 'rrd', self.rrd_graphs)
 
     def _register_context_processor(self):
         """Register template context processor for global variables"""
@@ -36,6 +37,10 @@ class WebRoutes:
         """Home page"""
         status = self.controller.get_status()
         return render_template('index.html', status=status)
+
+    def monitoring_dashboard(self):
+        """Monitoring dashboard page"""
+        return render_template('monitoring.html')
 
     def logs(self):
         """Logs page"""

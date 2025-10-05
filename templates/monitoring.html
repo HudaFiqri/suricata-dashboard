@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Monitoring Dashboard - {{ dashboard_name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="fas fa-desktop"></i> Monitoring Dashboard</h2>
+        <p class="text-muted">Choose your monitoring view</p>
+    </div>
+</div>
+
+<!-- Monitoring Options Cards -->
+<div class="row g-4">
+    <!-- RRD Tools Card -->
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm hover-card">
+            <div class="card-body text-center p-5">
+                <div class="mb-4">
+                    <i class="fas fa-chart-area fa-5x text-primary"></i>
+                </div>
+                <h3 class="card-title mb-3">RRD Traffic Graphs</h3>
+                <p class="card-text text-muted mb-4">
+                    Advanced traffic visualization using RRD tools. View historical traffic patterns,
+                    protocol statistics, and detailed network metrics over time.
+                </p>
+                <ul class="list-unstyled text-start mb-4">
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Historical graphs (1h to 30d)</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Protocol breakdown (TCP, UDP, ICMP)</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Database statistics table</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Traffic & packet analysis</li>
+                </ul>
+                <a href="{{ url_for('rrd') }}" class="btn btn-primary btn-lg w-100">
+                    <i class="fas fa-chart-line me-2"></i> Open RRD Graphs
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Monitor Card -->
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm hover-card">
+            <div class="card-body text-center p-5">
+                <div class="mb-4">
+                    <i class="fas fa-chart-line fa-5x text-info"></i>
+                </div>
+                <h3 class="card-title mb-3">Alert Monitoring</h3>
+                <p class="card-text text-muted mb-4">
+                    Real-time alert monitoring and event tracking. Monitor live traffic,
+                    view security alerts, and analyze network events as they happen.
+                </p>
+                <ul class="list-unstyled text-start mb-4">
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Real-time event tracking</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Live traffic statistics</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Alert details & filtering</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Event search & categorization</li>
+                </ul>
+                <a href="{{ url_for('monitor') }}" class="btn btn-info btn-lg w-100">
+                    <i class="fas fa-bell me-2"></i> Open Alert Monitor
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats Overview -->
+<div class="row mt-5">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-tachometer-alt"></i> Quick Overview</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="p-3">
+                            <i class="fas fa-database fa-3x text-primary mb-2"></i>
+                            <h4 id="db-status">Checking...</h4>
+                            <p class="text-muted">Database Status</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3">
+                            <i class="fas fa-server fa-3x text-success mb-2"></i>
+                            <h4 id="suricata-status">Checking...</h4>
+                            <p class="text-muted">Suricata Status</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3">
+                            <i class="fas fa-chart-area fa-3x text-warning mb-2"></i>
+                            <h4 id="rrd-files">-</h4>
+                            <p class="text-muted">RRD Graphs Available</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3">
+                            <i class="fas fa-exclamation-triangle fa-3x text-danger mb-2"></i>
+                            <h4 id="recent-alerts">-</h4>
+                            <p class="text-muted">Recent Alerts (1h)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2) !important;
+}
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 1.1rem;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function checkStatus() {
+    // Check database status
+    $.get('/api/database/check', function(response) {
+        if (response.success && response.connected) {
+            $('#db-status').html('<span class="text-success">Connected</span>');
+        } else {
+            $('#db-status').html('<span class="text-danger">Disconnected</span>');
+        }
+    }).fail(function() {
+        $('#db-status').html('<span class="text-danger">Error</span>');
+    });
+
+    // Check Suricata status
+    $.get('/api/status', function(response) {
+        if (response.running) {
+            $('#suricata-status').html('<span class="text-success">Running</span>');
+        } else {
+            $('#suricata-status').html('<span class="text-danger">Stopped</span>');
+        }
+    }).fail(function() {
+        $('#suricata-status').html('<span class="text-danger">Error</span>');
+    });
+
+    // Get RRD availability (assume 3 protocols available)
+    $('#rrd-files').text('3 Metrics');
+
+    // Get recent alerts count
+    $.get('/api/monitor/data?timespan=1h', function(response) {
+        if (response.success) {
+            $('#recent-alerts').text(response.total_alerts || 0);
+        } else {
+            $('#recent-alerts').text('0');
+        }
+    }).fail(function() {
+        $('#recent-alerts').text('N/A');
+    });
+}
+
+$(document).ready(function() {
+    checkStatus();
+
+    // Refresh status every 30 seconds
+    setInterval(checkStatus, 30000);
+});
+</script>
+{% endblock %}

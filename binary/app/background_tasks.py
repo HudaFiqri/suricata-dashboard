@@ -20,7 +20,8 @@ class BackgroundTasks:
         """Start all background tasks"""
         # Traffic aggregation (eve.json → database)
         self._start_thread(self._aggregate_traffic_data, "Traffic Aggregation")
-        print("[TRAFFIC-AGG] Traffic aggregation enabled - Monitoring eve.json")
+        interval_min = self.config.TRAFFIC_AGGREGATION_INTERVAL // 60
+        print(f"[TRAFFIC-AGG] Traffic aggregation enabled - Interval: {interval_min}m ({self.config.TRAFFIC_AGGREGATION_INTERVAL}s)")
 
         # RRD metrics update (database → RRD files)
         self._start_thread(self._update_rrd_metrics, "RRD Metrics")
@@ -51,10 +52,10 @@ class BackgroundTasks:
 
     # ==================== Traffic Aggregation ====================
     def _aggregate_traffic_data(self):
-        """Aggregate traffic data from eve.json to database every minute"""
+        """Aggregate traffic data from eve.json to database"""
         eve_log_path = f"{self.config.SURICATA_LOG_DIR}/eve.json"
         last_position = 0
-        interval_seconds = 60
+        interval_seconds = self.config.TRAFFIC_AGGREGATION_INTERVAL  # Configurable (default 5 min)
 
         while True:
             try:
@@ -142,7 +143,7 @@ class BackgroundTasks:
         last_position = 0
         eve_log_path = f"{self.config.SURICATA_LOG_DIR}/eve.json"
 
-        print("[ALERT-SYNC] Alert synchronization enabled - Monitoring eve.json")
+        print(f"[ALERT-SYNC] Alert synchronization enabled - Real-time mode")
 
         while True:
             try:
@@ -181,7 +182,7 @@ class BackgroundTasks:
             except Exception as e:
                 print(f"[ALERT-SYNC] Error: {e}")
 
-            time.sleep(5)
+            time.sleep(0.1)
 
     # ==================== Stats Sync ====================
     def _sync_stats_to_database(self):
@@ -190,7 +191,7 @@ class BackgroundTasks:
         last_position = 0
         current_timestamp = None
 
-        print("[STATS-SYNC] Statistics synchronization enabled - Monitoring stats.log")
+        print(f"[STATS-SYNC] Statistics synchronization enabled - Real-time mode")
 
         def _parse_timestamp(line: str):
             try:
@@ -254,7 +255,7 @@ class BackgroundTasks:
             except Exception as err:
                 print(f"[STATS-SYNC] Error: {err}")
 
-            time.sleep(10)
+            time.sleep(0.1)
 
     # ==================== Database Retention ====================
     def _database_retention_worker(self):

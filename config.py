@@ -61,6 +61,8 @@ def _infer_db_type(port_value, user_value):
 class Config:
     # Dashboard settings
     DASHBOARD_NAME = _get_env('SURICATA_DASHBOARD_NAME', default='Suricata Dashboard')
+    TRAFFIC_AGGREGATION_INTERVAL = int(_get_env('TRAFFIC_AGGREGATION_INTERVAL', default='300'))  # 5 minutes
+    DB_STORE_TIME = int(_get_env('DB_STORE_TIME', default='60'))  # Database store interval in seconds
 
     # Suricata paths
     SURICATA_BINARY_PATH = _get_env('SURICATA_BINARY_PATH', default='suricata')
