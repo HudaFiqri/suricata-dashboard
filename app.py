@@ -3,8 +3,19 @@ from binary import SuricataFrontendController, SuricataRRDManager, DatabaseManag
 from config import Config
 import threading
 import time
+import os
 
 app = Flask(__name__)
+
+# Ensure application directories exist
+try:
+    os.makedirs(Config.APP_DATA_DIR, exist_ok=True)
+    os.makedirs(Config.APP_LOG_DIR, exist_ok=True)
+    print(f"✓ Application directories initialized:")
+    print(f"  - Data: {Config.APP_DATA_DIR}")
+    print(f"  - Logs: {Config.APP_LOG_DIR}")
+except Exception as e:
+    print(f"⚠ Warning: Could not create application directories: {e}")
 
 # Initialize Suricata Frontend Controller with config
 controller = SuricataFrontendController(
@@ -52,6 +63,64 @@ def update_rrd_metrics():
             print(f"Error updating RRD metrics: {e}")
         time.sleep(60)  # Update every minute
 
+# Background thread to sync alerts from eve.json to database
+def sync_alerts_to_database():
+    """Import alerts from eve.json to database"""
+    import json
+    from datetime import datetime
+
+    last_position = 0
+
+    while True:
+        try:
+            eve_log_path = f"{Config.SURICATA_LOG_DIR}/eve.json"
+
+            try:
+                with open(eve_log_path, 'r') as f:
+                    # Seek to last position
+                    f.seek(last_position)
+
+                    for line in f:
+                        try:
+                            event = json.loads(line.strip())
+
+                            # Only process alert events
+                            if event.get('event_type') == 'alert':
+                                alert = event.get('alert', {})
+
+                                alert_data = {
+                                    'timestamp': datetime.fromisoformat(event.get('timestamp', '').replace('Z', '+00:00')) if event.get('timestamp') else datetime.utcnow(),
+                                    'signature': alert.get('signature'),
+                                    'signature_id': alert.get('signature_id'),
+                                    'category': alert.get('category'),
+                                    'severity': alert.get('severity'),
+                                    'protocol': event.get('proto'),
+                                    'src_ip': event.get('src_ip'),
+                                    'src_port': event.get('src_port'),
+                                    'dest_ip': event.get('dest_ip'),
+                                    'dest_port': event.get('dest_port'),
+                                    'payload': event.get('payload'),
+                                    'extra_data': json.dumps(event)
+                                }
+
+                                db_manager.add_alert(alert_data)
+
+                        except json.JSONDecodeError:
+                            continue
+
+                    # Update position
+                    last_position = f.tell()
+
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                print(f"[ALERT-SYNC] Error reading eve.json: {e}")
+
+        except Exception as e:
+            print(f"[ALERT-SYNC] Error: {e}")
+
+        time.sleep(5)  # Check every 5 seconds
+
 # Auto-restart monitor thread
 def auto_restart_monitor():
     """Monitor Suricata and auto-restart if crashed"""
@@ -94,6 +163,11 @@ def auto_restart_monitor():
 # Start background threads
 rrd_thread = threading.Thread(target=update_rrd_metrics, daemon=True)
 rrd_thread.start()
+
+# Start alert sync thread
+alert_sync_thread = threading.Thread(target=sync_alerts_to_database, daemon=True)
+alert_sync_thread.start()
+print("[ALERT-SYNC] Alert synchronization enabled - Monitoring eve.json")
 
 if Config.AUTO_RESTART_ENABLED:
     restart_thread = threading.Thread(target=auto_restart_monitor, daemon=True)
@@ -277,7 +351,15 @@ def api_database_info():
 def api_database_alerts():
     limit = request.args.get('limit', 100, type=int)
     category = request.args.get('category', None)
+    protocol = request.args.get('protocol', None)
+
+    # Get alerts with filter
     alerts = db_manager.get_alerts(limit=limit, category=category)
+
+    # Additional filter by protocol if specified
+    if protocol:
+        alerts = [alert for alert in alerts if alert.protocol and alert.protocol.upper() == protocol.upper()]
+
     return jsonify({'alerts': [alert.to_dict() for alert in alerts]})
 
 @app.route('/api/database/stats')

@@ -213,62 +213,18 @@ let allAlerts = [];
 
 function loadAlerts() {
     const category = $('#alert-category').val();
+    const limit = 100;
 
-    // Get alerts from eve.json logs
-    $.get('/api/logs', function(response) {
-        if (response.logs && response.logs.length > 0) {
-            // Parse logs to extract alert information
-            const parsedAlerts = [];
-
-            response.logs.forEach(function(log) {
-                // Parse ALERT logs
-                if (log.startsWith('[ALERT]')) {
-                    const alertMatch = log.match(/\[ALERT\]\s+(.+?)\s+-\s+(.+?)\s+\|\s+(.+?)\s+->\s+(.+?)\s+\[(\w+)\]\s+\(Severity:\s+(\d+)\)/);
-                    if (alertMatch) {
-                        const alert = {
-                            timestamp: alertMatch[1],
-                            signature: alertMatch[2],
-                            src_ip: alertMatch[3],
-                            dest_ip: alertMatch[4],
-                            protocol: alertMatch[5],
-                            severity: parseInt(alertMatch[6])
-                        };
-                        parsedAlerts.push(alert);
-                    }
-                }
-                // Parse FLOW logs with protocol filter
-                else if (log.startsWith('[FLOW]')) {
-                    const flowMatch = log.match(/\[FLOW\]\s+(.+?)\s+-\s+(.+?):(\d+)\s+->\s+(.+?):(\d+)\s+\[(\w+)\]/);
-                    if (flowMatch) {
-                        const protocol = flowMatch[6];
-
-                        // Apply category filter
-                        if (!category || category.toLowerCase() === protocol.toLowerCase()) {
-                            const alert = {
-                                timestamp: flowMatch[1],
-                                signature: 'Network Flow',
-                                src_ip: flowMatch[2],
-                                dest_ip: flowMatch[4],
-                                protocol: protocol,
-                                severity: 3
-                            };
-                            parsedAlerts.push(alert);
-                        }
-                    }
-                }
-            });
-
-            if (parsedAlerts.length > 0) {
-                allAlerts = parsedAlerts;
-                displayAlerts(allAlerts);
-            } else {
-                $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts found for selected filter</td></tr>');
-            }
+    // Get alerts from database
+    $.get(`/api/database/alerts?limit=${limit}${category ? '&protocol=' + category.toUpperCase() : ''}`, function(response) {
+        if (response.alerts && response.alerts.length > 0) {
+            allAlerts = response.alerts;
+            displayAlerts(allAlerts);
         } else {
-            $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No logs available</td></tr>');
+            $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts found. Alerts are auto-synced from eve.json every 5 seconds.</td></tr>');
         }
     }).fail(function() {
-        $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-danger">Failed to load alerts</td></tr>');
+        $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-warning">Failed to load alerts from database. Check database configuration in .env</td></tr>');
     });
 }
 

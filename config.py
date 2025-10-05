@@ -20,7 +20,11 @@ class Config:
     DB_USER = os.getenv('DB_USER', 'root')
     DB_PASSWORD = os.getenv('DB_PASSWORD', '')
     DB_NAME = os.getenv('DB_NAME', 'suricata')
-    DB_PATH = os.getenv('DB_PATH', 'suricata.db')  # For SQLite
+    DB_PATH = os.getenv('DB_PATH', '/opt/suricata_monitoring/data/suricata.db')  # For SQLite
+
+    # Application storage paths
+    APP_DATA_DIR = os.getenv('APP_DATA_DIR', '/opt/suricata_monitoring/data')
+    APP_LOG_DIR = os.getenv('APP_LOG_DIR', '/opt/suricata_monitoring/log')
 
     # Flask settings
     FLASK_HOST = os.getenv('FLASK_HOST', '0.0.0.0')

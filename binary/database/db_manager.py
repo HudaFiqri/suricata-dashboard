@@ -33,73 +33,92 @@ class DatabaseManager:
 
         # If db_type is empty or sqlite with no config, use local storage silently
         if not db_type or (self.db_type == 'sqlite' and not self.db_config):
-            self.db_type = 'sqlite'
-            self.db_url = 'sqlite:///suricata.db'
-
-            self.engine = create_engine(
-                self.db_url,
-                connect_args={'check_same_thread': False},
-                poolclass=StaticPool,
-                echo=False
-            )
-
-            print(f"✓ Database connected: local")
+            self._initialize_local_storage()
         else:
-            # Create database URL
-            self.db_url = self._create_db_url()
+            # Try to connect to configured database
+            self._initialize_configured_database()
 
-            # Try to create engine and connect
-            try:
-                # Create engine
-                if self.db_type == 'sqlite':
-                    self.engine = create_engine(
-                        self.db_url,
-                        connect_args={'check_same_thread': False},
-                        poolclass=StaticPool,
-                        echo=False
-                    )
-                else:
-                    self.engine = create_engine(
-                        self.db_url,
-                        pool_pre_ping=True,
-                        pool_recycle=3600,
-                        echo=False
-                    )
+        # Create session factory and tables
+        if hasattr(self, 'engine'):
+            self.Session = scoped_session(sessionmaker(bind=self.engine))
+            self._create_tables()
 
-                # Test connection
-                with self.engine.connect() as conn:
-                    conn.execute(text("SELECT 1"))
+    def _initialize_local_storage(self):
+        """Initialize local SQLite storage"""
+        import os
+        self.db_type = 'sqlite'
+        default_db_path = os.getenv('DB_PATH', '/opt/suricata_monitoring/data/suricata.db')
 
-                print(f"✓ Database connected: {self.db_type.upper()}")
+        # Ensure directory exists
+        db_dir = os.path.dirname(default_db_path)
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+        except Exception as e:
+            print(f"Warning: Could not create directory {db_dir}: {e}")
+            # Fallback to current directory
+            default_db_path = 'suricata.db'
 
-            except Exception as e:
-                print(f"✗ Failed to connect to {self.db_type.upper()}: {e}")
-                print("→ Falling back to local storage...")
+        self.db_url = f'sqlite:///{default_db_path}'
 
-                # Fallback to SQLite
-                self.fallback_active = True
-                self.db_type = 'sqlite'
-                self.db_url = 'sqlite:///suricata_fallback.db'
+        self.engine = create_engine(
+            self.db_url,
+            connect_args={'check_same_thread': False},
+            poolclass=StaticPool,
+            echo=False
+        )
 
+        print(f"✓ Database connected: local storage ({default_db_path})")
+
+    def _initialize_configured_database(self):
+        """Try to connect to configured database, fallback to local storage if failed"""
+        # Create database URL
+        self.db_url = self._create_db_url()
+
+        # Try to create engine and connect
+        try:
+            # Create engine
+            if self.db_type == 'sqlite':
                 self.engine = create_engine(
                     self.db_url,
                     connect_args={'check_same_thread': False},
                     poolclass=StaticPool,
                     echo=False
                 )
+            else:
+                self.engine = create_engine(
+                    self.db_url,
+                    pool_pre_ping=True,
+                    pool_recycle=3600,
+                    echo=False
+                )
 
-                print(f"✓ Database connected: local (fallback)")
+            # Test connection
+            with self.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
 
-        # Create session factory
-        self.Session = scoped_session(sessionmaker(bind=self.engine))
+            print(f"✓ Database connected: {self.db_type.upper()}")
 
-        # Create tables
-        self._create_tables()
+        except Exception as e:
+            print(f"✗ Failed to connect to {self.db_type.upper()}: {e}")
+            print("→ Falling back to local storage...")
+
+            # Fallback to local storage
+            self.fallback_active = True
+            self._initialize_local_storage()
 
     def _create_db_url(self) -> str:
         """Create database URL based on type and config"""
         if self.db_type == 'sqlite':
-            db_path = self.db_config.get('path', 'suricata.db')
+            import os
+            db_path = self.db_config.get('path', '/opt/suricata_monitoring/data/suricata.db')
+
+            # Ensure directory exists
+            db_dir = os.path.dirname(db_path)
+            try:
+                os.makedirs(db_dir, exist_ok=True)
+            except Exception as e:
+                print(f"Warning: Could not create directory {db_dir}: {e}")
+
             return f'sqlite:///{db_path}'
 
         elif self.db_type == 'mysql':
