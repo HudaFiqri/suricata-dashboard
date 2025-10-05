@@ -51,15 +51,36 @@ controller = SuricataController(
 
 ## API Endpoints
 
+### Process Control
 - `GET /api/status` - Get Suricata status
 - `POST /api/start` - Start Suricata
 - `POST /api/stop` - Stop Suricata
 - `POST /api/restart` - Restart Suricata
 - `POST /api/reload-rules` - Reload rules
+
+### Logs & Configuration
 - `GET /api/logs` - Get recent logs
 - `GET /api/rules` - Get rules files
 - `GET /api/config` - Get configuration
 - `POST /api/config` - Save configuration
+
+### Monitoring & Traffic
+- `GET /api/monitor/data` - Get traffic monitoring data (TCP, UDP, ICMP, Alerts)
+- `GET /api/monitor/alerts` - Get recent alerts from eve.json
+- `GET /api/monitor/events` - Get all events from eve.json
+
+### Database
+- `GET /api/database/check` - Check database connection status
+- `GET /api/database/info` - Get database information
+- `GET /api/database/alerts` - Get alerts from database
+- `GET /api/database/traffic/latest` - Get latest traffic statistics
+- `GET /api/database/traffic/recent` - Get recent traffic statistics
+
+### RRD Graphs
+- `GET /api/rrd/graph` - Generate RRD graph (params: metric, timespan)
+  - Metrics: `tcp`, `udp`, `icmp`, `alerts`
+  - Timespans: `5m`, `15m`, `30m`, `1h`, `6h`, `24h`, `7d`, `30d`
+- `GET /api/rrd/update` - Update RRD metrics from database
 
 ## Security Notes
 

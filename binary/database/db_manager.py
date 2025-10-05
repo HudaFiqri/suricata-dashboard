@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
+import hashlib
 
 from .models import Base, Alert, Log, Statistics, TrafficStats
 from .mysql import create_mysql_engine
@@ -70,10 +71,13 @@ class DatabaseManager:
 
     def get_db_info(self) -> Dict[str, Any]:
         """Get database connection information"""
+        # Hash the database URL with MD5 for security
+        url_hash = hashlib.md5(self.db_url.encode()).hexdigest()
+
         return {
             'type': self.db_type,
             'original_type': self.original_db_type,
-            'url': self.db_url.split('@')[0] if '@' in self.db_url else self.db_url,  # Hide password
+            'url': url_hash,  # MD5 hashed URL
             'connected': self._test_connection(),
         }
 

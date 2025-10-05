@@ -232,6 +232,9 @@ class SuricataRRDManager:
         try:
             # Map timespan to seconds
             timespan_map = {
+                '5m': 300,
+                '15m': 900,
+                '30m': 1800,
                 '1h': 3600,
                 '6h': 21600,
                 '24h': 86400,
@@ -308,6 +311,9 @@ class SuricataRRDManager:
 
         try:
             timespan_map = {
+                '5m': 300,
+                '15m': 900,
+                '30m': 1800,
                 '1h': 3600,
                 '6h': 21600,
                 '24h': 86400,
