@@ -87,21 +87,23 @@ def check_dependencies():
     return True
 
 def main():
-    print("\n" + "=" * 60)
-    print("           Suricata Web Dashboard")
-    print("=" * 60)
-    print("\nChecking dependencies...")
-    print("-" * 60)
+    # Only show startup banner on main process (not reloader)
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        print("\n" + "=" * 60)
+        print("           Suricata Web Dashboard")
+        print("=" * 60)
+        print("\nChecking dependencies...")
+        print("-" * 60)
 
-    if not check_dependencies():
-        print("\nPlease install missing dependencies and try again.")
-        sys.exit(1)
+        if not check_dependencies():
+            print("\nPlease install missing dependencies and try again.")
+            sys.exit(1)
 
-    print("\n" + "=" * 60)
-    print("Starting Flask development server...")
-    print("Dashboard will be available at: http://localhost:5000")
-    print("Press Ctrl+C to stop the server")
-    print("=" * 60 + "\n")
+        print("\n" + "=" * 60)
+        print("Starting Flask development server...")
+        print("Dashboard will be available at: http://localhost:5000")
+        print("Press Ctrl+C to stop the server")
+        print("=" * 60 + "\n")
 
     try:
         from app import app
