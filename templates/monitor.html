@@ -220,10 +220,10 @@ function loadAlerts() {
             allAlerts = response.alerts;
             displayAlerts(allAlerts);
         } else {
-            $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts found</td></tr>');
+            $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-muted">No alerts in database. Alerts will appear here once Suricata detects threats.</td></tr>');
         }
-    }).fail(function() {
-        $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-danger">Failed to load alerts</td></tr>');
+    }).fail(function(xhr, status, error) {
+        $('#alert-table-body').html('<tr><td colspan="6" class="text-center text-warning">Database not configured or no alerts yet. Enable database in .env to store alerts.</td></tr>');
     });
 }
 

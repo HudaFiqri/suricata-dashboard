@@ -150,12 +150,39 @@ $('.config-search').click(function(e) {
     const searchTerm = $(this).data('search');
     const editor = $('#config-editor')[0];
     const content = editor.value;
-    const index = content.toLowerCase().indexOf(searchTerm.toLowerCase());
 
-    if (index !== -1) {
+    // Find the first occurrence
+    const lines = content.split('\n');
+    let lineNumber = -1;
+    let charPosition = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].toLowerCase().includes(searchTerm.toLowerCase())) {
+            lineNumber = i;
+            break;
+        }
+        charPosition += lines[i].length + 1; // +1 for newline
+    }
+
+    if (lineNumber !== -1) {
         editor.focus();
-        editor.setSelectionRange(index, index + searchTerm.length);
-        editor.scrollTop = editor.scrollHeight * (index / content.length) - 100;
+
+        // Calculate scroll position based on line number
+        const lineHeight = parseInt(window.getComputedStyle(editor).lineHeight);
+        const scrollPosition = lineNumber * lineHeight;
+
+        editor.scrollTop = scrollPosition - 100; // Offset for better visibility
+
+        // Highlight the line
+        const lineStart = charPosition;
+        const lineEnd = charPosition + lines[lineNumber].length;
+        editor.setSelectionRange(lineStart, lineEnd);
+
+        // Visual feedback
+        $('.config-search').removeClass('active');
+        $(this).addClass('active');
+    } else {
+        alert('Section "' + searchTerm + '" not found in configuration');
     }
 });
 
