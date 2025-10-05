@@ -3,49 +3,134 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _get_env_raw(*keys):
+    for key in keys:
+        value = os.getenv(key)
+        if value is not None:
+            return value
+    return None
+
+
+def _get_env(*keys, default=None):
+    for key in keys:
+        value = os.getenv(key)
+        if value is not None and value != '':
+            return value
+    return default
+
+
+def _normalize_db_type(value):
+    if not value:
+        return None
+
+    normalized = value.strip().lower()
+    mapping = {
+        'postgres': 'postgresql',
+        'postgresql': 'postgresql',
+        'psql': 'postgresql',
+        'mysql': 'mysql',
+        'mariadb': 'mysql',
+        'sqlite': 'sqlite',
+        'sqlite3': 'sqlite'
+    }
+    return mapping.get(normalized, normalized)
+
+
+def _infer_db_type(port_value, user_value):
+    port = None
+    if port_value is not None:
+        try:
+            port = int(port_value)
+        except ValueError:
+            port = None
+
+    if port in (5432, 6432):
+        return 'postgresql'
+    if port in (3306, 33060, 3307):
+        return 'mysql'
+
+    if user_value:
+        lowered_user = user_value.strip().lower()
+        if lowered_user == 'postgres':
+            return 'postgresql'
+        if lowered_user in ('root', 'mysql'):
+            return 'mysql'
+
+    return None
+
+
 class Config:
     # Suricata paths
-    SURICATA_BINARY_PATH = os.getenv('SURICATA_BINARY_PATH', 'suricata')
-    SURICATA_CONFIG_PATH = os.getenv('SURICATA_CONFIG_PATH', '/etc/suricata/suricata.yaml')
-    SURICATA_RULES_DIR = os.getenv('SURICATA_RULES_DIR', '/etc/suricata/rules')
-    SURICATA_LOG_DIR = os.getenv('SURICATA_LOG_DIR', '/var/log/suricata')
+    SURICATA_BINARY_PATH = _get_env('SURICATA_BINARY_PATH', default='suricata')
+    SURICATA_CONFIG_PATH = _get_env('SURICATA_CONFIG_PATH', default='/etc/suricata/suricata.yaml')
+    SURICATA_RULES_DIR = _get_env('SURICATA_RULES_DIR', default='/etc/suricata/rules')
+    SURICATA_LOG_DIR = _get_env('SURICATA_LOG_DIR', default='/var/log/suricata')
 
     # RRD settings
-    RRD_DIR = os.getenv('RRD_DIR', '/var/lib/suricata/rrd')
+    RRD_DIR = _get_env('RRD_DIR', default='/var/lib/suricata/rrd')
 
     # Database settings
-    DB_TYPE = os.getenv('DB_TYPE', 'sqlite')  # sqlite, mysql, postgresql
-    DB_HOST = os.getenv('DB_HOST', 'localhost')
-    DB_PORT = int(os.getenv('DB_PORT', 3306))  # MySQL default
-    DB_USER = os.getenv('DB_USER', 'root')
-    DB_PASSWORD = os.getenv('DB_PASSWORD', '')
-    DB_NAME = os.getenv('DB_NAME', 'suricata')
-    DB_PATH = os.getenv('DB_PATH', '/opt/suricata_monitoring/data/suricata.db')  # For SQLite
+    _db_host_env = _get_env('DB_HOST', 'DATABASE_HOST')
+    _db_port_env = _get_env('DB_PORT', 'DATABASE_PORT')
+    _db_user_env = _get_env('DB_USER', 'DATABASE_USERNAME')
+
+    _raw_db_type_env = _get_env_raw('DB_TYPE', 'DATABASE_TYPE')
+    _normalized_db_type = _normalize_db_type(_raw_db_type_env)
+
+    DB_TYPE = _normalized_db_type or _infer_db_type(_db_port_env, _db_user_env) or 'sqlite'
+
+    default_host = _get_env('DB_HOST', 'DATABASE_HOST', default='localhost')
+    default_port = _get_env('DB_PORT', 'DATABASE_PORT')
+    default_user = _get_env('DB_USER', 'DATABASE_USERNAME')
+    default_password = _get_env('DB_PASSWORD', 'DATABASE_PASSWORD', default='')
+    default_name = _get_env('DB_NAME', 'DATABASE_NAME', default='suricata')
+    default_path = _get_env('DB_PATH', 'DATABASE_PATH', default='/opt/suricata_monitoring/data/suricata.db')
+
+    fallback_defaults = {
+        'postgresql': {'port': '5432', 'user': 'postgres'},
+        'mysql': {'port': '3306', 'user': 'root'},
+        'sqlite': {'port': '0', 'user': ''}
+    }
+
+    defaults_for_type = fallback_defaults.get(DB_TYPE, {'port': '0', 'user': ''})
+
+    DB_HOST = default_host
+
+    if DB_TYPE == 'sqlite':
+        DB_PORT = 0
+    else:
+        DB_PORT = int(default_port or defaults_for_type['port'])
+
+    DB_USER = default_user or defaults_for_type['user']
+    DB_PASSWORD = default_password
+    DB_NAME = default_name
+    DB_PATH = default_path
 
     # Application storage paths
-    APP_DATA_DIR = os.getenv('APP_DATA_DIR', '/opt/suricata_monitoring/data')
-    APP_LOG_DIR = os.getenv('APP_LOG_DIR', '/opt/suricata_monitoring/log')
+    APP_DATA_DIR = _get_env('APP_DATA_DIR', default='/opt/suricata_monitoring/data')
+    APP_LOG_DIR = _get_env('APP_LOG_DIR', default='/opt/suricata_monitoring/log')
 
     # Flask settings
-    FLASK_HOST = os.getenv('FLASK_HOST', '0.0.0.0')
-    FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
-    FLASK_DEBUG = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
+    FLASK_HOST = _get_env('FLASK_HOST', default='0.0.0.0')
+    FLASK_PORT = int(_get_env('FLASK_PORT', default='5000'))
+    FLASK_DEBUG = _get_env('FLASK_DEBUG', default='True').strip().lower() == 'true'
 
     # Dashboard settings
-    AUTO_REFRESH_INTERVAL = int(os.getenv('AUTO_REFRESH_INTERVAL', 5000))
-    LOG_LINES_LIMIT = int(os.getenv('LOG_LINES_LIMIT', 100))
-    MAX_RULE_FILE_SIZE = int(os.getenv('MAX_RULE_FILE_SIZE', 1048576))
+    AUTO_REFRESH_INTERVAL = int(_get_env('AUTO_REFRESH_INTERVAL', default='5000'))
+    LOG_LINES_LIMIT = int(_get_env('LOG_LINES_LIMIT', default='100'))
+    MAX_RULE_FILE_SIZE = int(_get_env('MAX_RULE_FILE_SIZE', default='1048576'))
 
     # Auto-restart settings
-    AUTO_RESTART_ENABLED = os.getenv('AUTO_RESTART_ENABLED', 'False').lower() == 'true'
-    AUTO_RESTART_MAX_RETRIES = int(os.getenv('AUTO_RESTART_MAX_RETRIES', 3))
-    AUTO_RESTART_CHECK_INTERVAL = int(os.getenv('AUTO_RESTART_CHECK_INTERVAL', 30))  # seconds
+    AUTO_RESTART_ENABLED = _get_env('AUTO_RESTART_ENABLED', default='False').strip().lower() == 'true'
+    AUTO_RESTART_MAX_RETRIES = int(_get_env('AUTO_RESTART_MAX_RETRIES', default='3'))
+    AUTO_RESTART_CHECK_INTERVAL = int(_get_env('AUTO_RESTART_CHECK_INTERVAL', default='30'))  # seconds
 
     # SSL/TLS settings
-    USE_HTTPS = os.getenv('USE_HTTPS', 'False').lower() == 'true'
-    SSL_CERT_PATH = os.getenv('SSL_CERT_PATH', 'binary/certificates/cert.pem')
-    SSL_KEY_PATH = os.getenv('SSL_KEY_PATH', 'binary/certificates/key.pem')
-    
+    USE_HTTPS = _get_env('USE_HTTPS', default='False').strip().lower() == 'true'
+    SSL_CERT_PATH = _get_env('SSL_CERT_PATH', default='binary/certificates/cert.pem')
+    SSL_KEY_PATH = _get_env('SSL_KEY_PATH', default='binary/certificates/key.pem')
+
     @classmethod
     def get_platform_defaults(cls):
         if os.name == 'nt':  # Windows
