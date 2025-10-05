@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Suricata Status</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled status-detail-list mb-0" id="status-info">
+                    <li>
+                        <span class="status-label">Status:</span>
+                        {% if status.status == 'running' %}
+                        <span class="status-value status-running"><i class="fas fa-play-circle"></i> Running</span>
+                        {% elif status.status == 'stopped' %}
+                        <span class="status-value status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span>
+                        {% else %}
+                        <span class="status-value status-error"><i class="fas fa-exclamation-circle"></i> Error</span>
+                        {% endif %}
+                    </li>
+                    <li>
+                        <span class="status-label">PID:</span>
+                        <span class="status-value">{{ status.pid if status.pid is defined else 'N/A' }}</span>
+                    </li>
+                    <li>
+                        <span class="status-label">Uptime:</span>
+                        <span class="status-value">{{ status.uptime if status.uptime is defined and status.uptime else '-' }}</span>
+                    </li>
+                    <li>
+                        <span class="status-label">Last Time:</span>
+                        <span class="status-value">{{ status.last_time if status.last_time else '-' }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-database"></i> Database Status</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled status-detail-list mb-0" id="database-status">
+                    <li>
+                        <span class="status-label">Database Brand:</span>
+                        <span class="status-value" id="database-brand">{% if status.database %}{{ status.database.label }}{% else %}-{% endif %}</span>
+                    </li>
+                    <li>
+                        <span class="status-label">Database Host:</span>
+                        <span class="status-value" id="database-host">{% if status.database %}{{ status.database.host }}{% if status.database.port %}:{{ status.database.port }}{% endif %}{% else %}-{% endif %}</span>
+                    </li>
+                    <li>
+                        <span class="status-label">Database Status:</span>
+                        <span class="status-value" id="database-connection">Checking...</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.status-detail-list .status-label {
+    font-weight: 600;
+    min-width: 140px;
+    display: inline-block;
+}
+
+.status-detail-list li + li {
+    margin-top: 0.5rem;
+}
+
+.status-detail-list .status-value {
+    font-weight: 500;
+}
+
+.status-note {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+</style>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-tachometer-alt"></i> Quick Overview</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <div class="p-3">
+                            <i class="fas fa-database fa-3x text-primary mb-2"></i>
+                            <h4 id="dashboard-db-status">Checking...</h4>
+                            <p class="text-muted">Database Status</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3">
+                            <i class="fas fa-server fa-3x text-success mb-2"></i>
+                            <h4 id="dashboard-suricata-status">Checking...</h4>
+                            <p class="text-muted">Suricata Status</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3">
+                            <i class="fas fa-chart-area fa-3x text-warning mb-2"></i>
+                            <h4 id="dashboard-rrd-files">-</h4>
+                            <p class="text-muted">RRD Graphs Available</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="alertModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Operation Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modal-message">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function formatLocalTime(epochSeconds) {
+    const numeric = Number(epochSeconds);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return '-';
+    }
+    const date = new Date(numeric * 1000);
+    if (Number.isNaN(date.getTime())) {
+        return '-';
+    }
+    return date.toLocaleString();
+}
+
+function showAlert(message, isSuccess = true) {
+    $('#modal-message').html('<div class="alert alert-' + (isSuccess ? "success" : "danger") + '">' + message + '</div>');
+    $('#alertModal').modal('show');
+    setTimeout(() => updateStatus(), 1000);
+}
+
+function renderSuricataStatus(data) {
+    const statusList = $('#status-info');
+    if (!statusList.length) {
+        return;
+    }
+
+    let statusBadge;
+    if (data.status === 'running') {
+        statusBadge = '<span class="status-value status-running"><i class="fas fa-play-circle"></i> Running</span>';
+    } else if (data.status === 'stopped') {
+        statusBadge = '<span class="status-value status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span>';
+    } else {
+        statusBadge = '<span class="status-value status-error"><i class="fas fa-exclamation-circle"></i> Error</span>';
+    }
+
+    const pidValue = (data.pid !== undefined && data.pid !== null && data.pid !== '') ? data.pid : 'N/A';
+    const uptimeValue = data.uptime ? data.uptime : '-';
+    let lastTimeDisplay = '-';
+    if (data.last_time_epoch) {
+        lastTimeDisplay = formatLocalTime(data.last_time_epoch);
+    } else if (data.last_time) {
+        lastTimeDisplay = data.last_time;
+    }
+
+    let rows = `
+        <li>
+            <span class="status-label">Status:</span>
+            ${statusBadge}
+        </li>
+        <li>
+            <span class="status-label">PID:</span>
+            <span class="status-value">${pidValue}</span>
+        </li>
+        <li>
+            <span class="status-label">Uptime:</span>
+            <span class="status-value">${uptimeValue}</span>
+        </li>
+        <li>
+            <span class="status-label">Last Time:</span>
+            <span class="status-value">${lastTimeDisplay}</span>
+        </li>
+    `;
+
+    if (data.status === 'error' && data.message) {
+        rows += `
+        <li class="status-note text-muted">
+            ${data.message}
+        </li>`;
+    }
+
+    statusList.html(rows);
+}
+
+function updateStatus() {
+    $.get('/api/status', function(data) {
+        renderSuricataStatus(data);
+
+        const suricataStatusEl = $('#dashboard-suricata-status');
+        if (suricataStatusEl.length) {
+            if (data.status === 'running') {
+                suricataStatusEl.html('<span class="text-success">Running</span>');
+            } else if (data.status === 'stopped') {
+                suricataStatusEl.html('<span class="text-danger">Stopped</span>');
+            } else {
+                suricataStatusEl.html('<span class="text-warning">Error</span>');
+            }
+        }
+
+        const dbBrandEl = $('#database-brand');
+        if (dbBrandEl.length) {
+            if (data.database) {
+                const dbLabel = data.database.label || (data.database.type ? data.database.type.toUpperCase() : '-');
+                dbBrandEl.text(dbLabel);
+            } else {
+                dbBrandEl.text('-');
+            }
+        }
+
+        const dbHostEl = $('#database-host');
+        if (dbHostEl.length) {
+            if (data.database) {
+                const host = data.database.host || 'localhost';
+                const port = (data.database.port !== undefined && data.database.port !== null && data.database.port !== '') ? `:${data.database.port}` : '';
+                dbHostEl.text(`${host}${port}`);
+            } else {
+                dbHostEl.text('-');
+            }
+        }
+    }).fail(function() {
+        const suricataStatusEl = $('#dashboard-suricata-status');
+        if (suricataStatusEl.length) {
+            suricataStatusEl.html('<span class="text-danger">Error</span>');
+        }
+
+        const statusList = $('#status-info');
+        if (statusList.length) {
+            statusList.html(`
+                <li>
+                    <span class="status-label">Status:</span>
+                    <span class="status-value status-error"><i class="fas fa-exclamation-circle"></i> Error</span>
+                </li>
+                <li>
+                    <span class="status-label">PID:</span>
+                    <span class="status-value">N/A</span>
+                </li>
+                <li>
+                    <span class="status-label">Uptime:</span>
+                    <span class="status-value">-</span>
+                </li>
+                <li>
+                    <span class="status-label">Last Time:</span>
+                    <span class="status-value">-</span>
+                </li>
+            `);
+        }
+    });
+}
+
+function updateQuickOverview() {
+    $.get('/api/database/check', function(response) {
+        const dbStatusEl = $('#dashboard-db-status');
+        if (dbStatusEl.length) {
+            if (response.success && response.connected) {
+                dbStatusEl.html('<span class="text-success">Connected</span>');
+            } else if (response.success) {
+                dbStatusEl.html('<span class="text-danger">Disconnected</span>');
+            } else {
+                dbStatusEl.html('<span class="text-danger">Error</span>');
+            }
+        }
+
+        const cardStatusEl = $('#database-connection');
+        if (cardStatusEl.length) {
+            if (response.success && response.connected) {
+                cardStatusEl.html('<span class="text-success">Connected</span>');
+            } else if (response.success) {
+                cardStatusEl.html('<span class="text-danger">Disconnected</span>');
+            } else {
+                cardStatusEl.html('<span class="text-danger">Error</span>');
+            }
+        }
+    }).fail(function() {
+        const dbStatusEl = $('#dashboard-db-status');
+        if (dbStatusEl.length) {
+            dbStatusEl.html('<span class="text-danger">Error</span>');
+        }
+        const cardStatusEl = $('#database-connection');
+        if (cardStatusEl.length) {
+            cardStatusEl.html('<span class="text-danger">Error</span>');
+        }
+    });
+
+    $('#dashboard-rrd-files').text('3 Metrics');
+
+}
+
+$(document).ready(function() {
+    updateStatus();
+    updateQuickOverview();
+    setInterval(updateStatus, 1000);
+    setInterval(updateQuickOverview, 30000);
+});
+</script>
+{% endblock %}
+
+
