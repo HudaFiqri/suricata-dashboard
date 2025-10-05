@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, func, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import StaticPool
 from typing import Optional, List, Dict, Any
@@ -26,46 +26,15 @@ class DatabaseManager:
                 - For PostgreSQL: {'host': 'localhost', 'port': 5432, 'user': 'postgres',
                                   'password': 'pass', 'database': 'suricata'}
         """
-        self.db_type = db_type.lower()
+        self.db_type = db_type.lower() if db_type else 'sqlite'
         self.db_config = db_config or {}
         self.fallback_active = False
         self.original_db_type = self.db_type
 
-        # Create database URL
-        self.db_url = self._create_db_url()
-
-        # Try to create engine and connect
-        try:
-            # Create engine
-            if self.db_type == 'sqlite':
-                self.engine = create_engine(
-                    self.db_url,
-                    connect_args={'check_same_thread': False},
-                    poolclass=StaticPool,
-                    echo=False
-                )
-            else:
-                self.engine = create_engine(
-                    self.db_url,
-                    pool_pre_ping=True,
-                    pool_recycle=3600,
-                    echo=False
-                )
-
-            # Test connection
-            with self.engine.connect() as conn:
-                conn.execute("SELECT 1")
-
-            print(f"✓ Database connection successful: {self.db_type.upper()}")
-
-        except Exception as e:
-            print(f"✗ Failed to connect to {self.db_type.upper()} database: {e}")
-            print("→ Falling back to local SQLite database...")
-
-            # Fallback to SQLite
-            self.fallback_active = True
+        # If db_type is empty or sqlite with no config, use local storage silently
+        if not db_type or (self.db_type == 'sqlite' and not self.db_config):
             self.db_type = 'sqlite'
-            self.db_url = 'sqlite:///suricata_fallback.db'
+            self.db_url = 'sqlite:///suricata.db'
 
             self.engine = create_engine(
                 self.db_url,
@@ -74,7 +43,52 @@ class DatabaseManager:
                 echo=False
             )
 
-            print(f"✓ Fallback database initialized: {self.db_url}")
+            print(f"✓ Using local storage: {self.db_url}")
+        else:
+            # Create database URL
+            self.db_url = self._create_db_url()
+
+            # Try to create engine and connect
+            try:
+                # Create engine
+                if self.db_type == 'sqlite':
+                    self.engine = create_engine(
+                        self.db_url,
+                        connect_args={'check_same_thread': False},
+                        poolclass=StaticPool,
+                        echo=False
+                    )
+                else:
+                    self.engine = create_engine(
+                        self.db_url,
+                        pool_pre_ping=True,
+                        pool_recycle=3600,
+                        echo=False
+                    )
+
+                # Test connection
+                with self.engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+
+                print(f"✓ Database connected: {self.db_type.upper()}")
+
+            except Exception as e:
+                print(f"✗ Failed to connect to {self.db_type.upper()}: {e}")
+                print("→ Falling back to local storage...")
+
+                # Fallback to SQLite
+                self.fallback_active = True
+                self.db_type = 'sqlite'
+                self.db_url = 'sqlite:///suricata_fallback.db'
+
+                self.engine = create_engine(
+                    self.db_url,
+                    connect_args={'check_same_thread': False},
+                    poolclass=StaticPool,
+                    echo=False
+                )
+
+                print(f"✓ Using local storage: {self.db_url}")
 
         # Create session factory
         self.Session = scoped_session(sessionmaker(bind=self.engine))
@@ -137,7 +151,7 @@ class DatabaseManager:
         """Test if database connection is alive"""
         try:
             with self.engine.connect() as conn:
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
             return True
         except Exception:
             return False

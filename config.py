@@ -31,6 +31,16 @@ class Config:
     AUTO_REFRESH_INTERVAL = int(os.getenv('AUTO_REFRESH_INTERVAL', 5000))
     LOG_LINES_LIMIT = int(os.getenv('LOG_LINES_LIMIT', 100))
     MAX_RULE_FILE_SIZE = int(os.getenv('MAX_RULE_FILE_SIZE', 1048576))
+
+    # Auto-restart settings
+    AUTO_RESTART_ENABLED = os.getenv('AUTO_RESTART_ENABLED', 'False').lower() == 'true'
+    AUTO_RESTART_MAX_RETRIES = int(os.getenv('AUTO_RESTART_MAX_RETRIES', 3))
+    AUTO_RESTART_CHECK_INTERVAL = int(os.getenv('AUTO_RESTART_CHECK_INTERVAL', 30))  # seconds
+
+    # SSL/TLS settings
+    USE_HTTPS = os.getenv('USE_HTTPS', 'False').lower() == 'true'
+    SSL_CERT_PATH = os.getenv('SSL_CERT_PATH', 'binary/certificates/cert.pem')
+    SSL_KEY_PATH = os.getenv('SSL_KEY_PATH', 'binary/certificates/key.pem')
     
     @classmethod
     def get_platform_defaults(cls):

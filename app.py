@@ -52,9 +52,53 @@ def update_rrd_metrics():
             print(f"Error updating RRD metrics: {e}")
         time.sleep(60)  # Update every minute
 
-# Start background thread
+# Auto-restart monitor thread
+def auto_restart_monitor():
+    """Monitor Suricata and auto-restart if crashed"""
+    retry_count = 0
+    last_status = None
+
+    while True:
+        try:
+            if Config.AUTO_RESTART_ENABLED:
+                status = controller.get_status()
+                is_running = status.get('running', False)
+
+                # Check if Suricata crashed
+                if not is_running and last_status and last_status.get('running', False):
+                    print(f"[AUTO-RESTART] Suricata crashed! Retry count: {retry_count}/{Config.AUTO_RESTART_MAX_RETRIES}")
+
+                    if retry_count < Config.AUTO_RESTART_MAX_RETRIES:
+                        print("[AUTO-RESTART] Attempting to restart Suricata...")
+                        result = controller.restart()
+
+                        if result.get('success'):
+                            print("[AUTO-RESTART] Suricata restarted successfully")
+                            retry_count += 1
+                        else:
+                            print(f"[AUTO-RESTART] Failed to restart: {result.get('message')}")
+                    else:
+                        print(f"[AUTO-RESTART] Max retries ({Config.AUTO_RESTART_MAX_RETRIES}) reached. Stopping auto-restart.")
+
+                # Reset retry count if running
+                if is_running:
+                    retry_count = 0
+
+                last_status = status
+
+        except Exception as e:
+            print(f"[AUTO-RESTART] Error in monitor: {e}")
+
+        time.sleep(Config.AUTO_RESTART_CHECK_INTERVAL)
+
+# Start background threads
 rrd_thread = threading.Thread(target=update_rrd_metrics, daemon=True)
 rrd_thread.start()
+
+if Config.AUTO_RESTART_ENABLED:
+    restart_thread = threading.Thread(target=auto_restart_monitor, daemon=True)
+    restart_thread.start()
+    print(f"[AUTO-RESTART] Monitoring enabled (max retries: {Config.AUTO_RESTART_MAX_RETRIES}, check interval: {Config.AUTO_RESTART_CHECK_INTERVAL}s)")
 
 @app.route('/')
 def index():
@@ -173,4 +217,4 @@ def api_database_stats():
     return jsonify(stats)
 
 if __name__ == '__main__':
-    app.run(debug=Config.FLASK_DEBUG, host=Config.FLASK_HOST, port=Config.FLASK_PORT)
+    app.run(debug=Config.FLASK_DEBUG, host=Config.FLASK_HOST, port=Config.FLASK_PORT, use_debugger=False, use_reloader=True)
