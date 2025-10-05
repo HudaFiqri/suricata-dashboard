@@ -6,7 +6,7 @@ import json
 import hashlib
 import os
 
-from .models import Base, Alert, Log, Statistics, TrafficStats
+from .models import Base, Alert, Log, Statistics, TrafficStats, IntegrationConfig
 from .mysql import create_mysql_engine
 from .postgresql import create_postgresql_engine
 
@@ -336,6 +336,71 @@ class DatabaseManager:
         finally:
             session.close()
 
+    # ==================== Integration Settings ====================
+
+    def upsert_integration_settings(self, name: str, settings: Dict[str, Any]) -> IntegrationConfig:
+        """Store integration settings hash in the database (MD5)."""
+        session = self.get_session()
+        try:
+            payload_json = json.dumps(settings or {}, sort_keys=True)
+            config_hash = hashlib.md5(payload_json.encode('utf-8')).hexdigest()
+            record = session.query(IntegrationConfig).filter(IntegrationConfig.name == name).first()
+            now = datetime.utcnow()
+            enabled = bool(settings.get('enabled', False))
+
+            if record:
+                record.enabled = enabled
+                record.config_hash = config_hash
+                record.updated_at = now
+            else:
+                record = IntegrationConfig(
+                    name=name,
+                    enabled=enabled,
+                    config_hash=config_hash,
+                    updated_at=now
+                )
+                session.add(record)
+
+            session.commit()
+            return record
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def get_integration_hashes(self) -> Dict[str, Dict[str, Any]]:
+        """Return all stored integration hashes."""
+        session = self.get_session()
+        try:
+            records = session.query(IntegrationConfig).all()
+            return {
+                record.name: {
+                    'enabled': record.enabled,
+                    'config_hash': record.config_hash,
+                    'updated_at': record.updated_at.isoformat() if record.updated_at else None
+                }
+                for record in records
+            }
+        finally:
+            session.close()
+
+    def get_integration_hash(self, name: str) -> Optional[Dict[str, Any]]:
+        """Return hash info for a single integration."""
+        session = self.get_session()
+        try:
+            record = session.query(IntegrationConfig).filter(IntegrationConfig.name == name).first()
+            if not record:
+                return None
+            return {
+                'name': record.name,
+                'enabled': record.enabled,
+                'config_hash': record.config_hash,
+                'updated_at': record.updated_at.isoformat() if record.updated_at else None
+            }
+        finally:
+            session.close()
+
     # ==================== Traffic Stats Operations ====================
 
     def add_traffic_stats(self, stats_data: Dict[str, Any]) -> Optional[TrafficStats]:
@@ -438,3 +503,5 @@ class DatabaseManager:
             raise
         finally:
             session.close()
+
+

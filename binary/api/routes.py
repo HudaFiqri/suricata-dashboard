@@ -7,13 +7,14 @@ from flask import request, jsonify, send_file
 class APIRoutes:
     """Centralized API routes handler"""
 
-    def __init__(self, app, controller, rrd_manager, monitor_api, alerts_api, database_api):
+    def __init__(self, app, controller, rrd_manager, monitor_api, alerts_api, database_api, integration_manager):
         self.app = app
         self.controller = controller
         self.rrd_manager = rrd_manager
         self.monitor_api = monitor_api
         self.alerts_api = alerts_api
         self.database_api = database_api
+        self.integration_manager = integration_manager
         self._register_routes()
 
     def _register_routes(self):
@@ -34,6 +35,11 @@ class APIRoutes:
         # Config API
         self.app.add_url_rule('/api/config', 'api_config_get', self.get_config, methods=['GET'])
         self.app.add_url_rule('/api/config', 'api_config_post', self.save_config, methods=['POST'])
+
+        # Integration APIs
+        self.app.add_url_rule('/api/integration', 'api_integration_get_all', self.get_integrations, methods=['GET'])
+        self.app.add_url_rule('/api/integration/<integration_name>', 'api_integration_get', self.get_integration, methods=['GET'])
+        self.app.add_url_rule('/api/integration/<integration_name>', 'api_integration_save', self.save_integration, methods=['POST'])
 
         # Monitor APIs
         self.app.add_url_rule('/api/monitor/data', 'api_monitor_data', self.get_monitor_data)
@@ -166,6 +172,48 @@ class APIRoutes:
         except Exception as e:
             return jsonify({'success': False, 'message': str(e)})
 
+    # ==================== Integrations ====================
+    def get_integrations(self):
+        """Get all integration settings"""
+        try:
+            settings = self.integration_manager.get_settings()
+            hashes = self.integration_manager.get_hashes()
+            response = {'success': True, 'settings': settings}
+            if hashes:
+                response['hashes'] = hashes
+            return jsonify(response)
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    def get_integration(self, integration_name):
+        """Get single integration settings"""
+        try:
+            settings = self.integration_manager.get_integration(integration_name)
+            hash_info = self.integration_manager.get_hash(integration_name)
+            response = {'success': True, 'settings': settings, 'integration': integration_name.lower()}
+            if hash_info:
+                response['hash'] = hash_info
+            return jsonify(response)
+        except ValueError as exc:
+            return jsonify({'success': False, 'message': str(exc)}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    def save_integration(self, integration_name):
+        """Save integration configuration"""
+        try:
+            payload = request.get_json(silent=True) or {}
+            settings = self.integration_manager.update_integration(integration_name, payload)
+            hash_info = self.integration_manager.get_hash(integration_name)
+            response = {'success': True, 'settings': settings, 'integration': integration_name.lower()}
+            if hash_info:
+                response['hash'] = hash_info
+            return jsonify(response)
+        except ValueError as exc:
+            return jsonify({'success': False, 'message': str(exc)}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
     # ==================== Monitor ====================
     def get_monitor_data(self):
         """Get monitoring data from eve.json"""
@@ -251,3 +299,4 @@ class APIRoutes:
     def debug_eve(self):
         """Debug endpoint to check eve.json"""
         return jsonify(self.monitor_api.get_debug_info())
+

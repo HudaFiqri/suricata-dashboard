@@ -1,7 +1,5 @@
 {% extends "base.html" %}
-
 {% block title %}Configuration - Suricata Dashboard{% endblock %}
-
 {% block content %}
 <div class="row">
     <div class="col-md-3">
@@ -26,10 +24,18 @@
                     <a href="#" class="list-group-item list-group-item-action config-search" data-search="vars">
                         <i class="fas fa-dollar-sign"></i> Variables
                     </a>
+                    <div class="list-group-item list-group-item-secondary text-uppercase fw-bold small">
+                        <i class="fas fa-plug"></i> Integration
+                    </div>
+                    <a href="#" class="list-group-item list-group-item-action" data-integration="discord">
+                        <i class="fab fa-discord"></i> Discord
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" data-integration="telegram">
+                        <i class="fab fa-telegram"></i> Telegram
+                    </a>
                 </div>
             </div>
         </div>
-
         <div class="card mt-3">
             <div class="card-header">
                 <h6><i class="fas fa-info-circle"></i> Info</h6>
@@ -43,7 +49,6 @@
             </div>
         </div>
     </div>
-
     <div class="col-md-9">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -76,7 +81,52 @@
         </div>
     </div>
 </div>
-
+<div class="modal fade" id="integrationModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="integrationModalLabel">Integration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger d-none" id="integration-error"></div>
+                <div class="alert alert-success d-none" id="integration-success"></div>
+                <div class="text-muted small d-none" id="integration-hash-wrapper">
+                    MD5 Hash: <code id="integration-hash-value">-</code>
+                </div>
+                <input type="hidden" id="integration-name">
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="integration-enabled">
+                    <label class="form-check-label" for="integration-enabled">Enable integration</label>
+                </div>
+                <div id="discord-fields" class="integration-fields d-none">
+                    <div class="mb-3">
+                        <label for="discord-webhook" class="form-label">Webhook URL</label>
+                        <input type="url" class="form-control" id="discord-webhook" placeholder="https://discord.com/api/webhooks/...">
+                        <div class="form-text">Provide a Discord webhook URL with notification permissions.</div>
+                    </div>
+                </div>
+                <div id="telegram-fields" class="integration-fields d-none">
+                    <div class="mb-3">
+                        <label for="telegram-bot-token" class="form-label">Bot Token</label>
+                        <input type="text" class="form-control" id="telegram-bot-token" placeholder="123456789:ABCDEF...">
+                    </div>
+                    <div class="mb-3">
+                        <label for="telegram-chat-id" class="form-label">Chat ID</label>
+                        <input type="text" class="form-control" id="telegram-chat-id" placeholder="@channel or numeric chat id">
+                        <div class="form-text">Use the numeric chat ID or channel handle for the target destination.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="integration-save-btn">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="modal fade" id="configModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -93,9 +143,22 @@
     </div>
 </div>
 {% endblock %}
-
 {% block scripts %}
 <script>
+const integrationDefaults = {
+    discord: {
+        enabled: false,
+        webhook_url: ''
+    },
+    telegram: {
+        enabled: false,
+        bot_token: '',
+        chat_id: ''
+    }
+};
+let integrationSettings = {};
+let integrationHashes = {};
+let integrationModalInstance = null;
 function loadConfig() {
     $.get('/api/config', function(data) {
         if (data.config !== undefined) {
@@ -108,20 +171,16 @@ function loadConfig() {
         $('#config-editor').val('Failed to load configuration');
     });
 }
-
 function updateLineCount() {
     const lines = $('#config-editor').val().split('\n').length;
     $('#line-count').text(lines);
 }
-
 function showConfigResult(message, isSuccess = true) {
     $('#config-modal-message').html('<div class="alert alert-' + (isSuccess ? 'success' : 'danger') + '">' + message + '</div>');
     $('#configModal').modal('show');
 }
-
 function saveConfig() {
     const config = $('#config-editor').val();
-
     $.ajax({
         url: '/api/config',
         method: 'POST',
@@ -135,82 +194,213 @@ function saveConfig() {
         }
     });
 }
+function loadIntegrationSettings() {
+    $.get('/api/integration', function(response) {
+        if (response.success && response.settings) {
+            integrationSettings = response.settings;
+            integrationHashes = response.hashes || {};
+        }
+    }).fail(function(xhr) {
+        console.warn('Failed to load integration settings', xhr.responseText || xhr.statusText);
+    });
+}
+function getIntegrationData(name) {
+    const defaults = integrationDefaults[name] || {};
+    const stored = integrationSettings[name] || {};
+    return Object.assign({}, defaults, stored);
+}
+function resetIntegrationFeedback() {
+    $('#integration-error').addClass('d-none').text('');
+    $('#integration-success').addClass('d-none').text('');
+}
+function hideIntegrationHash() {
+    $('#integration-hash-wrapper').addClass('d-none');
+    $('#integration-hash-value').text('-');
+}
 
+function updateIntegrationHashDisplay(info) {
+    if (info && info.config_hash) {
+        $('#integration-hash-wrapper').removeClass('d-none');
+        $('#integration-hash-value').text(info.config_hash);
+    } else {
+        hideIntegrationHash();
+    }
+}
+function setIntegrationFeedback(message, type) {
+    if (!message) {
+        resetIntegrationFeedback();
+        return;
+    }
+    if (type === 'success') {
+        $('#integration-success').removeClass('d-none').text(message);
+        $('#integration-error').addClass('d-none').text('');
+    } else {
+        $('#integration-error').removeClass('d-none').text(message);
+        $('#integration-success').addClass('d-none').text('');
+    }
+}
+function toggleIntegrationFields(name) {
+    $('.integration-fields').addClass('d-none');
+    if (name === 'discord') {
+        $('#discord-fields').removeClass('d-none');
+    } else if (name === 'telegram') {
+        $('#telegram-fields').removeClass('d-none');
+    }
+}
+function openIntegrationModal(name) {
+    const normalized = (name || '').toLowerCase();
+    const data = getIntegrationData(normalized);
+    if (!integrationModalInstance) {
+        integrationModalInstance = new bootstrap.Modal(document.getElementById('integrationModal'));
+    }
+    $('#integration-name').val(normalized);
+    $('#integrationModalLabel').text(normalized === 'telegram' ? 'Telegram Integration' : 'Discord Integration');
+    $('#integration-enabled').prop('checked', !!data.enabled);
+    $('#discord-webhook').val(data.webhook_url || '');
+    $('#telegram-bot-token').val(data.bot_token || '');
+    $('#telegram-chat-id').val(data.chat_id || '');
+    updateIntegrationHashDisplay(integrationHashes[normalized]);
+    toggleIntegrationFields(normalized);
+    resetIntegrationFeedback();
+    integrationModalInstance.show();
+}
+function collectIntegrationPayload(name) {
+    const normalized = (name || '').toLowerCase();
+    const payload = { enabled: $('#integration-enabled').is(':checked') };
+    if (normalized === 'discord') {
+        payload.webhook_url = ($('#discord-webhook').val() || '').trim();
+    } else if (normalized === 'telegram') {
+        payload.bot_token = ($('#telegram-bot-token').val() || '').trim();
+        payload.chat_id = ($('#telegram-chat-id').val() || '').trim();
+    }
+    return payload;
+}
+function setIntegrationSaving(isSaving) {
+    const $btn = $('#integration-save-btn');
+    if (isSaving) {
+        if (!$btn.data('original-html')) {
+            $btn.data('original-html', $btn.html());
+        }
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...');
+    } else {
+        const original = $btn.data('original-html');
+        if (original) {
+            $btn.html(original);
+        }
+        $btn.prop('disabled', false);
+    }
+}
+function saveIntegration() {
+    const name = $('#integration-name').val();
+    if (!name) {
+        return;
+    }
+    const payload = collectIntegrationPayload(name);
+    setIntegrationSaving(true);
+    resetIntegrationFeedback();
+    $.ajax({
+        url: '/api/integration/' + name,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: function(response) {
+            if (response.success) {
+                integrationSettings[name] = response.settings || payload;
+                if (response.hash) {
+                    integrationHashes[name] = response.hash;
+                    updateIntegrationHashDisplay(response.hash);
+                } else if (integrationHashes[name]) {
+                    updateIntegrationHashDisplay(integrationHashes[name]);
+                } else {
+                    hideIntegrationHash();
+                }
+                setIntegrationFeedback('Settings saved successfully.', 'success');
+            } else {
+                setIntegrationFeedback(response.message || 'Failed to save settings.', 'error');
+            }
+        },
+        error: function(xhr) {
+            const message = (xhr.responseJSON && xhr.responseJSON.message) || xhr.responseText || 'Failed to save settings.';
+            setIntegrationFeedback(message, 'error');
+        },
+        complete: function() {
+            setIntegrationSaving(false);
+        }
+    });
+}
 $('#save-config-btn').click(saveConfig);
-
 $('#reload-config-btn').click(function() {
     if (confirm('Reload configuration from file? Any unsaved changes will be lost.')) {
         loadConfig();
     }
 });
-
-// Quick navigation
+$('#integration-save-btn').click(saveIntegration);
+$('#integrationModal').on('hidden.bs.modal', function() {
+    $('#integration-name').val('');
+    $('#integration-enabled').prop('checked', false);
+    $('#discord-webhook, #telegram-bot-token, #telegram-chat-id').val('');
+    hideIntegrationHash();
+    resetIntegrationFeedback();
+    setIntegrationSaving(false);
+});
 $('.config-search').click(function(e) {
     e.preventDefault();
     const searchTerm = $(this).data('search');
     const editor = $('#config-editor')[0];
     const content = editor.value;
-
-    // Find the first occurrence
     const lines = content.split('\n');
     let lineNumber = -1;
     let charPosition = 0;
-
     for (let i = 0; i < lines.length; i++) {
         if (lines[i].toLowerCase().includes(searchTerm.toLowerCase())) {
             lineNumber = i;
             break;
         }
-        charPosition += lines[i].length + 1; // +1 for newline
+        charPosition += lines[i].length + 1;
     }
-
     if (lineNumber !== -1) {
         editor.focus();
-
-        // Calculate scroll position based on line number
         const lineHeight = parseInt(window.getComputedStyle(editor).lineHeight);
         const scrollPosition = lineNumber * lineHeight;
-
-        editor.scrollTop = scrollPosition - 100; // Offset for better visibility
-
-        // Highlight the line
+        editor.scrollTop = scrollPosition - 100;
         const lineStart = charPosition;
         const lineEnd = charPosition + lines[lineNumber].length;
         editor.setSelectionRange(lineStart, lineEnd);
-
-        // Visual feedback
-        $('.config-search').removeClass('active');
+        $('#config-nav .list-group-item').removeClass('active');
         $(this).addClass('active');
     } else {
         alert('Section "' + searchTerm + '" not found in configuration');
     }
 });
-
-// Update line count on input
+$('#config-nav').on('click', '[data-integration]', function(e) {
+    e.preventDefault();
+    const target = $(this).data('integration');
+    $('#config-nav .list-group-item').removeClass('active');
+    $(this).addClass('active');
+    openIntegrationModal(target);
+});
 $('#config-editor').on('input', updateLineCount);
-
-// Keyboard shortcuts
 $(document).on('keydown', function(e) {
-    // Ctrl+S to save
     if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
         saveConfig();
     }
 });
-
-// Tab key support
 $('#config-editor').on('keydown', function(e) {
     if (e.key === 'Tab') {
         e.preventDefault();
         const start = this.selectionStart;
         const end = this.selectionEnd;
         const value = this.value;
-
         this.value = value.substring(0, start) + '  ' + value.substring(end);
         this.selectionStart = this.selectionEnd = start + 2;
     }
 });
-
 loadConfig();
+loadIntegrationSettings();
 </script>
 {% endblock %}
+
+
+
+

@@ -2,7 +2,7 @@
 Application Engine - Core initialization and setup
 """
 import os
-from binary import SuricataFrontendController, SuricataRRDManager, DatabaseManager
+from binary import SuricataFrontendController, SuricataRRDManager, DatabaseManager, IntegrationManager
 from binary.api import MonitorAPI, AlertsAPI, DatabaseAPI, APIRoutes
 
 
@@ -19,6 +19,7 @@ class AppEngine:
         self.controller = None
         self.rrd_manager = None
         self.db_manager = None
+        self.integration_manager = None
         self.monitor_api = None
         self.alerts_api = None
         self.database_api = None
@@ -55,6 +56,9 @@ class AppEngine:
             db_type=self.config.DB_TYPE,
             db_config=db_config
         )
+
+        # Integration manager
+        self.integration_manager = IntegrationManager(self.config.APP_DATA_DIR, db_manager=self.db_manager)
 
         # RRD Manager (with database integration)
         self.rrd_manager = SuricataRRDManager(
@@ -98,6 +102,8 @@ class AppEngine:
             self.rrd_manager,
             self.monitor_api,
             self.alerts_api,
-            self.database_api
+            self.database_api,
+            self.integration_manager
         )
         return self.api_routes
+
