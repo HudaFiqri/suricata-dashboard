@@ -197,7 +197,12 @@ $('#clear-filters').click(function() {
     $('#log-level-filter').val('');
     $('#log-search').val('');
     displayLogs(originalLogs);
+    updateLogStats(originalLogs);
 });
+
+// Real-time search
+$('#log-search').on('input', filterLogs);
+$('#log-level-filter').on('change', filterLogs);
 
 loadLogs();
 </script>

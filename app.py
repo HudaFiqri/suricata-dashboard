@@ -140,7 +140,24 @@ def api_logs():
             eve_logs = controller.log_manager.get_eve_log(100)
             if eve_logs:
                 # Convert eve.json to readable format
-                logs = [f"[{log.get('event_type', 'unknown')}] {log.get('timestamp', '')} - {log.get('alert', {}).get('signature', str(log))}" for log in eve_logs]
+                formatted_logs = []
+                for log in eve_logs:
+                    event_type = log.get('event_type', 'unknown')
+                    timestamp = log.get('timestamp', '')
+
+                    if event_type == 'alert':
+                        alert = log.get('alert', {})
+                        signature = alert.get('signature', 'Unknown')
+                        severity = alert.get('severity', 0)
+                        src_ip = log.get('src_ip', '')
+                        dest_ip = log.get('dest_ip', '')
+                        formatted_logs.append(f"[ALERT] {timestamp} - {signature} | {src_ip} -> {dest_ip} (Severity: {severity})")
+                    elif event_type == 'stats':
+                        formatted_logs.append(f"[STATS] {timestamp} - Statistics Update")
+                    else:
+                        formatted_logs.append(f"[{event_type.upper()}] {timestamp}")
+
+                logs = formatted_logs
 
         return jsonify({'logs': logs if logs else []})
     except Exception as e:
