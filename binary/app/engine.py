@@ -6,6 +6,11 @@ from binary import SuricataFrontendController, SuricataRRDManager, DatabaseManag
 from binary.api import MonitorAPI, AlertsAPI, DatabaseAPI, APIRoutes
 
 
+def _is_reloader_process():
+    """Check if running in Flask reloader child process"""
+    return os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+
+
 class AppEngine:
     """Core application engine for Suricata Dashboard"""
 
@@ -28,9 +33,11 @@ class AppEngine:
         try:
             os.makedirs(self.config.APP_DATA_DIR, exist_ok=True)
             os.makedirs(self.config.APP_LOG_DIR, exist_ok=True)
-            print(f"[APP] Directories initialized: data={self.config.APP_DATA_DIR}, logs={self.config.APP_LOG_DIR}")
+            if not _is_reloader_process():
+                print(f"[APP] Directories initialized: data={self.config.APP_DATA_DIR}, logs={self.config.APP_LOG_DIR}")
         except Exception as e:
-            print(f"[APP] Warning: Could not create directories: {e}")
+            if not _is_reloader_process():
+                print(f"[APP] Warning: Could not create directories: {e}")
 
     def _init_components(self):
         """Initialize core components"""

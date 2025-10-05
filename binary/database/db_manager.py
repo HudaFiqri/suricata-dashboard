@@ -4,10 +4,16 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
 import hashlib
+import os
 
 from .models import Base, Alert, Log, Statistics, TrafficStats
 from .mysql import create_mysql_engine
 from .postgresql import create_postgresql_engine
+
+
+def _is_reloader_process():
+    """Check if running in Flask reloader child process"""
+    return os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
 
 
 class DatabaseManager:
@@ -49,7 +55,8 @@ class DatabaseManager:
 
         try:
             self.db_url, self.engine = factory(self.db_config)
-            print(f"[DATABASE] Connected to {self.db_type.upper()}")
+            if not _is_reloader_process():
+                print(f"[DATABASE] Connected to {self.db_type.upper()}")
         except Exception as exc:
             raise RuntimeError(f"[DATABASE] Failed to connect to {self.db_type.upper()}: {exc}") from exc
 

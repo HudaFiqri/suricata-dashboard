@@ -8,6 +8,11 @@ import threading
 from datetime import datetime
 
 
+def _is_reloader_process():
+    """Check if running in Flask reloader child process"""
+    return os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+
+
 class BackgroundTasks:
     """Manages all background tasks for the application"""
 
@@ -18,26 +23,36 @@ class BackgroundTasks:
 
     def start_all(self):
         """Start all background tasks"""
+        # Skip logging on Flask reloader child process
+        is_reloader = _is_reloader_process()
+
         # Traffic aggregation (eve.json → database)
         self._start_thread(self._aggregate_traffic_data, "Traffic Aggregation")
-        interval_min = self.config.TRAFFIC_AGGREGATION_INTERVAL // 60
-        print(f"[TRAFFIC-AGG] Traffic aggregation enabled - Interval: {interval_min}m ({self.config.TRAFFIC_AGGREGATION_INTERVAL}s)")
+        if not is_reloader:
+            interval_min = self.config.TRAFFIC_AGGREGATION_INTERVAL // 60
+            print(f"[TRAFFIC-AGG] Traffic aggregation enabled - Interval: {interval_min}m ({self.config.TRAFFIC_AGGREGATION_INTERVAL}s)")
 
         # RRD metrics update (database → RRD files)
         self._start_thread(self._update_rrd_metrics, "RRD Metrics")
 
         # Alert sync from eve.json to database
         self._start_thread(self._sync_alerts_to_database, "Alert Sync")
+        if not is_reloader:
+            print(f"[ALERT-SYNC] Alert synchronization enabled - Real-time mode")
 
         # Statistics sync from stats.log to database
         self._start_thread(self._sync_stats_to_database, "Stats Sync")
+        if not is_reloader:
+            print(f"[STATS-SYNC] Statistics synchronization enabled - Real-time mode")
 
         # Database retention cleanup
         if self.config.DB_RETENTION_DAYS > 0:
             self._start_thread(self._database_retention_worker, "DB Cleanup")
-            print(f"[DB-CLEANUP] Retention worker active (retention: {self.config.DB_RETENTION_DAYS} days)")
+            if not is_reloader:
+                print(f"[DB-CLEANUP] Retention worker active (retention: {self.config.DB_RETENTION_DAYS} days)")
         else:
-            print("[DB-CLEANUP] Retention worker disabled (DB_RETENTION_DAYS=0)")
+            if not is_reloader:
+                print("[DB-CLEANUP] Retention worker disabled (DB_RETENTION_DAYS=0)")
 
         # Auto-restart monitor
         if self.config.AUTO_RESTART_ENABLED:
@@ -145,8 +160,6 @@ class BackgroundTasks:
         last_position = 0
         eve_log_path = f"{self.config.SURICATA_LOG_DIR}/eve.json"
 
-        print(f"[ALERT-SYNC] Alert synchronization enabled - Real-time mode")
-
         while True:
             try:
                 with open(eve_log_path, 'r') as f:
@@ -192,8 +205,6 @@ class BackgroundTasks:
         stats_log_path = os.path.join(self.config.SURICATA_LOG_DIR, 'stats.log')
         last_position = 0
         current_timestamp = None
-
-        print(f"[STATS-SYNC] Statistics synchronization enabled - Real-time mode")
 
         def _parse_timestamp(line: str):
             try:
