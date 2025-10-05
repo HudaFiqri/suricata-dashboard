@@ -8,9 +8,8 @@
                 <h5><i class="fas fa-chart-line"></i> Alert Monitoring</h5>
                 <div>
                     <select class="form-select form-select-sm d-inline-block w-auto me-2" id="metric-select">
-                        <option value="ssh">SSH Alerts</option>
-                        <option value="http">HTTP Alerts</option>
-                        <option value="dns">DNS Alerts</option>
+                        <option value="tcp">TCP Traffic</option>
+                        <option value="udp">UDP Traffic</option>
                         <option value="total">Total Alerts</option>
                     </select>
                     <select class="form-select form-select-sm d-inline-block w-auto me-2" id="timespan-select">
@@ -33,34 +32,25 @@
 </div>
 
 <div class="row">
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card text-center">
             <div class="card-body">
-                <i class="fas fa-shield-alt fa-3x text-primary mb-2"></i>
-                <h3 id="ssh-count">-</h3>
-                <p class="text-muted">SSH Alerts</p>
+                <i class="fas fa-network-wired fa-3x text-primary mb-2"></i>
+                <h3 id="tcp-count">-</h3>
+                <p class="text-muted">TCP Traffic</p>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card text-center">
             <div class="card-body">
-                <i class="fas fa-globe fa-3x text-success mb-2"></i>
-                <h3 id="http-count">-</h3>
-                <p class="text-muted">HTTP Alerts</p>
+                <i class="fas fa-exchange-alt fa-3x text-info mb-2"></i>
+                <h3 id="udp-count">-</h3>
+                <p class="text-muted">UDP Traffic</p>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="fas fa-network-wired fa-3x text-info mb-2"></i>
-                <h3 id="dns-count">-</h3>
-                <p class="text-muted">DNS Alerts</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card text-center">
             <div class="card-body">
                 <i class="fas fa-exclamation-triangle fa-3x text-warning mb-2"></i>
@@ -80,9 +70,8 @@
                     <input type="text" class="form-control form-control-sm d-inline-block w-auto me-2" id="alert-search" placeholder="Search alerts...">
                     <select class="form-select form-select-sm d-inline-block w-auto me-2" id="alert-category">
                         <option value="">All Categories</option>
-                        <option value="ssh">SSH</option>
-                        <option value="http">HTTP</option>
-                        <option value="dns">DNS</option>
+                        <option value="tcp">TCP</option>
+                        <option value="udp">UDP</option>
                     </select>
                     <button class="btn btn-sm btn-primary" id="refresh-alerts">
                         <i class="fas fa-sync"></i> Refresh
@@ -178,13 +167,12 @@ function updateChart() {
 
             // Update chart color based on metric
             const colors = {
-                'ssh': { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' },
-                'http': { border: 'rgb(75, 192, 192)', bg: 'rgba(75, 192, 192, 0.2)' },
-                'dns': { border: 'rgb(153, 102, 255)', bg: 'rgba(153, 102, 255, 0.2)' },
+                'tcp': { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' },
+                'udp': { border: 'rgb(75, 192, 192)', bg: 'rgba(75, 192, 192, 0.2)' },
                 'total': { border: 'rgb(255, 159, 64)', bg: 'rgba(255, 159, 64, 0.2)' }
             };
 
-            const color = colors[metric] || colors['ssh'];
+            const color = colors[metric] || colors['tcp'];
             alertChart.data.datasets[0].borderColor = color.border;
             alertChart.data.datasets[0].backgroundColor = color.bg;
 
@@ -204,7 +192,7 @@ function updateChart() {
 
 function updateCounts() {
     // Get latest counts for all metrics
-    const metrics = ['ssh', 'http', 'dns', 'total'];
+    const metrics = ['tcp', 'udp', 'total'];
 
     metrics.forEach(metric => {
         $.get(`/api/monitor/data?metric=${metric}&timespan=1h`, function(response) {
@@ -215,6 +203,8 @@ function updateCounts() {
             } else {
                 $(`#${metric}-count`).text('0');
             }
+        }).fail(function() {
+            $(`#${metric}-count`).text('0');
         });
     });
 }

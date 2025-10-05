@@ -4,30 +4,74 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-12">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-list"></i> Quick Navigation</h6>
+            </div>
+            <div class="card-body p-2">
+                <div class="list-group list-group-flush" id="config-nav">
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="af-packet">
+                        <i class="fas fa-network-wired"></i> AF-Packet
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="app-layer">
+                        <i class="fas fa-layer-group"></i> App Layer
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="outputs">
+                        <i class="fas fa-file-export"></i> Outputs
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="logging">
+                        <i class="fas fa-clipboard-list"></i> Logging
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="vars">
+                        <i class="fas fa-dollar-sign"></i> Variables
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-info-circle"></i> Info</h6>
+            </div>
+            <div class="card-body">
+                <small class="text-muted">
+                    <p><strong>Format:</strong> YAML</p>
+                    <p><strong>Tip:</strong> Use Ctrl+F to search</p>
+                    <p class="mb-0"><strong>Line Count:</strong> <span id="line-count">0</span></p>
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-cog"></i> Suricata Configuration</h5>
                 <div>
-                    <button class="btn btn-primary" id="save-config-btn">
+                    <button class="btn btn-sm btn-primary" id="save-config-btn">
                         <i class="fas fa-save"></i> Save Config
                     </button>
-                    <button class="btn btn-secondary" id="reload-config-btn">
+                    <button class="btn btn-sm btn-secondary" id="reload-config-btn">
                         <i class="fas fa-sync"></i> Reload
                     </button>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Warning:</strong> Modifying the configuration requires careful attention. 
-                        Invalid configurations may prevent Suricata from starting.
-                    </div>
+            <div class="card-body p-0">
+                <div class="alert alert-warning m-3 mb-0">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> Modifying the configuration requires careful attention.
+                    Invalid configurations may prevent Suricata from starting.
                 </div>
-                <textarea id="config-editor" class="form-control" rows="25" style="font-family: monospace;">
-Loading configuration...
-                </textarea>
+                <div id="editor-container" style="position: relative; height: 600px; border-top: 1px solid #dee2e6;">
+                    <textarea id="config-editor" class="form-control h-100 border-0" style="font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; resize: none; padding: 15px;">Loading configuration...</textarea>
+                </div>
+                <div class="border-top p-2 bg-light">
+                    <small class="text-muted">
+                        <i class="fas fa-keyboard"></i> Press Ctrl+S to save |
+                        <i class="fas fa-search"></i> Press Ctrl+F to search
+                    </small>
+                </div>
             </div>
         </div>
     </div>
@@ -56,6 +100,7 @@ function loadConfig() {
     $.get('/api/config', function(data) {
         if (data.config !== undefined) {
             $('#config-editor').val(data.config);
+            updateLineCount();
         } else if (data.error) {
             $('#config-editor').val('Error loading configuration: ' + data.error);
         }
@@ -64,14 +109,19 @@ function loadConfig() {
     });
 }
 
+function updateLineCount() {
+    const lines = $('#config-editor').val().split('\n').length;
+    $('#line-count').text(lines);
+}
+
 function showConfigResult(message, isSuccess = true) {
     $('#config-modal-message').html('<div class="alert alert-' + (isSuccess ? 'success' : 'danger') + '">' + message + '</div>');
     $('#configModal').modal('show');
 }
 
-$('#save-config-btn').click(function() {
+function saveConfig() {
     const config = $('#config-editor').val();
-    
+
     $.ajax({
         url: '/api/config',
         method: 'POST',
@@ -84,7 +134,9 @@ $('#save-config-btn').click(function() {
             showConfigResult('Failed to save configuration', false);
         }
     });
-});
+}
+
+$('#save-config-btn').click(saveConfig);
 
 $('#reload-config-btn').click(function() {
     if (confirm('Reload configuration from file? Any unsaved changes will be lost.')) {
@@ -92,9 +144,44 @@ $('#reload-config-btn').click(function() {
     }
 });
 
-// Add syntax highlighting for YAML (basic)
-$('#config-editor').on('input', function() {
-    // Basic validation could be added here
+// Quick navigation
+$('.config-search').click(function(e) {
+    e.preventDefault();
+    const searchTerm = $(this).data('search');
+    const editor = $('#config-editor')[0];
+    const content = editor.value;
+    const index = content.toLowerCase().indexOf(searchTerm.toLowerCase());
+
+    if (index !== -1) {
+        editor.focus();
+        editor.setSelectionRange(index, index + searchTerm.length);
+        editor.scrollTop = editor.scrollHeight * (index / content.length) - 100;
+    }
+});
+
+// Update line count on input
+$('#config-editor').on('input', updateLineCount);
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    // Ctrl+S to save
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        saveConfig();
+    }
+});
+
+// Tab key support
+$('#config-editor').on('keydown', function(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        const value = this.value;
+
+        this.value = value.substring(0, start) + '  ' + value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 2;
+    }
 });
 
 loadConfig();
