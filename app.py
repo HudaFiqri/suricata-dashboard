@@ -64,6 +64,82 @@ def update_rrd_metrics():
         time.sleep(60)  # Update every minute
 
 # Background thread to sync alerts from eve.json to database
+# Statistics synchronization thread
+def sync_stats_to_database():
+    """Import statistics from Suricata stats.log into the database."""
+    import json
+    from datetime import datetime
+
+    stats_log_path = os.path.join(Config.SURICATA_LOG_DIR, 'stats.log')
+    last_position = 0
+    current_timestamp = None
+
+    def _parse_timestamp(line: str):
+        try:
+            _, value = line.split('Date:', 1)
+            ts_str = value.strip().split('(')[0].strip()
+            return datetime.strptime(ts_str, '%m/%d/%Y -- %H:%M:%S')
+        except Exception:
+            return datetime.utcnow()
+
+    while True:
+        try:
+            if not os.path.exists(stats_log_path):
+                time.sleep(10)
+                continue
+
+            file_size = os.path.getsize(stats_log_path)
+            if file_size < last_position:
+                last_position = 0
+
+            with open(stats_log_path, 'r', encoding='utf-8') as stats_file:
+                stats_file.seek(last_position)
+
+                for raw_line in stats_file:
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+
+                    if line.lower().startswith('date:'):
+                        current_timestamp = _parse_timestamp(line)
+                        continue
+
+                    if '|' not in line:
+                        continue
+
+                    parts = [segment.strip() for segment in line.split('|') if segment.strip()]
+                    if len(parts) < 3:
+                        continue
+
+                    metric_name, scope, value_token = parts[0], parts[1], parts[2]
+                    try:
+                        metric_value = float(value_token.split()[0])
+                    except ValueError:
+                        continue
+
+                    timestamp = current_timestamp or datetime.utcnow()
+                    category = metric_name.split('.', 1)[0] if '.' in metric_name else scope.lower()
+
+                    extra = {'scope': scope, 'raw': line}
+
+                    db_manager.add_statistic({
+                        'timestamp': timestamp,
+                        'metric_name': metric_name,
+                        'metric_value': metric_value,
+                        'metric_type': scope,
+                        'category': category,
+                        'extra_data': extra,
+                    })
+
+                last_position = stats_file.tell()
+
+        except FileNotFoundError:
+            last_position = 0
+        except Exception as err:
+            print(f"[STATS-SYNC] Error processing stats.log: {err}")
+
+        time.sleep(10)
+
 def sync_alerts_to_database():
     """Import alerts from eve.json to database"""
     import json
@@ -121,95 +197,6 @@ def sync_alerts_to_database():
             print(f"[ALERT-SYNC] Error: {e}")
 
         time.sleep(5)  # Check every 5 seconds
-
-# Statistics synchronization thread
-def sync_stats_to_database():
-    """Import statistics from Suricata stats.log into the database."""
-    import json
-    import math
-    from datetime import datetime
-
-    stats_log_path = os.path.join(Config.SURICATA_LOG_DIR, 'stats.log')
-    last_position = 0
-
-    def iter_metrics(prefix: str, payload):
-        if isinstance(payload, dict):
-            for key, value in payload.items():
-                new_prefix = f"{prefix}.{key}" if prefix else key
-                yield from iter_metrics(new_prefix, value)
-        elif isinstance(payload, list):
-            for index, value in enumerate(payload):
-                list_prefix = f"{prefix}.{index}" if prefix else str(index)
-                yield from iter_metrics(list_prefix, value)
-        elif isinstance(payload, (int, float)):
-            yield prefix, float(payload)
-
-    while True:
-        try:
-            if not os.path.exists(stats_log_path):
-                time.sleep(10)
-                continue
-
-            file_size = os.path.getsize(stats_log_path)
-            if file_size < last_position:
-                last_position = 0
-
-            with open(stats_log_path, 'r', encoding='utf-8') as stats_file:
-                stats_file.seek(last_position)
-
-                for raw_line in stats_file:
-                    line = raw_line.strip()
-                    if not line:
-                        continue
-
-                    try:
-                        event = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-
-                    stats_payload = None
-                    if isinstance(event, dict):
-                        if isinstance(event.get('stats'), dict):
-                            stats_payload = event.get('stats')
-                        elif isinstance(event.get('event'), dict) and isinstance(event['event'].get('stats'), dict):
-                            stats_payload = event['event']['stats']
-
-                    if not isinstance(stats_payload, dict):
-                        continue
-
-                    timestamp_value = event.get('timestamp') or event.get('time')
-                    try:
-                        metric_timestamp = datetime.fromisoformat(timestamp_value.replace('Z', '+00:00')) if timestamp_value else datetime.utcnow()
-                    except (ValueError, AttributeError):
-                        metric_timestamp = datetime.utcnow()
-
-                    metric_type = event.get('event_type', 'stats')
-
-                    for metric_name, metric_value in iter_metrics('', stats_payload):
-                        if not metric_name:
-                            continue
-                        if not math.isfinite(metric_value):
-                            continue
-                        category = metric_name.split('.', 1)[0]
-
-                        db_manager.add_statistic({
-                            'timestamp': metric_timestamp,
-                            'metric_name': metric_name,
-                            'metric_value': metric_value,
-                            'metric_type': metric_type,
-                            'category': category,
-                            'extra_data': event,
-                        })
-
-                last_position = stats_file.tell()
-
-        except FileNotFoundError:
-            last_position = 0
-        except Exception as err:
-            print(f"[STATS-SYNC] Error processing stats.log: {err}")
-
-        time.sleep(10)
-
 
 # Database retention cleanup thread
 def database_retention_worker():
@@ -494,3 +481,8 @@ def api_database_stats():
 
 if __name__ == '__main__':
     app.run(debug=Config.FLASK_DEBUG, host=Config.FLASK_HOST, port=Config.FLASK_PORT, use_debugger=False, use_reloader=True)
+
+
+
+
+
