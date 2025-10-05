@@ -55,6 +55,40 @@ class SuricataRRDManager:
         for name, rrd_file in rrd_files.items():
             if not os.path.exists(rrd_file):
                 self._create_rrd(rrd_file, name)
+            else:
+                print(f"RRD database already exists: {rrd_file}")
+
+    def regenerate_rrd_databases(self):
+        """Force regenerate all RRD databases"""
+        if not self.enabled:
+            return {'success': False, 'message': 'RRDtool not available'}
+
+        rrd_files = {
+            'tcp': self.tcp_rrd,
+            'udp': self.udp_rrd,
+            'icmp': self.icmp_rrd,
+            'alerts': self.alerts_rrd
+        }
+
+        regenerated = []
+        for name, rrd_file in rrd_files.items():
+            try:
+                # Delete old RRD file if exists
+                if os.path.exists(rrd_file):
+                    os.remove(rrd_file)
+                    print(f"Deleted old RRD database: {rrd_file}")
+
+                # Create new RRD file
+                self._create_rrd(rrd_file, name)
+                regenerated.append(name)
+            except Exception as e:
+                print(f"Error regenerating RRD {name}: {e}")
+
+        return {
+            'success': True,
+            'message': f'Regenerated {len(regenerated)} RRD databases',
+            'regenerated': regenerated
+        }
 
     def _create_rrd(self, rrd_file: str, name: str):
         """Create a new RRD database using Python rrdtool"""
