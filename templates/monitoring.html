@@ -31,7 +31,7 @@
                     <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Traffic & packet analysis</li>
                 </ul>
                 <a href="{{ url_for('rrd') }}" class="btn btn-primary btn-lg w-100">
-                    <i class="fas fa-chart-line me-2"></i> Open RRD Graphs
+                    <i class="fas fa-chart-line me-2"></i> Open Traffic Graphs
                 </a>
             </div>
         </div>
@@ -63,48 +63,7 @@
     </div>
 </div>
 
-<!-- Quick Stats Overview -->
-<div class="row mt-5">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-tachometer-alt"></i> Quick Overview</h5>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-md-3">
-                        <div class="p-3">
-                            <i class="fas fa-database fa-3x text-primary mb-2"></i>
-                            <h4 id="db-status">Checking...</h4>
-                            <p class="text-muted">Database Status</p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="p-3">
-                            <i class="fas fa-server fa-3x text-success mb-2"></i>
-                            <h4 id="suricata-status">Checking...</h4>
-                            <p class="text-muted">Suricata Status</p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="p-3">
-                            <i class="fas fa-chart-area fa-3x text-warning mb-2"></i>
-                            <h4 id="rrd-files">-</h4>
-                            <p class="text-muted">RRD Graphs Available</p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="p-3">
-                            <i class="fas fa-exclamation-triangle fa-3x text-danger mb-2"></i>
-                            <h4 id="recent-alerts">-</h4>
-                            <p class="text-muted">Recent Alerts (1h)</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 <style>
 .hover-card {
@@ -123,51 +82,4 @@
 </style>
 {% endblock %}
 
-{% block scripts %}
-<script>
-function checkStatus() {
-    // Check database status
-    $.get('/api/database/check', function(response) {
-        if (response.success && response.connected) {
-            $('#db-status').html('<span class="text-success">Connected</span>');
-        } else {
-            $('#db-status').html('<span class="text-danger">Disconnected</span>');
-        }
-    }).fail(function() {
-        $('#db-status').html('<span class="text-danger">Error</span>');
-    });
 
-    // Check Suricata status
-    $.get('/api/status', function(response) {
-        if (response.running) {
-            $('#suricata-status').html('<span class="text-success">Running</span>');
-        } else {
-            $('#suricata-status').html('<span class="text-danger">Stopped</span>');
-        }
-    }).fail(function() {
-        $('#suricata-status').html('<span class="text-danger">Error</span>');
-    });
-
-    // Get RRD availability (assume 3 protocols available)
-    $('#rrd-files').text('3 Metrics');
-
-    // Get recent alerts count
-    $.get('/api/monitor/data?timespan=1h', function(response) {
-        if (response.success) {
-            $('#recent-alerts').text(response.total_alerts || 0);
-        } else {
-            $('#recent-alerts').text('0');
-        }
-    }).fail(function() {
-        $('#recent-alerts').text('N/A');
-    });
-}
-
-$(document).ready(function() {
-    checkStatus();
-
-    // Refresh status every 30 seconds
-    setInterval(checkStatus, 30000);
-});
-</script>
-{% endblock %}

@@ -58,6 +58,48 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
+                <h5><i class="fas fa-tachometer-alt"></i> Quick Overview</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="p-3">
+                            <i class="fas fa-database fa-3x text-primary mb-2"></i>
+                            <h4 id="dashboard-db-status">Checking...</h4>
+                            <p class="text-muted">Database Status</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3">
+                            <i class="fas fa-server fa-3x text-success mb-2"></i>
+                            <h4 id="dashboard-suricata-status">Checking...</h4>
+                            <p class="text-muted">Suricata Status</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3">
+                            <i class="fas fa-chart-area fa-3x text-warning mb-2"></i>
+                            <h4 id="dashboard-rrd-files">-</h4>
+                            <p class="text-muted">RRD Graphs Available</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3">
+                            <i class="fas fa-exclamation-triangle fa-3x text-danger mb-2"></i>
+                            <h4 id="dashboard-recent-alerts">-</h4>
+                            <p class="text-muted">Recent Alerts (1h)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
                 <h5><i class="fas fa-exclamation-triangle"></i> Recent Alerts</h5>
             </div>
             <div class="card-body">
@@ -89,7 +131,7 @@
 {% block scripts %}
 <script>
 function showAlert(message, isSuccess = true) {
-    $('#modal-message').html('<div class="alert alert-' + (isSuccess ? 'success' : 'danger') + '">' + message + '</div>');
+    $('#modal-message').html('<div class="alert alert-' + (isSuccess ? "success" : "danger") + '">' + message + '</div>');
     $('#alertModal').modal('show');
     setTimeout(() => updateStatus(), 1000);
 }
@@ -124,10 +166,71 @@ function updateStatus() {
         }
 
         $('#status-info').html(statusHtml);
+
+        const suricataStatusEl = $('#dashboard-suricata-status');
+        if (suricataStatusEl.length) {
+            if (data.status === 'running') {
+                suricataStatusEl.html('<span class="text-success">Running</span>');
+            } else if (data.status === 'stopped') {
+                suricataStatusEl.html('<span class="text-danger">Stopped</span>');
+            } else {
+                suricataStatusEl.html('<span class="text-warning">Error</span>');
+            }
+        }
+    }).fail(function() {
+        const suricataStatusEl = $('#dashboard-suricata-status');
+        if (suricataStatusEl.length) {
+            suricataStatusEl.html('<span class="text-danger">Error</span>');
+        }
     });
 }
-// Update status every 1 second
-setInterval(updateStatus, 1000);
+
+function updateQuickOverview() {
+    $.get('/api/database/check', function(response) {
+        const dbStatusEl = $('#dashboard-db-status');
+        if (!dbStatusEl.length) {
+            return;
+        }
+
+        if (response.success && response.connected) {
+            dbStatusEl.html('<span class="text-success">Connected</span>');
+        } else {
+            dbStatusEl.html('<span class="text-danger">Disconnected</span>');
+        }
+    }).fail(function() {
+        const dbStatusEl = $('#dashboard-db-status');
+        if (dbStatusEl.length) {
+            dbStatusEl.html('<span class="text-danger">Error</span>');
+        }
+    });
+
+    $('#dashboard-rrd-files').text('3 Metrics');
+
+    $.get('/api/monitor/data?timespan=1h', function(response) {
+        const alertEl = $('#dashboard-recent-alerts');
+        if (!alertEl.length) {
+            return;
+        }
+        if (response.success) {
+            alertEl.text(response.total_alerts || 0);
+        } else {
+            alertEl.text('0');
+        }
+    }).fail(function() {
+        const alertEl = $('#dashboard-recent-alerts');
+        if (alertEl.length) {
+            alertEl.text('N/A');
+        }
+    });
+}
+
+$(document).ready(function() {
+    updateStatus();
+    updateQuickOverview();
+    setInterval(updateStatus, 1000);
+    setInterval(updateQuickOverview, 30000);
+});
 </script>
 {% endblock %}
+
 
