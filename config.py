@@ -59,6 +59,9 @@ def _infer_db_type(port_value, user_value):
 
 
 class Config:
+    # Dashboard settings
+    DASHBOARD_NAME = _get_env('SURICATA_DASHBOARD_NAME', default='Suricata Dashboard')
+
     # Suricata paths
     SURICATA_BINARY_PATH = _get_env('SURICATA_BINARY_PATH', default='suricata')
     SURICATA_CONFIG_PATH = _get_env('SURICATA_CONFIG_PATH', default='/etc/suricata/suricata.yaml')
