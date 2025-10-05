@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine, func, text
 from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.pool import StaticPool
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
@@ -9,119 +8,54 @@ from .models import Base, Alert, Log, Statistics
 
 
 class DatabaseManager:
-    """
-    Database manager with support for SQLite, MySQL, and PostgreSQL
-    """
+    """Database manager with support for MySQL and PostgreSQL."""
 
-    def __init__(self, db_type: str = 'sqlite', db_config: Optional[Dict[str, str]] = None):
-        """
-        Initialize database manager
+    SUPPORTED_DB_TYPES = ('mysql', 'postgresql')
 
-        Args:
-            db_type: Database type ('sqlite', 'mysql', 'postgresql')
-            db_config: Database configuration dict with keys:
-                - For SQLite: {'path': '/path/to/db.sqlite'}
-                - For MySQL: {'host': 'localhost', 'port': 3306, 'user': 'root',
-                             'password': 'pass', 'database': 'suricata'}
-                - For PostgreSQL: {'host': 'localhost', 'port': 5432, 'user': 'postgres',
-                                  'password': 'pass', 'database': 'suricata'}
-        """
-        self.db_type = db_type.lower() if db_type else 'sqlite'
-        self.db_config = db_config or {}
-        self.fallback_active = False
+    def __init__(self, db_type: str = 'postgresql', db_config: Optional[Dict[str, str]] = None):
+        """Initialize database manager."""
+        normalized_type = (db_type or '').strip().lower()
+        if normalized_type not in self.SUPPORTED_DB_TYPES:
+            raise ValueError(f"Unsupported database type: {db_type}")
+
+        if not db_config:
+            raise ValueError('Database configuration is required for SQL backends.')
+
+        self.db_type = normalized_type
         self.original_db_type = self.db_type
+        self.db_config = db_config
 
-        # If db_type is empty or sqlite with no config, use local storage silently
-        if not db_type or (self.db_type == 'sqlite' and not self.db_config):
-            self._initialize_local_storage()
-        else:
-            # Try to connect to configured database
-            self._initialize_configured_database()
+        self.engine = None
+        self.db_url = ''
 
-        # Create session factory and tables
-        if hasattr(self, 'engine'):
-            self.Session = scoped_session(sessionmaker(bind=self.engine))
-            self._create_tables()
+        self._initialize_database()
 
-    def _initialize_local_storage(self):
-        """Initialize local SQLite storage"""
-        import os
-        self.db_type = 'sqlite'
-        default_db_path = os.getenv('DB_PATH', '/opt/suricata_monitoring/data/suricata.db')
+        self.Session = scoped_session(sessionmaker(bind=self.engine))
+        self._create_tables()
 
-        # Ensure directory exists
-        db_dir = os.path.dirname(default_db_path)
-        try:
-            os.makedirs(db_dir, exist_ok=True)
-        except Exception as e:
-            print(f"Warning: Could not create directory {db_dir}: {e}")
-            # Fallback to current directory
-            default_db_path = 'suricata.db'
-
-        self.db_url = f'sqlite:///{default_db_path}'
-
-        self.engine = create_engine(
-            self.db_url,
-            connect_args={'check_same_thread': False},
-            poolclass=StaticPool,
-            echo=False
-        )
-
-        print(f"✓ Database connected: local storage ({default_db_path})")
-
-    def _initialize_configured_database(self):
-        """Try to connect to configured database, fallback to local storage if failed"""
-        # Create database URL
+    def _initialize_database(self):
+        """Create an engine for the configured SQL backend."""
         self.db_url = self._create_db_url()
 
-        # Try to create engine and connect
         try:
-            # Create engine
-            if self.db_type == 'sqlite':
-                self.engine = create_engine(
-                    self.db_url,
-                    connect_args={'check_same_thread': False},
-                    poolclass=StaticPool,
-                    echo=False
-                )
-            else:
-                self.engine = create_engine(
-                    self.db_url,
-                    pool_pre_ping=True,
-                    pool_recycle=3600,
-                    echo=False
-                )
+            self.engine = create_engine(
+                self.db_url,
+                pool_pre_ping=True,
+                pool_recycle=3600,
+                echo=False,
+            )
 
-            # Test connection
             with self.engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
+                conn.execute(text('SELECT 1'))
 
-            print(f"✓ Database connected: {self.db_type.upper()}")
+            print(f"[OK] Database connected: {self.db_type.upper()}")
 
-        except Exception as e:
-            print(f"✗ Failed to connect to {self.db_type.upper()}: {e}")
-            print("→ Falling back to local storage...")
-
-            # Fallback to local storage
-            self.fallback_active = True
-            self._initialize_local_storage()
+        except Exception as exc:
+            raise RuntimeError(f"Failed to connect to {self.db_type.upper()}: {exc}") from exc
 
     def _create_db_url(self) -> str:
         """Create database URL based on type and config"""
-        if self.db_type == 'sqlite':
-            import os
-            db_path = self.db_config.get('path', '/opt/suricata_monitoring/data/suricata.db')
-
-            # Ensure directory exists
-            db_dir = os.path.dirname(db_path)
-            try:
-                os.makedirs(db_dir, exist_ok=True)
-            except Exception as e:
-                print(f"Warning: Could not create directory {db_dir}: {e}")
-
-            return f'sqlite:///{db_path}'
-
-        elif self.db_type == 'mysql':
+        if self.db_type == 'mysql':
             host = self.db_config.get('host', 'localhost')
             port = self.db_config.get('port', 3306)
             user = self.db_config.get('user', 'root')
@@ -129,7 +63,7 @@ class DatabaseManager:
             database = self.db_config.get('database', 'suricata')
             return f'mysql+pymysql://{user}:{password}@{host}:{port}/{database}?charset=utf8mb4'
 
-        elif self.db_type == 'postgresql':
+        if self.db_type == 'postgresql':
             host = self.db_config.get('host', 'localhost')
             port = self.db_config.get('port', 5432)
             user = self.db_config.get('user', 'postgres')
@@ -137,8 +71,7 @@ class DatabaseManager:
             database = self.db_config.get('database', 'suricata')
             return f'postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}'
 
-        else:
-            raise ValueError(f"Unsupported database type: {self.db_type}")
+        raise ValueError(f"Unsupported database type: {self.db_type}")
 
     def _create_tables(self):
         """Create all tables"""
@@ -161,9 +94,8 @@ class DatabaseManager:
         return {
             'type': self.db_type,
             'original_type': self.original_db_type,
-            'fallback_active': self.fallback_active,
             'url': self.db_url.split('@')[0] if '@' in self.db_url else self.db_url,  # Hide password
-            'connected': self._test_connection()
+            'connected': self._test_connection(),
         }
 
     def _test_connection(self) -> bool:

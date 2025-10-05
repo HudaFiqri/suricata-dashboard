@@ -21,6 +21,9 @@
                         <p><strong>Status:</strong> <span class="status-error"><i class="fas fa-exclamation-circle"></i> Error</span></p>
                         <p><strong>Message:</strong> {{ status.message }}</p>
                     {% endif %}
+                    {% if status.database %}
+                    <p><strong>Database:</strong> {{ status.database.label }} <span class="text-muted">({{ status.database.host }}:{{ status.database.port }})</span></p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -94,11 +97,16 @@ function showAlert(message, isSuccess = true) {
 function updateStatus() {
     $.get('/api/status', function(data) {
         let statusHtml = '';
+        const pidValue = (data.pid !== undefined && data.pid !== null) ? data.pid : 'N/A';
+
         if (data.status === 'running') {
             statusHtml = `
                 <p><strong>Status:</strong> <span class="status-running"><i class="fas fa-play-circle"></i> Running</span></p>
-                <p><strong>PID:</strong> ${data.pid}</p>
+                <p><strong>PID:</strong> ${pidValue}</p>
             `;
+            if (data.uptime) {
+                statusHtml += `<p><strong>Uptime:</strong> ${data.uptime}</p>`;
+            }
         } else if (data.status === 'stopped') {
             statusHtml = '<p><strong>Status:</strong> <span class="status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span></p>';
         } else {
@@ -107,11 +115,19 @@ function updateStatus() {
                 <p><strong>Message:</strong> ${data.message}</p>
             `;
         }
+
+        if (data.database) {
+            const dbLabel = data.database.label || (data.database.type ? data.database.type.toUpperCase() : '-');
+            const dbHost = data.database.host || 'localhost';
+            const dbPort = (data.database.port !== undefined && data.database.port !== null) ? data.database.port : '-';
+            statusHtml += `<p><strong>Database:</strong> ${dbLabel} <span class="text-muted">(${dbHost}:${dbPort})</span></p>`;
+        }
+
         $('#status-info').html(statusHtml);
     });
 }
-
 // Update status every 1 second
 setInterval(updateStatus, 1000);
 </script>
 {% endblock %}
+

@@ -23,24 +23,59 @@ class SuricataBackendController:
                 cmd_status = ['systemctl', 'status', 'suricata']
                 status_result = subprocess.run(cmd_status, capture_output=True, text=True)
 
-                pid = None
+                pid: Optional[int] = None
                 for line in status_result.stdout.split('\n'):
                     if 'Main PID:' in line:
                         pid_part = line.split('Main PID:')[1].strip().split()[0]
                         try:
                             pid = int(pid_part)
                         except ValueError:
-                            pass
+                            pid = None
                         break
+
+                uptime = None
+                uptime_seconds: Optional[int] = None
+                if pid:
+                    try:
+                        process = psutil.Process(pid)
+                        uptime_seconds = max(int(time.time() - process.create_time()), 0)
+                        uptime = self._format_duration(uptime_seconds)
+                    except (psutil.Error, OSError, ValueError):
+                        uptime = None
+                        uptime_seconds = None
 
                 return {
                     'status': 'running',
-                    'pid': pid if pid else 'N/A'
+                    'pid': pid if pid else 'N/A',
+                    'uptime': uptime,
+                    'uptime_seconds': uptime_seconds
                 }
             else:
                 return {'status': 'stopped'}
         except Exception as e:
             return {'status': 'error', 'message': str(e)}
+
+
+    @staticmethod
+    def _format_duration(total_seconds: int) -> str:
+        """Format uptime seconds into a compact human-readable string"""
+        if total_seconds <= 0:
+            return '0s'
+
+        periods = [
+            ('d', 86400),
+            ('h', 3600),
+            ('m', 60),
+            ('s', 1),
+        ]
+        parts = []
+        remainder = total_seconds
+        for suffix, length in periods:
+            value, remainder = divmod(remainder, length)
+            if value:
+                parts.append(f"{value}{suffix}")
+
+        return ' '.join(parts) or '0s'
 
     def start(self) -> Dict[str, Any]:
         """Start Suricata service using systemctl"""

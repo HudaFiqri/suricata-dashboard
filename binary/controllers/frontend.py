@@ -3,6 +3,7 @@ from ..suricata_config import SuricataConfig
 from ..suricata_rule_manager import SuricataRuleManager
 from ..suricata_log_manager import SuricataLogManager
 from .backend import SuricataBackendController
+from config import Config
 
 class SuricataFrontendController:
     """Frontend controller that aggregates backend service control with config, rules, and logs management"""
@@ -22,8 +23,26 @@ class SuricataFrontendController:
         self.log_manager = SuricataLogManager(log_directory)
 
     def get_status(self) -> Dict[str, Any]:
-        """Get service status from backend"""
-        return self.backend.get_status()
+        """Get service status from backend and enrich with database info"""
+        status = self.backend.get_status()
+
+        db_type = (Config.DB_TYPE or '').strip().lower()
+        db_label_map = {
+            'postgresql': 'PostgreSQL',
+            'mysql': 'MySQL'
+        }
+        if db_type:
+            status['database'] = {
+                'type': db_type,
+                'label': db_label_map.get(db_type, db_type.upper()),
+                'host': Config.DB_HOST,
+                'port': Config.DB_PORT,
+                'name': Config.DB_NAME
+            }
+        else:
+            status['database'] = None
+
+        return status
 
     def start(self) -> Dict[str, Any]:
         """Start service via backend"""

@@ -33,15 +33,13 @@ rrd_manager = SuricataRRDManager(
 
 # Initialize Database Manager
 db_config = {}
-if Config.DB_TYPE == 'sqlite':
-    db_config = {'path': Config.DB_PATH}
-elif Config.DB_TYPE == 'mysql':
+if Config.DB_TYPE == 'mysql':
     db_config = {
         'host': Config.DB_HOST,
         'port': Config.DB_PORT,
         'user': Config.DB_USER,
         'password': Config.DB_PASSWORD,
-        'database': Config.DB_NAME
+        'database': Config.DB_NAME,
     }
 elif Config.DB_TYPE == 'postgresql':
     db_config = {
@@ -49,8 +47,10 @@ elif Config.DB_TYPE == 'postgresql':
         'port': Config.DB_PORT,
         'user': Config.DB_USER,
         'password': Config.DB_PASSWORD,
-        'database': Config.DB_NAME
+        'database': Config.DB_NAME,
     }
+else:
+    raise ValueError(f"Unsupported database type: {Config.DB_TYPE}")
 
 db_manager = DatabaseManager(db_type=Config.DB_TYPE, db_config=db_config)
 

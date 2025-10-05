@@ -30,9 +30,7 @@ def _normalize_db_type(value):
         'postgresql': 'postgresql',
         'psql': 'postgresql',
         'mysql': 'mysql',
-        'mariadb': 'mysql',
-        'sqlite': 'sqlite',
-        'sqlite3': 'sqlite'
+        'mariadb': 'mysql'
     }
     return mapping.get(normalized, normalized)
 
@@ -76,36 +74,23 @@ class Config:
     _db_user_env = _get_env('DB_USER', 'DATABASE_USERNAME')
 
     _raw_db_type_env = _get_env_raw('DB_TYPE', 'DATABASE_TYPE')
-    _normalized_db_type = _normalize_db_type(_raw_db_type_env)
+    DB_TYPE = _normalize_db_type(_raw_db_type_env) or _infer_db_type(_db_port_env, _db_user_env) or 'postgresql'
 
-    DB_TYPE = _normalized_db_type or _infer_db_type(_db_port_env, _db_user_env) or 'sqlite'
-
-    default_host = _get_env('DB_HOST', 'DATABASE_HOST', default='localhost')
-    default_port = _get_env('DB_PORT', 'DATABASE_PORT')
-    default_user = _get_env('DB_USER', 'DATABASE_USERNAME')
-    default_password = _get_env('DB_PASSWORD', 'DATABASE_PASSWORD', default='')
-    default_name = _get_env('DB_NAME', 'DATABASE_NAME', default='suricata')
-    default_path = _get_env('DB_PATH', 'DATABASE_PATH', default='/opt/suricata_monitoring/data/suricata.db')
-
-    fallback_defaults = {
+    _supported_defaults = {
         'postgresql': {'port': '5432', 'user': 'postgres'},
-        'mysql': {'port': '3306', 'user': 'root'},
-        'sqlite': {'port': '0', 'user': ''}
+        'mysql': {'port': '3306', 'user': 'root'}
     }
 
-    defaults_for_type = fallback_defaults.get(DB_TYPE, {'port': '0', 'user': ''})
+    if DB_TYPE not in _supported_defaults:
+        raise ValueError(f"Unsupported database type: {DB_TYPE}")
 
-    DB_HOST = default_host
+    defaults_for_type = _supported_defaults[DB_TYPE]
 
-    if DB_TYPE == 'sqlite':
-        DB_PORT = 0
-    else:
-        DB_PORT = int(default_port or defaults_for_type['port'])
-
-    DB_USER = default_user or defaults_for_type['user']
-    DB_PASSWORD = default_password
-    DB_NAME = default_name
-    DB_PATH = default_path
+    DB_HOST = _db_host_env or 'localhost'
+    DB_PORT = int(_db_port_env or defaults_for_type['port'])
+    DB_USER = _db_user_env or defaults_for_type['user']
+    DB_PASSWORD = _get_env('DB_PASSWORD', 'DATABASE_PASSWORD', default='')
+    DB_NAME = _get_env('DB_NAME', 'DATABASE_NAME', default='suricata')
 
     # Application storage paths
     APP_DATA_DIR = _get_env('APP_DATA_DIR', default='/opt/suricata_monitoring/data')
@@ -147,3 +132,4 @@ class Config:
                 'rules_dir': '/etc/suricata/rules',
                 'log_dir': '/var/log/suricata'
             }
+
