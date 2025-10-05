@@ -18,7 +18,11 @@ class BackgroundTasks:
 
     def start_all(self):
         """Start all background tasks"""
-        # RRD metrics update
+        # Traffic aggregation (eve.json → database)
+        self._start_thread(self._aggregate_traffic_data, "Traffic Aggregation")
+        print("[TRAFFIC-AGG] Traffic aggregation enabled - Monitoring eve.json")
+
+        # RRD metrics update (database → RRD files)
         self._start_thread(self._update_rrd_metrics, "RRD Metrics")
 
         # Alert sync from eve.json to database
@@ -45,11 +49,88 @@ class BackgroundTasks:
         thread.start()
         self.threads.append(thread)
 
-    # ==================== RRD Metrics ====================
-    def _update_rrd_metrics(self):
-        """Update RRD metrics every minute"""
+    # ==================== Traffic Aggregation ====================
+    def _aggregate_traffic_data(self):
+        """Aggregate traffic data from eve.json to database every minute"""
+        eve_log_path = f"{self.config.SURICATA_LOG_DIR}/eve.json"
+        last_position = 0
+        interval_seconds = 60
+
         while True:
             try:
+                if not os.path.exists(eve_log_path):
+                    time.sleep(interval_seconds)
+                    continue
+
+                # Aggregate counters
+                aggregated = {}
+                current_time = datetime.utcnow()
+
+                with open(eve_log_path, 'r') as f:
+                    f.seek(last_position)
+
+                    for line in f:
+                        try:
+                            event = json.loads(line.strip())
+                            event_type = event.get('event_type', '')
+                            proto = event.get('proto', 'UNKNOWN').upper()
+
+                            if proto not in aggregated:
+                                aggregated[proto] = {
+                                    'packet_count': 0,
+                                    'byte_count': 0,
+                                    'flow_count': 0,
+                                    'alert_count': 0
+                                }
+
+                            # Count flows
+                            if event_type == 'flow':
+                                aggregated[proto]['flow_count'] += 1
+                                aggregated[proto]['packet_count'] += event.get('flow', {}).get('pkts_toserver', 0) + event.get('flow', {}).get('pkts_toclient', 0)
+                                aggregated[proto]['byte_count'] += event.get('flow', {}).get('bytes_toserver', 0) + event.get('flow', {}).get('bytes_toclient', 0)
+
+                            # Count alerts
+                            if event_type == 'alert':
+                                aggregated[proto]['alert_count'] += 1
+
+                        except json.JSONDecodeError:
+                            continue
+
+                    last_position = f.tell()
+
+                # Store aggregated data to database
+                for proto, counts in aggregated.items():
+                    self.engine.db_manager.add_traffic_stats({
+                        'timestamp': current_time,
+                        'protocol': proto,
+                        'packet_count': counts['packet_count'],
+                        'byte_count': counts['byte_count'],
+                        'flow_count': counts['flow_count'],
+                        'alert_count': counts['alert_count'],
+                        'interval_seconds': interval_seconds
+                    })
+
+                if aggregated:
+                    protocols = ', '.join([f"{p}:{v['flow_count']}" for p, v in aggregated.items()])
+                    print(f"[TRAFFIC-AGG] Stored: {protocols} flows")
+
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                print(f"[TRAFFIC-AGG] Error: {e}")
+
+            time.sleep(interval_seconds)
+
+    # ==================== RRD Metrics ====================
+    def _update_rrd_metrics(self):
+        """Update RRD metrics from database every minute"""
+        while True:
+            try:
+                # Get latest traffic stats from database
+                traffic_stats = self.engine.db_manager.get_latest_traffic_stats()
+
+                # Update RRD with database values
+                # (RRDManager will be updated to use these values)
                 self.engine.rrd_manager.update_metrics()
             except Exception as e:
                 print(f"Error updating RRD metrics: {e}")

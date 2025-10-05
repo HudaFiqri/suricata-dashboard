@@ -95,3 +95,32 @@ class Statistics(Base):
             'category': self.category,
             'extra_data': self.extra_data
         }
+
+
+class TrafficStats(Base):
+    """Model for aggregated traffic statistics (for RRD)"""
+    __tablename__ = 'traffic_stats'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    protocol = Column(String(20), index=True)  # TCP, UDP, ICMP, etc
+    packet_count = Column(Integer, default=0)
+    byte_count = Column(Integer, default=0)
+    flow_count = Column(Integer, default=0)
+    alert_count = Column(Integer, default=0)
+    interval_seconds = Column(Integer, default=60)  # Aggregation interval
+
+    def __repr__(self):
+        return f"<TrafficStats(protocol='{self.protocol}', packets={self.packet_count}, timestamp={self.timestamp})>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'protocol': self.protocol,
+            'packet_count': self.packet_count,
+            'byte_count': self.byte_count,
+            'flow_count': self.flow_count,
+            'alert_count': self.alert_count,
+            'interval_seconds': self.interval_seconds
+        }

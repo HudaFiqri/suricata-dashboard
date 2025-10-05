@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
 
-from .models import Base, Alert, Log, Statistics
+from .models import Base, Alert, Log, Statistics, TrafficStats
 from .mysql import create_mysql_engine
 from .postgresql import create_postgresql_engine
 
@@ -322,5 +322,92 @@ class DatabaseManager:
             session.rollback()
             print(f"Error cleaning up old data: {e}")
             return None
+        finally:
+            session.close()
+
+    # ==================== Traffic Stats Operations ====================
+
+    def add_traffic_stats(self, stats_data: Dict[str, Any]) -> Optional[TrafficStats]:
+        """Add aggregated traffic statistics"""
+        session = self.get_session()
+        try:
+            stats = TrafficStats(
+                timestamp=stats_data.get('timestamp', datetime.utcnow()),
+                protocol=stats_data.get('protocol'),
+                packet_count=stats_data.get('packet_count', 0),
+                byte_count=stats_data.get('byte_count', 0),
+                flow_count=stats_data.get('flow_count', 0),
+                alert_count=stats_data.get('alert_count', 0),
+                interval_seconds=stats_data.get('interval_seconds', 60)
+            )
+            session.add(stats)
+            session.commit()
+            return stats
+        except Exception as e:
+            session.rollback()
+            print(f"Error adding traffic stats: {e}")
+            return None
+        finally:
+            session.close()
+
+    def get_traffic_stats(self, protocol: Optional[str] = None,
+                         start_time: Optional[datetime] = None,
+                         end_time: Optional[datetime] = None,
+                         limit: int = 1000) -> List[TrafficStats]:
+        """Get traffic statistics with optional filtering"""
+        session = self.get_session()
+        try:
+            query = session.query(TrafficStats)
+
+            if protocol:
+                query = query.filter(TrafficStats.protocol == protocol.upper())
+
+            if start_time:
+                query = query.filter(TrafficStats.timestamp >= start_time)
+
+            if end_time:
+                query = query.filter(TrafficStats.timestamp <= end_time)
+
+            stats = query.order_by(TrafficStats.timestamp.desc()).limit(limit).all()
+            return stats
+        except Exception as e:
+            print(f"Error getting traffic stats: {e}")
+            return []
+        finally:
+            session.close()
+
+    def get_latest_traffic_stats(self) -> Dict[str, int]:
+        """Get latest traffic statistics for each protocol"""
+        session = self.get_session()
+        try:
+            result = {}
+            protocols = ['TCP', 'UDP', 'ICMP']
+
+            for proto in protocols:
+                stat = session.query(TrafficStats).filter(
+                    TrafficStats.protocol == proto
+                ).order_by(TrafficStats.timestamp.desc()).first()
+
+                if stat:
+                    result[proto.lower()] = {
+                        'packet_count': stat.packet_count,
+                        'flow_count': stat.flow_count,
+                        'alert_count': stat.alert_count,
+                        'byte_count': stat.byte_count,
+                        'timestamp': stat.timestamp
+                    }
+                else:
+                    result[proto.lower()] = {
+                        'packet_count': 0,
+                        'flow_count': 0,
+                        'alert_count': 0,
+                        'byte_count': 0,
+                        'timestamp': None
+                    }
+
+            return result
+        except Exception as e:
+            print(f"Error getting latest traffic stats: {e}")
+            return {}
         finally:
             session.close()
