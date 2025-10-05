@@ -112,8 +112,10 @@ class BackgroundTasks:
                     })
 
                 if aggregated:
-                    protocols = ', '.join([f"{p}:{v['flow_count']}" for p, v in aggregated.items()])
-                    print(f"[TRAFFIC-AGG] Stored: {protocols} flows")
+                    # Only show protocols with non-zero flows
+                    proto_stats = [f"{p.upper()}={v['flow_count']}" for p, v in aggregated.items() if v['flow_count'] > 0]
+                    if proto_stats:
+                        print(f"[TRAFFIC-AGG] Stored traffic stats: {' '.join(proto_stats)}")
 
             except FileNotFoundError:
                 pass

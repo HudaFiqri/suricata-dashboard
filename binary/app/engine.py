@@ -28,11 +28,9 @@ class AppEngine:
         try:
             os.makedirs(self.config.APP_DATA_DIR, exist_ok=True)
             os.makedirs(self.config.APP_LOG_DIR, exist_ok=True)
-            print(f"✓ Application directories initialized:")
-            print(f"  - Data: {self.config.APP_DATA_DIR}")
-            print(f"  - Logs: {self.config.APP_LOG_DIR}")
+            print(f"[APP] Directories initialized: data={self.config.APP_DATA_DIR}, logs={self.config.APP_LOG_DIR}")
         except Exception as e:
-            print(f"⚠ Warning: Could not create application directories: {e}")
+            print(f"[APP] Warning: Could not create directories: {e}")
 
     def _init_components(self):
         """Initialize core components"""

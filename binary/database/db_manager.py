@@ -49,9 +49,9 @@ class DatabaseManager:
 
         try:
             self.db_url, self.engine = factory(self.db_config)
-            print(f"[OK] Database connected: {self.db_type.upper()}")
+            print(f"[DATABASE] Connected to {self.db_type.upper()}")
         except Exception as exc:
-            raise RuntimeError(f"Failed to connect to {self.db_type.upper()}: {exc}") from exc
+            raise RuntimeError(f"[DATABASE] Failed to connect to {self.db_type.upper()}: {exc}") from exc
 
     def _create_tables(self):
         """Create all tables"""
