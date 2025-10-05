@@ -8,23 +8,30 @@
                 <h5><i class="fas fa-info-circle"></i> Suricata Status</h5>
             </div>
             <div class="card-body">
-                <div id="status-info">
-                    {% if status.status == 'running' %}
-                        <p><strong>Status:</strong> <span class="status-running"><i class="fas fa-play-circle"></i> Running</span></p>
-                        <p><strong>PID:</strong> {{ status.pid }}</p>
-                        {% if status.uptime %}
-                        <p><strong>Uptime:</strong> {{ status.uptime }}</p>
+                <ul class="list-unstyled status-detail-list mb-0" id="status-info">
+                    <li>
+                        <span class="status-label">Status:</span>
+                        {% if status.status == 'running' %}
+                        <span class="status-value status-running"><i class="fas fa-play-circle"></i> Running</span>
+                        {% elif status.status == 'stopped' %}
+                        <span class="status-value status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span>
+                        {% else %}
+                        <span class="status-value status-error"><i class="fas fa-exclamation-circle"></i> Error</span>
                         {% endif %}
-                    {% elif status.status == 'stopped' %}
-                        <p><strong>Status:</strong> <span class="status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span></p>
-                    {% else %}
-                        <p><strong>Status:</strong> <span class="status-error"><i class="fas fa-exclamation-circle"></i> Error</span></p>
-                        <p><strong>Message:</strong> {{ status.message }}</p>
-                    {% endif %}
-                    {% if status.database %}
-                    <p><strong>Database:</strong> {{ status.database.label }} <span class="text-muted">({{ status.database.host }}:{{ status.database.port }})</span></p>
-                    {% endif %}
-                </div>
+                    </li>
+                    <li>
+                        <span class="status-label">PID:</span>
+                        <span class="status-value">{{ status.pid if status.pid is defined else 'N/A' }}</span>
+                    </li>
+                    <li>
+                        <span class="status-label">Uptime:</span>
+                        <span class="status-value">{{ status.uptime if status.uptime is defined and status.uptime else '-' }}</span>
+                    </li>
+                    <li>
+                        <span class="status-label">Last Time:</span>
+                        <span class="status-value">{{ status.last_time if status.last_time else '-' }}</span>
+                    </li>
+                </ul>
             </div>
         </div>
     </div>
@@ -32,27 +39,48 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h5><i class="fas fa-chart-line"></i> Quick Stats</h5>
+                <h5><i class="fas fa-database"></i> Database Status</h5>
             </div>
             <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-4">
-                        <h3 class="text-primary" id="alerts-count">-</h3>
-                        <p>Alerts</p>
-                    </div>
-                    <div class="col-4">
-                        <h3 class="text-warning" id="rules-count">-</h3>
-                        <p>Rules</p>
-                    </div>
-                    <div class="col-4">
-                        <h3 class="text-info" id="uptime-display">-</h3>
-                        <p>Uptime</p>
-                    </div>
-                </div>
+                <ul class="list-unstyled status-detail-list mb-0" id="database-status">
+                    <li>
+                        <span class="status-label">Database Brand:</span>
+                        <span class="status-value" id="database-brand">{% if status.database %}{{ status.database.label }}{% else %}-{% endif %}</span>
+                    </li>
+                    <li>
+                        <span class="status-label">Database Host:</span>
+                        <span class="status-value" id="database-host">{% if status.database %}{{ status.database.host }}{% if status.database.port %}:{{ status.database.port }}{% endif %}{% else %}-{% endif %}</span>
+                    </li>
+                    <li>
+                        <span class="status-label">Database Status:</span>
+                        <span class="status-value" id="database-connection">Checking...</span>
+                    </li>
+                </ul>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.status-detail-list .status-label {
+    font-weight: 600;
+    min-width: 140px;
+    display: inline-block;
+}
+
+.status-detail-list li + li {
+    margin-top: 0.5rem;
+}
+
+.status-detail-list .status-value {
+    font-weight: 500;
+}
+
+.status-note {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+</style>
 
 <div class="row mt-4">
     <div class="col-12">
@@ -130,42 +158,80 @@
 
 {% block scripts %}
 <script>
+function formatLocalTime(epochSeconds) {
+    const numeric = Number(epochSeconds);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return '-';
+    }
+    const date = new Date(numeric * 1000);
+    if (Number.isNaN(date.getTime())) {
+        return '-';
+    }
+    return date.toLocaleString();
+}
+
 function showAlert(message, isSuccess = true) {
     $('#modal-message').html('<div class="alert alert-' + (isSuccess ? "success" : "danger") + '">' + message + '</div>');
     $('#alertModal').modal('show');
     setTimeout(() => updateStatus(), 1000);
 }
 
+function renderSuricataStatus(data) {
+    const statusList = $('#status-info');
+    if (!statusList.length) {
+        return;
+    }
+
+    let statusBadge;
+    if (data.status === 'running') {
+        statusBadge = '<span class="status-value status-running"><i class="fas fa-play-circle"></i> Running</span>';
+    } else if (data.status === 'stopped') {
+        statusBadge = '<span class="status-value status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span>';
+    } else {
+        statusBadge = '<span class="status-value status-error"><i class="fas fa-exclamation-circle"></i> Error</span>';
+    }
+
+    const pidValue = (data.pid !== undefined && data.pid !== null && data.pid !== '') ? data.pid : 'N/A';
+    const uptimeValue = data.uptime ? data.uptime : '-';
+    let lastTimeDisplay = '-';
+    if (data.last_time_epoch) {
+        lastTimeDisplay = formatLocalTime(data.last_time_epoch);
+    } else if (data.last_time) {
+        lastTimeDisplay = data.last_time;
+    }
+
+    let rows = `
+        <li>
+            <span class="status-label">Status:</span>
+            ${statusBadge}
+        </li>
+        <li>
+            <span class="status-label">PID:</span>
+            <span class="status-value">${pidValue}</span>
+        </li>
+        <li>
+            <span class="status-label">Uptime:</span>
+            <span class="status-value">${uptimeValue}</span>
+        </li>
+        <li>
+            <span class="status-label">Last Time:</span>
+            <span class="status-value">${lastTimeDisplay}</span>
+        </li>
+    `;
+
+    if (data.status === 'error' && data.message) {
+        rows += `
+        <li class="status-note text-muted">
+            ${data.message}
+        </li>`;
+    }
+
+    statusList.html(rows);
+}
+
 function updateStatus() {
     $.get('/api/status', function(data) {
-        let statusHtml = '';
-        const pidValue = (data.pid !== undefined && data.pid !== null) ? data.pid : 'N/A';
-
-        if (data.status === 'running') {
-            statusHtml = `
-                <p><strong>Status:</strong> <span class="status-running"><i class="fas fa-play-circle"></i> Running</span></p>
-                <p><strong>PID:</strong> ${pidValue}</p>
-            `;
-            if (data.uptime) {
-                statusHtml += `<p><strong>Uptime:</strong> ${data.uptime}</p>`;
-            }
-        } else if (data.status === 'stopped') {
-            statusHtml = '<p><strong>Status:</strong> <span class="status-stopped"><i class="fas fa-stop-circle"></i> Stopped</span></p>';
-        } else {
-            statusHtml = `
-                <p><strong>Status:</strong> <span class="status-error"><i class="fas fa-exclamation-circle"></i> Error</span></p>
-                <p><strong>Message:</strong> ${data.message}</p>
-            `;
-        }
-
-        if (data.database) {
-            const dbLabel = data.database.label || (data.database.type ? data.database.type.toUpperCase() : '-');
-            const dbHost = data.database.host || 'localhost';
-            const dbPort = (data.database.port !== undefined && data.database.port !== null) ? data.database.port : '-';
-            statusHtml += `<p><strong>Database:</strong> ${dbLabel} <span class="text-muted">(${dbHost}:${dbPort})</span></p>`;
-        }
-
-        $('#status-info').html(statusHtml);
+        renderSuricataStatus(data);
 
         const suricataStatusEl = $('#dashboard-suricata-status');
         if (suricataStatusEl.length) {
@@ -177,10 +243,53 @@ function updateStatus() {
                 suricataStatusEl.html('<span class="text-warning">Error</span>');
             }
         }
+
+        const dbBrandEl = $('#database-brand');
+        if (dbBrandEl.length) {
+            if (data.database) {
+                const dbLabel = data.database.label || (data.database.type ? data.database.type.toUpperCase() : '-');
+                dbBrandEl.text(dbLabel);
+            } else {
+                dbBrandEl.text('-');
+            }
+        }
+
+        const dbHostEl = $('#database-host');
+        if (dbHostEl.length) {
+            if (data.database) {
+                const host = data.database.host || 'localhost';
+                const port = (data.database.port !== undefined && data.database.port !== null && data.database.port !== '') ? `:${data.database.port}` : '';
+                dbHostEl.text(`${host}${port}`);
+            } else {
+                dbHostEl.text('-');
+            }
+        }
     }).fail(function() {
         const suricataStatusEl = $('#dashboard-suricata-status');
         if (suricataStatusEl.length) {
             suricataStatusEl.html('<span class="text-danger">Error</span>');
+        }
+
+        const statusList = $('#status-info');
+        if (statusList.length) {
+            statusList.html(`
+                <li>
+                    <span class="status-label">Status:</span>
+                    <span class="status-value status-error"><i class="fas fa-exclamation-circle"></i> Error</span>
+                </li>
+                <li>
+                    <span class="status-label">PID:</span>
+                    <span class="status-value">N/A</span>
+                </li>
+                <li>
+                    <span class="status-label">Uptime:</span>
+                    <span class="status-value">-</span>
+                </li>
+                <li>
+                    <span class="status-label">Last Time:</span>
+                    <span class="status-value">-</span>
+                </li>
+            `);
         }
     });
 }
@@ -188,19 +297,34 @@ function updateStatus() {
 function updateQuickOverview() {
     $.get('/api/database/check', function(response) {
         const dbStatusEl = $('#dashboard-db-status');
-        if (!dbStatusEl.length) {
-            return;
+        if (dbStatusEl.length) {
+            if (response.success && response.connected) {
+                dbStatusEl.html('<span class="text-success">Connected</span>');
+            } else if (response.success) {
+                dbStatusEl.html('<span class="text-danger">Disconnected</span>');
+            } else {
+                dbStatusEl.html('<span class="text-danger">Error</span>');
+            }
         }
 
-        if (response.success && response.connected) {
-            dbStatusEl.html('<span class="text-success">Connected</span>');
-        } else {
-            dbStatusEl.html('<span class="text-danger">Disconnected</span>');
+        const cardStatusEl = $('#database-connection');
+        if (cardStatusEl.length) {
+            if (response.success && response.connected) {
+                cardStatusEl.html('<span class="text-success">Connected</span>');
+            } else if (response.success) {
+                cardStatusEl.html('<span class="text-danger">Disconnected</span>');
+            } else {
+                cardStatusEl.html('<span class="text-danger">Error</span>');
+            }
         }
     }).fail(function() {
         const dbStatusEl = $('#dashboard-db-status');
         if (dbStatusEl.length) {
             dbStatusEl.html('<span class="text-danger">Error</span>');
+        }
+        const cardStatusEl = $('#database-connection');
+        if (cardStatusEl.length) {
+            cardStatusEl.html('<span class="text-danger">Error</span>');
         }
     });
 

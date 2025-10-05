@@ -35,26 +35,35 @@ class SuricataBackendController:
 
                 uptime = None
                 uptime_seconds: Optional[int] = None
+                last_time: Optional[str] = None
+                last_time_epoch: Optional[int] = None
                 if pid:
                     try:
                         process = psutil.Process(pid)
-                        uptime_seconds = max(int(time.time() - process.create_time()), 0)
+                        create_time = process.create_time()
+                        uptime_seconds = max(int(time.time() - create_time), 0)
                         uptime = self._format_duration(uptime_seconds)
+                        last_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(create_time))
+                        last_time_epoch = int(create_time)
                     except (psutil.Error, OSError, ValueError):
                         uptime = None
                         uptime_seconds = None
+                        last_time = None
+                        last_time_epoch = None
 
                 return {
                     'status': 'running',
                     'running': True,
                     'pid': pid if pid else 'N/A',
                     'uptime': uptime,
-                    'uptime_seconds': uptime_seconds
+                    'uptime_seconds': uptime_seconds,
+                    'last_time': last_time,
+                    'last_time_epoch': last_time_epoch
                 }
             else:
-                return {'status': 'stopped', 'running': False}
+                return {'status': 'stopped', 'running': False, 'last_time': None, 'last_time_epoch': None}
         except Exception as e:
-            return {'status': 'error', 'message': str(e), 'running': False}
+            return {'status': 'error', 'message': str(e), 'running': False, 'last_time': None, 'last_time_epoch': None}
 
 
     @staticmethod
