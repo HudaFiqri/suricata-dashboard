@@ -7,11 +7,6 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-chart-line"></i> Alert Monitoring</h5>
                 <div>
-                    <select class="form-select form-select-sm d-inline-block w-auto me-2" id="metric-select">
-                        <option value="tcp">TCP Traffic</option>
-                        <option value="udp">UDP Traffic</option>
-                        <option value="total">Total Alerts</option>
-                    </select>
                     <select class="form-select form-select-sm d-inline-block w-auto me-2" id="timespan-select">
                         <option value="1h">Last Hour</option>
                         <option value="6h">Last 6 Hours</option>
@@ -114,15 +109,23 @@ let currentTimespan = '1h';
 function initChart() {
     const ctx = document.getElementById('alertChart').getContext('2d');
     alertChart = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: [],
             datasets: [{
-                label: 'Alerts',
+                label: 'Traffic & Alerts',
                 data: [],
-                borderColor: 'rgb(75, 192, 192)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                tension: 0.1
+                backgroundColor: [
+                    'rgba(54, 162, 235, 0.5)',
+                    'rgba(75, 192, 192, 0.5)',
+                    'rgba(255, 159, 64, 0.5)'
+                ],
+                borderColor: [
+                    'rgb(54, 162, 235)',
+                    'rgb(75, 192, 192)',
+                    'rgb(255, 159, 64)'
+                ],
+                borderWidth: 2
             }]
         },
         options: {
@@ -133,12 +136,6 @@ function initChart() {
                     beginAtZero: true,
                     ticks: {
                         stepSize: 1
-                    }
-                },
-                x: {
-                    type: 'time',
-                    time: {
-                        unit: 'minute'
                     }
                 }
             },
@@ -153,32 +150,19 @@ function initChart() {
 }
 
 function updateChart() {
-    const metric = $('#metric-select').val();
     const timespan = $('#timespan-select').val();
 
-    $.get(`/api/monitor/data?metric=${metric}&timespan=${timespan}`, function(response) {
-        if (response.success && response.data) {
-            const labels = response.data.map(d => new Date(d.timestamp * 1000));
-            const values = response.data.map(d => d.value);
-
-            alertChart.data.labels = labels;
-            alertChart.data.datasets[0].data = values;
-            alertChart.data.datasets[0].label = `${metric.toUpperCase()} Alerts`;
-
-            // Update chart color based on metric
-            const colors = {
-                'tcp': { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' },
-                'udp': { border: 'rgb(75, 192, 192)', bg: 'rgba(75, 192, 192, 0.2)' },
-                'total': { border: 'rgb(255, 159, 64)', bg: 'rgba(255, 159, 64, 0.2)' }
-            };
-
-            const color = colors[metric] || colors['tcp'];
-            alertChart.data.datasets[0].borderColor = color.border;
-            alertChart.data.datasets[0].backgroundColor = color.bg;
-
+    $.get(`/api/monitor/data?timespan=${timespan}`, function(response) {
+        if (response.success) {
+            alertChart.data.labels = ['TCP Traffic', 'UDP Traffic', 'Total Alerts'];
+            alertChart.data.datasets[0].data = [
+                response.tcp_traffic || 0,
+                response.udp_traffic || 0,
+                response.total_alerts || 0
+            ];
+            alertChart.data.datasets[0].label = `Traffic & Alerts (${timespan})`;
             alertChart.update();
         } else {
-            // Handle RRD not available
             alertChart.data.labels = [];
             alertChart.data.datasets[0].data = [];
             alertChart.update();
@@ -191,21 +175,22 @@ function updateChart() {
 }
 
 function updateCounts() {
-    // Get latest counts for all metrics
-    const metrics = ['tcp', 'udp', 'total'];
+    const timespan = $('#timespan-select').val();
 
-    metrics.forEach(metric => {
-        $.get(`/api/monitor/data?metric=${metric}&timespan=1h`, function(response) {
-            if (response.success && response.data && response.data.length > 0) {
-                // Get the last data point
-                const lastValue = response.data[response.data.length - 1].value;
-                $(`#${metric}-count`).text(Math.round(lastValue));
-            } else {
-                $(`#${metric}-count`).text('0');
-            }
-        }).fail(function() {
-            $(`#${metric}-count`).text('0');
-        });
+    $.get(`/api/monitor/data?timespan=${timespan}`, function(response) {
+        if (response.success) {
+            $('#tcp-count').text(response.tcp_traffic || 0);
+            $('#udp-count').text(response.udp_traffic || 0);
+            $('#total-count').text(response.total_alerts || 0);
+        } else {
+            $('#tcp-count').text('0');
+            $('#udp-count').text('0');
+            $('#total-count').text('0');
+        }
+    }).fail(function() {
+        $('#tcp-count').text('0');
+        $('#udp-count').text('0');
+        $('#total-count').text('0');
     });
 }
 
@@ -282,6 +267,7 @@ $(document).ready(function() {
     // Apply button
     $('#apply-config').click(function() {
         updateChart();
+        updateCounts();
     });
 
     // Alert search and filter
