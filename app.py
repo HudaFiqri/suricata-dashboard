@@ -442,10 +442,81 @@ def api_save_config():
 
 @app.route('/api/monitor/data')
 def api_monitor_data():
-    metric = request.args.get('metric', 'ssh')
+    """Get monitoring data from eve.json"""
+    import json
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+
+    metric = request.args.get('metric', 'tcp')
     timespan = request.args.get('timespan', '1h')
-    result = rrd_manager.get_graph_data(metric, timespan)
-    return jsonify(result)
+
+    try:
+        eve_log_path = f"{Config.SURICATA_LOG_DIR}/eve.json"
+
+        # Parse timespan
+        hours = 1
+        if timespan.endswith('h'):
+            hours = int(timespan[:-1])
+        elif timespan.endswith('d'):
+            hours = int(timespan[:-1]) * 24
+
+        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+
+        # Count metrics
+        tcp_count = 0
+        udp_count = 0
+        alert_count = 0
+
+        with open(eve_log_path, 'r') as f:
+            for line in f:
+                try:
+                    event = json.loads(line.strip())
+
+                    # Parse timestamp
+                    timestamp_str = event.get('timestamp', '')
+                    if timestamp_str:
+                        event_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        if event_time < cutoff_time:
+                            continue
+
+                    # Count by protocol
+                    proto = event.get('proto', '').upper()
+                    if proto == 'TCP':
+                        tcp_count += 1
+                    elif proto == 'UDP':
+                        udp_count += 1
+
+                    # Count alerts
+                    if event.get('event_type') == 'alert':
+                        alert_count += 1
+
+                except (json.JSONDecodeError, ValueError):
+                    continue
+
+        return jsonify({
+            'success': True,
+            'tcp_traffic': tcp_count,
+            'udp_traffic': udp_count,
+            'total_alerts': alert_count,
+            'timespan': timespan
+        })
+
+    except FileNotFoundError:
+        return jsonify({
+            'success': False,
+            'tcp_traffic': 0,
+            'udp_traffic': 0,
+            'total_alerts': 0,
+            'error': 'eve.json not found'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'tcp_traffic': 0,
+            'udp_traffic': 0,
+            'total_alerts': 0,
+            'error': str(e)
+        })
 
 @app.route('/api/monitor/graph/<metric>/<timespan>')
 def api_monitor_graph(metric, timespan):
@@ -461,23 +532,91 @@ def api_database_info():
 
 @app.route('/api/database/alerts')
 def api_database_alerts():
+    """Get recent alerts from eve.json"""
+    import json
+    from datetime import datetime
+
     limit = request.args.get('limit', 100, type=int)
     category = request.args.get('category', None)
     protocol = request.args.get('protocol', None)
 
-    # Get alerts with filter
-    alerts = db_manager.get_alerts(limit=limit, category=category)
+    try:
+        eve_log_path = f"{Config.SURICATA_LOG_DIR}/eve.json"
+        alerts = []
 
-    # Additional filter by protocol if specified
-    if protocol:
-        alerts = [alert for alert in alerts if alert.protocol and alert.protocol.upper() == protocol.upper()]
+        with open(eve_log_path, 'r') as f:
+            # Read all lines and filter alerts
+            for line in f:
+                try:
+                    event = json.loads(line.strip())
 
-    return jsonify({'alerts': [alert.to_dict() for alert in alerts]})
+                    # Only process alert events
+                    if event.get('event_type') == 'alert':
+                        alert_info = event.get('alert', {})
+
+                        # Apply filters
+                        if category and alert_info.get('category') != category:
+                            continue
+
+                        if protocol and event.get('proto', '').upper() != protocol.upper():
+                            continue
+
+                        alert_data = {
+                            'id': len(alerts) + 1,
+                            'timestamp': event.get('timestamp', ''),
+                            'signature': alert_info.get('signature'),
+                            'signature_id': alert_info.get('signature_id'),
+                            'category': alert_info.get('category'),
+                            'severity': alert_info.get('severity'),
+                            'protocol': event.get('proto'),
+                            'src_ip': event.get('src_ip'),
+                            'src_port': event.get('src_port'),
+                            'dest_ip': event.get('dest_ip'),
+                            'dest_port': event.get('dest_port'),
+                            'payload': event.get('payload'),
+                        }
+
+                        alerts.append(alert_data)
+
+                except json.JSONDecodeError:
+                    continue
+
+        # Get most recent alerts (reverse and limit)
+        alerts.reverse()
+        alerts = alerts[:limit]
+
+        return jsonify({'alerts': alerts})
+
+    except FileNotFoundError:
+        return jsonify({'alerts': [], 'error': 'eve.json not found'})
+    except Exception as e:
+        return jsonify({'alerts': [], 'error': str(e)})
 
 @app.route('/api/database/stats')
 def api_database_stats():
     stats = db_manager.get_latest_stats()
     return jsonify(stats)
+
+@app.route('/api/database/check')
+def api_database_check():
+    """Check database connection status"""
+    try:
+        db_info = db_manager.get_db_info()
+        is_connected = db_info.get('connected', False)
+
+        return jsonify({
+            'success': True,
+            'connected': is_connected,
+            'database_type': db_info.get('type'),
+            'database_url': db_info.get('url'),
+            'message': 'Database connected successfully' if is_connected else 'Database connection failed'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'connected': False,
+            'message': f'Database check error: {str(e)}'
+        })
 
 if __name__ == '__main__':
     app.run(debug=Config.FLASK_DEBUG, host=Config.FLASK_HOST, port=Config.FLASK_PORT, use_debugger=False, use_reloader=True)
