@@ -589,7 +589,7 @@ def api_database_info():
 
 @app.route('/api/database/alerts')
 def api_database_alerts():
-    """Get recent alerts from eve.json"""
+    """Get all events from eve.json"""
     import json
     from datetime import datetime
 
@@ -609,38 +609,77 @@ def api_database_alerts():
         alerts = []
 
         with open(eve_log_path, 'r') as f:
-            # Read all lines and filter alerts
+            # Read all lines and show ALL events
             for line in f:
+                if not line.strip():
+                    continue
+
                 try:
                     event = json.loads(line.strip())
+                    event_type = event.get('event_type', 'unknown')
 
-                    # Only process alert events
-                    if event.get('event_type') == 'alert':
+                    # Apply protocol filter
+                    if protocol and event.get('proto', '').upper() != protocol.upper():
+                        continue
+
+                    # Create signature/description based on event type
+                    signature = ''
+                    severity = 3  # Default info level
+
+                    if event_type == 'alert':
                         alert_info = event.get('alert', {})
+                        signature = alert_info.get('signature', 'Unknown Alert')
+                        severity = alert_info.get('severity', 1)
+                        category_val = alert_info.get('category', 'Unknown')
+                    elif event_type == 'http':
+                        http_data = event.get('http', {})
+                        signature = f"HTTP: {http_data.get('http_method', 'GET')} {http_data.get('hostname', '')}{http_data.get('url', '')}"
+                        category_val = 'HTTP'
+                    elif event_type == 'dns':
+                        dns_data = event.get('dns', {})
+                        signature = f"DNS Query: {dns_data.get('rrname', '')}"
+                        category_val = 'DNS'
+                    elif event_type == 'tls':
+                        tls_data = event.get('tls', {})
+                        signature = f"TLS: {tls_data.get('sni', 'N/A')}"
+                        category_val = 'TLS'
+                    elif event_type == 'ssh':
+                        signature = "SSH Connection"
+                        category_val = 'SSH'
+                    elif event_type == 'flow':
+                        signature = f"Flow: {event.get('proto', 'N/A')}"
+                        category_val = 'FLOW'
+                    elif event_type == 'stats':
+                        signature = "Statistics Update"
+                        category_val = 'STATS'
+                    elif event_type == 'fileinfo':
+                        fileinfo = event.get('fileinfo', {})
+                        signature = f"File: {fileinfo.get('filename', 'N/A')}"
+                        category_val = 'FILE'
+                    else:
+                        signature = f"{event_type.upper()}"
+                        category_val = event_type.upper()
 
-                        # Apply filters
-                        if category and alert_info.get('category') != category:
-                            continue
+                    # Apply category filter
+                    if category and category_val.upper() != category.upper():
+                        continue
 
-                        if protocol and event.get('proto', '').upper() != protocol.upper():
-                            continue
+                    alert_data = {
+                        'id': len(alerts) + 1,
+                        'timestamp': event.get('timestamp', ''),
+                        'signature': signature,
+                        'signature_id': None,
+                        'category': category_val,
+                        'severity': severity,
+                        'protocol': event.get('proto', 'N/A'),
+                        'src_ip': event.get('src_ip', 'N/A'),
+                        'src_port': event.get('src_port', ''),
+                        'dest_ip': event.get('dest_ip', 'N/A'),
+                        'dest_port': event.get('dest_port', ''),
+                        'payload': None,
+                    }
 
-                        alert_data = {
-                            'id': len(alerts) + 1,
-                            'timestamp': event.get('timestamp', ''),
-                            'signature': alert_info.get('signature'),
-                            'signature_id': alert_info.get('signature_id'),
-                            'category': alert_info.get('category'),
-                            'severity': alert_info.get('severity'),
-                            'protocol': event.get('proto'),
-                            'src_ip': event.get('src_ip'),
-                            'src_port': event.get('src_port'),
-                            'dest_ip': event.get('dest_ip'),
-                            'dest_port': event.get('dest_port'),
-                            'payload': event.get('payload'),
-                        }
-
-                        alerts.append(alert_data)
+                    alerts.append(alert_data)
 
                 except json.JSONDecodeError:
                     continue
