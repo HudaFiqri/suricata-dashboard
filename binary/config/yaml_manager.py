@@ -1,9 +1,31 @@
 """
 YAML Config Manager - Parse and update Suricata YAML configuration
 """
-import yaml
-from typing import Dict, Any, Optional
 import os
+from typing import Dict, Any, Optional
+
+import yaml
+
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+class SuricataDumper(yaml.SafeDumper):
+    """Custom dumper that keeps Suricata's yes/no boolean style."""
+    pass
+
+
+def _represent_bool(dumper: yaml.SafeDumper, data: bool):
+    return dumper.represent_scalar("tag:yaml.org,2002:bool", "yes" if data else "no")
+
+
+SuricataDumper.add_representer(bool, _represent_bool)
+
+
+def _to_bool(value: Any) -> bool:
+    """Normalize different truthy/falsy representations to a boolean."""
+    if isinstance(value, str):
+        return value.strip().lower() in _TRUE_VALUES
+    return bool(value)
 
 
 class YAMLConfigManager:
@@ -17,14 +39,24 @@ class YAMLConfigManager:
         if not os.path.exists(self.config_path):
             raise FileNotFoundError(f"Config file not found: {self.config_path}")
 
-        with open(self.config_path, 'r') as f:
+        with open(self.config_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
 
     def save(self, config: Dict[str, Any]) -> bool:
         """Save YAML configuration"""
         try:
-            with open(self.config_path, 'w') as f:
-                yaml.dump(config, f, default_flow_style=False, sort_keys=False, indent=2)
+            with open(self.config_path, "w", encoding="utf-8", newline="\n") as f:
+                yaml.dump(
+                    config,
+                    f,
+                    Dumper=SuricataDumper,
+                    default_flow_style=False,
+                    sort_keys=False,
+                    indent=2,
+                    allow_unicode=True,
+                    explicit_start=True,
+                    version=(1, 1),
+                )
             return True
         except Exception as e:
             print(f"Error saving config: {e}")
@@ -33,8 +65,8 @@ class YAMLConfigManager:
     def get_app_layer_protocols(self) -> Dict[str, Any]:
         """Get app-layer protocols configuration"""
         config = self.load()
-        app_layer = config.get('app-layer', {})
-        protocols = app_layer.get('protocols', {})
+        app_layer = config.get("app-layer", {})
+        protocols = app_layer.get("protocols", {})
         return protocols
 
     def update_app_layer_protocol(self, protocol: str, enabled: bool, settings: Optional[Dict] = None) -> bool:
@@ -53,18 +85,18 @@ class YAMLConfigManager:
             config = self.load()
 
             # Ensure app-layer structure exists
-            if 'app-layer' not in config:
-                config['app-layer'] = {}
-            if 'protocols' not in config['app-layer']:
-                config['app-layer']['protocols'] = {}
+            if "app-layer" not in config:
+                config["app-layer"] = {}
+            if "protocols" not in config["app-layer"]:
+                config["app-layer"]["protocols"] = {}
 
-            protocols = config['app-layer']['protocols']
+            protocols = config["app-layer"]["protocols"]
 
             # Update protocol
             if protocol not in protocols:
                 protocols[protocol] = {}
 
-            protocols[protocol]['enabled'] = 'yes' if enabled else 'no'
+            protocols[protocol]["enabled"] = _to_bool(enabled)
 
             # Update additional settings if provided
             if settings:
@@ -80,7 +112,7 @@ class YAMLConfigManager:
     def get_af_packet_config(self) -> Dict[str, Any]:
         """Get AF-Packet configuration"""
         config = self.load()
-        af_packet_list = config.get('af-packet', [])
+        af_packet_list = config.get("af-packet", [])
         if isinstance(af_packet_list, list) and len(af_packet_list) > 0:
             return af_packet_list[0]
         return {}
@@ -90,13 +122,13 @@ class YAMLConfigManager:
         try:
             config = self.load()
 
-            if 'af-packet' not in config:
-                config['af-packet'] = [{}]
+            if "af-packet" not in config:
+                config["af-packet"] = [{}]
 
-            if isinstance(config['af-packet'], list):
-                config['af-packet'][0].update(settings)
+            if isinstance(config["af-packet"], list):
+                config["af-packet"][0].update(settings)
             else:
-                config['af-packet'] = [settings]
+                config["af-packet"] = [settings]
 
             return self.save(config)
 
@@ -107,17 +139,17 @@ class YAMLConfigManager:
     def get_vars(self) -> Dict[str, Any]:
         """Get variables configuration"""
         config = self.load()
-        return config.get('vars', {})
+        return config.get("vars", {})
 
     def update_var(self, var_name: str, value: str) -> bool:
         """Update a specific variable"""
         try:
             config = self.load()
 
-            if 'vars' not in config:
-                config['vars'] = {}
+            if "vars" not in config:
+                config["vars"] = {}
 
-            config['vars'][var_name] = value
+            config["vars"][var_name] = value
 
             return self.save(config)
 
@@ -128,7 +160,7 @@ class YAMLConfigManager:
     def get_outputs(self) -> Dict[str, Any]:
         """Get outputs configuration"""
         config = self.load()
-        outputs_list = config.get('outputs', [])
+        outputs_list = config.get("outputs", [])
 
         # Convert list to dict for easier processing
         outputs_dict = {}
@@ -155,30 +187,32 @@ class YAMLConfigManager:
         try:
             config = self.load()
 
-            if 'outputs' not in config:
-                config['outputs'] = []
+            if "outputs" not in config:
+                config["outputs"] = []
 
-            outputs = config['outputs']
+            outputs = config["outputs"]
+
+            enabled_flag = _to_bool(enabled)
 
             # Find output in list
             output_found = False
-            for i, output in enumerate(outputs):
+            for output in outputs:
                 if output_name in output:
                     # Update enabled status
                     if isinstance(output[output_name], dict):
-                        output[output_name]['enabled'] = 'yes' if enabled else 'no'
+                        output[output_name]["enabled"] = enabled_flag
                         # Update additional settings
                         if settings:
                             output[output_name].update(settings)
                     else:
                         # Simple format: just enabled/no
-                        output[output_name] = 'yes' if enabled else 'no'
+                        output[output_name] = enabled_flag
                     output_found = True
                     break
 
             # If output not found, add it
             if not output_found:
-                new_output = {output_name: {'enabled': 'yes' if enabled else 'no'}}
+                new_output = {output_name: {"enabled": enabled_flag}}
                 if settings:
                     new_output[output_name].update(settings)
                 outputs.append(new_output)
@@ -192,18 +226,18 @@ class YAMLConfigManager:
     def get_logging(self) -> Dict[str, Any]:
         """Get logging configuration"""
         config = self.load()
-        return config.get('logging', {})
+        return config.get("logging", {})
 
     def update_logging(self, settings: Dict[str, Any]) -> bool:
         """Update logging configuration"""
         try:
             config = self.load()
 
-            if 'logging' not in config:
-                config['logging'] = {}
+            if "logging" not in config:
+                config["logging"] = {}
 
             # Update logging settings
-            config['logging'].update(settings)
+            config["logging"].update(settings)
 
             return self.save(config)
 
@@ -217,16 +251,16 @@ class YAMLConfigManager:
         detect_config = {}
 
         # Collect detection-related settings
-        if 'detect' in config:
-            detect_config['detect'] = config['detect']
-        if 'threading' in config:
-            detect_config['threading'] = config['threading']
-        if 'profiling' in config:
-            detect_config['profiling'] = config['profiling']
-        if 'mpm-algo' in config:
-            detect_config['mpm-algo'] = config['mpm-algo']
-        if 'sgh-mpm-context' in config:
-            detect_config['sgh-mpm-context'] = config['sgh-mpm-context']
+        if "detect" in config:
+            detect_config["detect"] = config["detect"]
+        if "threading" in config:
+            detect_config["threading"] = config["threading"]
+        if "profiling" in config:
+            detect_config["profiling"] = config["profiling"]
+        if "mpm-algo" in config:
+            detect_config["mpm-algo"] = config["mpm-algo"]
+        if "sgh-mpm-context" in config:
+            detect_config["sgh-mpm-context"] = config["sgh-mpm-context"]
 
         return detect_config
 
