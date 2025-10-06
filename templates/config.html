@@ -105,6 +105,18 @@
                         <input type="url" class="form-control" id="discord-webhook" placeholder="https://discord.com/api/webhooks/...">
                         <div class="form-text">Provide a Discord webhook URL with notification permissions.</div>
                     </div>
+                    <div class="mb-3">
+                        <label for="discord-template" class="form-label">Custom Message Template (Optional)</label>
+                        <textarea class="form-control font-monospace" id="discord-template" rows="6" placeholder="🚨 Security Alert&#10;&#10;Signature: {signature}&#10;Category: {category}&#10;Severity: {severity}&#10;Source: {src_ip}:{src_port}&#10;Destination: {dest_ip}:{dest_port}&#10;Protocol: {protocol}"></textarea>
+                        <div class="form-text">
+                            Available variables: {signature}, {category}, {severity}, {src_ip}, {src_port}, {dest_ip}, {dest_port}, {protocol}, {timestamp}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-sm btn-info" id="discord-test-btn">
+                            <i class="fas fa-paper-plane"></i> Test Send Message
+                        </button>
+                    </div>
                 </div>
                 <div id="telegram-fields" class="integration-fields d-none">
                     <div class="mb-3">
@@ -115,6 +127,18 @@
                         <label for="telegram-chat-id" class="form-label">Chat ID</label>
                         <input type="text" class="form-control" id="telegram-chat-id" placeholder="@channel or numeric chat id">
                         <div class="form-text">Use the numeric chat ID or channel handle for the target destination.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="telegram-template" class="form-label">Custom Message Template (Optional)</label>
+                        <textarea class="form-control font-monospace" id="telegram-template" rows="6" placeholder="🚨 Security Alert&#10;&#10;Signature: {signature}&#10;Category: {category}&#10;Severity: {severity}&#10;Source: {src_ip}:{src_port}&#10;Destination: {dest_ip}:{dest_port}&#10;Protocol: {protocol}"></textarea>
+                        <div class="form-text">
+                            Available variables: {signature}, {category}, {severity}, {src_ip}, {src_port}, {dest_ip}, {dest_port}, {protocol}, {timestamp}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-sm btn-info" id="telegram-test-btn">
+                            <i class="fas fa-paper-plane"></i> Test Send Message
+                        </button>
                     </div>
                 </div>
             </div>
@@ -148,12 +172,14 @@
 const integrationDefaults = {
     discord: {
         enabled: false,
-        webhook_url: ''
+        webhook_url: '',
+        message_template: ''
     },
     telegram: {
         enabled: false,
         bot_token: '',
-        chat_id: ''
+        chat_id: '',
+        message_template: ''
     }
 };
 let integrationSettings = {};
@@ -257,8 +283,10 @@ function openIntegrationModal(name) {
     $('#integrationModalLabel').text(normalized === 'telegram' ? 'Telegram Integration' : 'Discord Integration');
     $('#integration-enabled').prop('checked', !!data.enabled);
     $('#discord-webhook').val(data.webhook_url || '');
+    $('#discord-template').val(data.message_template || '');
     $('#telegram-bot-token').val(data.bot_token || '');
     $('#telegram-chat-id').val(data.chat_id || '');
+    $('#telegram-template').val(data.message_template || '');
     updateIntegrationHashDisplay(integrationHashes[normalized]);
     toggleIntegrationFields(normalized);
     resetIntegrationFeedback();
@@ -269,9 +297,11 @@ function collectIntegrationPayload(name) {
     const payload = { enabled: $('#integration-enabled').is(':checked') };
     if (normalized === 'discord') {
         payload.webhook_url = ($('#discord-webhook').val() || '').trim();
+        payload.message_template = ($('#discord-template').val() || '').trim();
     } else if (normalized === 'telegram') {
         payload.bot_token = ($('#telegram-bot-token').val() || '').trim();
         payload.chat_id = ($('#telegram-chat-id').val() || '').trim();
+        payload.message_template = ($('#telegram-template').val() || '').trim();
     }
     return payload;
 }
@@ -338,10 +368,97 @@ $('#integration-save-btn').click(saveIntegration);
 $('#integrationModal').on('hidden.bs.modal', function() {
     $('#integration-name').val('');
     $('#integration-enabled').prop('checked', false);
-    $('#discord-webhook, #telegram-bot-token, #telegram-chat-id').val('');
+    $('#discord-webhook, #discord-template, #telegram-bot-token, #telegram-chat-id, #telegram-template').val('');
     hideIntegrationHash();
     resetIntegrationFeedback();
     setIntegrationSaving(false);
+});
+
+// Test send message functions
+function testSendMessage(integration) {
+    const name = integration.toLowerCase();
+    let payload = {};
+
+    if (name === 'telegram') {
+        const bot_token = $('#telegram-bot-token').val().trim();
+        const chat_id = $('#telegram-chat-id').val().trim();
+        const template = $('#telegram-template').val().trim();
+
+        if (!bot_token || !chat_id) {
+            setIntegrationFeedback('Please fill in Bot Token and Chat ID first', 'error');
+            return;
+        }
+
+        if (template) {
+            payload.message = template;
+        }
+    } else if (name === 'discord') {
+        const webhook_url = $('#discord-webhook').val().trim();
+        const template = $('#discord-template').val().trim();
+
+        if (!webhook_url) {
+            setIntegrationFeedback('Please fill in Webhook URL first', 'error');
+            return;
+        }
+
+        if (template) {
+            payload.message = template;
+        }
+    }
+
+    resetIntegrationFeedback();
+
+    // Show loading state
+    const btnId = '#' + name + '-test-btn';
+    const $btn = $(btnId);
+    const originalHtml = $btn.html();
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Sending...');
+
+    // First save the settings to ensure we test with current config
+    const savePayload = collectIntegrationPayload(name);
+
+    $.ajax({
+        url: '/api/integration/' + name,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(savePayload),
+        success: function(response) {
+            // Now send test message
+            $.ajax({
+                url: '/api/integration/' + name + '/test',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function(data) {
+                    if (data.success) {
+                        setIntegrationFeedback(data.message, 'success');
+                    } else {
+                        setIntegrationFeedback(data.message, 'error');
+                    }
+                },
+                error: function(xhr) {
+                    const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Failed to send test message';
+                    setIntegrationFeedback(message, 'error');
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).html(originalHtml);
+                }
+            });
+        },
+        error: function(xhr) {
+            const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Failed to save settings';
+            setIntegrationFeedback(message, 'error');
+            $btn.prop('disabled', false).html(originalHtml);
+        }
+    });
+}
+
+$('#telegram-test-btn').click(function() {
+    testSendMessage('telegram');
+});
+
+$('#discord-test-btn').click(function() {
+    testSendMessage('discord');
 });
 $('.config-search').click(function(e) {
     e.preventDefault();

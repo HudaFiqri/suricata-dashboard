@@ -40,6 +40,8 @@ class APIRoutes:
         self.app.add_url_rule('/api/integration', 'api_integration_get_all', self.get_integrations, methods=['GET'])
         self.app.add_url_rule('/api/integration/<integration_name>', 'api_integration_get', self.get_integration, methods=['GET'])
         self.app.add_url_rule('/api/integration/<integration_name>', 'api_integration_save', self.save_integration, methods=['POST'])
+        self.app.add_url_rule('/api/integration/<integration_name>/test', 'api_integration_test', self.test_integration, methods=['POST'])
+        self.app.add_url_rule('/api/integration/<integration_name>/template', 'api_integration_template', self.save_template, methods=['POST'])
 
         # Monitor APIs
         self.app.add_url_rule('/api/monitor/data', 'api_monitor_data', self.get_monitor_data)
@@ -209,6 +211,94 @@ class APIRoutes:
             if hash_info:
                 response['hash'] = hash_info
             return jsonify(response)
+        except ValueError as exc:
+            return jsonify({'success': False, 'message': str(exc)}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    def test_integration(self, integration_name):
+        """Send test message to integration"""
+        try:
+            from binary.integrations.notification_sender import NotificationSender
+
+            payload = request.get_json(silent=True) or {}
+            custom_message = payload.get('message', '')
+
+            # Get integration settings
+            settings = self.integration_manager.get_integration(integration_name)
+
+            if integration_name.lower() == 'telegram':
+                bot_token = settings.get('bot_token', '')
+                chat_id = settings.get('chat_id', '')
+
+                if not bot_token or not chat_id:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Please configure Bot Token and Chat ID first'
+                    })
+
+                # Use custom message or default test message
+                if custom_message:
+                    message = custom_message
+                else:
+                    message = "🧪 <b>Test Message from Suricata Dashboard</b>\n\nThis is a test notification to verify your Telegram integration is working correctly."
+
+                result = NotificationSender.send_telegram(bot_token, chat_id, message)
+                return jsonify(result)
+
+            elif integration_name.lower() == 'discord':
+                webhook_url = settings.get('webhook_url', '')
+
+                if not webhook_url:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Please configure Webhook URL first'
+                    })
+
+                # Use custom message or default test message
+                if custom_message:
+                    message = custom_message
+                    title = "Custom Test Message"
+                else:
+                    message = "This is a test notification to verify your Discord integration is working correctly."
+                    title = "🧪 Test Message from Suricata Dashboard"
+
+                result = NotificationSender.send_discord(webhook_url, message, title)
+                return jsonify(result)
+
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'Integration {integration_name} not supported for testing'
+                }), 404
+
+        except ValueError as exc:
+            return jsonify({'success': False, 'message': str(exc)}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    def save_template(self, integration_name):
+        """Save custom message template for integration"""
+        try:
+            payload = request.get_json(silent=True) or {}
+            template = payload.get('template', '')
+
+            if not template:
+                return jsonify({
+                    'success': False,
+                    'message': 'Template cannot be empty'
+                })
+
+            # Update integration with template
+            update_payload = {'message_template': template}
+            settings = self.integration_manager.update_integration(integration_name, update_payload)
+
+            return jsonify({
+                'success': True,
+                'message': 'Message template saved successfully',
+                'settings': settings
+            })
+
         except ValueError as exc:
             return jsonify({'success': False, 'message': str(exc)}), 404
         except Exception as e:
