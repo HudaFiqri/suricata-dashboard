@@ -136,10 +136,65 @@ class YAMLConfigManager:
             print(f"Error updating AF-Packet config: {e}")
             return False
 
+    def get_stream(self) -> Dict[str, Any]:
+        """Get stream configuration"""
+        config = self.load()
+        stream_config = config.get("stream", {})
+        if not isinstance(stream_config, dict):
+            return {}
+
+        reassembly = stream_config.get("reassembly")
+        if reassembly is None or not isinstance(reassembly, dict):
+            stream_config["reassembly"] = {}
+
+        return stream_config
+
+    def update_stream(self, settings: Dict[str, Any]) -> bool:
+        """Update stream configuration"""
+        try:
+            config = self.load()
+            existing_stream = config.get("stream", {})
+            if not isinstance(existing_stream, dict):
+                existing_stream = {}
+
+            updated_stream = {**existing_stream}
+
+            reassembly_settings = settings.get("reassembly")
+            if isinstance(reassembly_settings, dict):
+                existing_reassembly = existing_stream.get("reassembly", {})
+                if not isinstance(existing_reassembly, dict):
+                    existing_reassembly = {}
+                updated_stream["reassembly"] = {**existing_reassembly, **reassembly_settings}
+
+            for key, value in settings.items():
+                if key == "reassembly":
+                    continue
+                updated_stream[key] = value
+
+            config["stream"] = updated_stream
+            return self.save(config)
+
+        except Exception as e:
+            print(f"Error updating stream config: {e}")
+            return False
+
+
     def get_vars(self) -> Dict[str, Any]:
         """Get variables configuration"""
         config = self.load()
         return config.get("vars", {})
+
+    def update_vars(self, variables: Dict[str, Any]) -> bool:
+        """Replace entire vars configuration"""
+        try:
+            config = self.load()
+            config["vars"] = variables or {}
+            return self.save(config)
+
+        except Exception as e:
+            print(f"Error updating vars: {e}")
+            return False
+
 
     def update_var(self, var_name: str, value: str) -> bool:
         """Update a specific variable"""

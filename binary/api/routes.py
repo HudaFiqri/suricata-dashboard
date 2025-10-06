@@ -48,6 +48,12 @@ class APIRoutes:
         self.app.add_url_rule('/api/suricata-config/app-layer', 'api_config_app_layer_update', self.update_app_layer_config, methods=['POST'])
         self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_get', self.get_outputs_config, methods=['GET'])
         self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_update', self.update_outputs_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/af-packet', 'api_config_af_packet_get', self.get_af_packet_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/af-packet', 'api_config_af_packet_update', self.update_af_packet_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/stream', 'api_config_stream_get', self.get_stream_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/stream', 'api_config_stream_update', self.update_stream_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/vars', 'api_config_vars_get', self.get_vars_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/vars', 'api_config_vars_update', self.update_vars_config, methods=['POST'])
         self.app.add_url_rule('/api/suricata-config/logging', 'api_config_logging_get', self.get_logging_config, methods=['GET'])
         self.app.add_url_rule('/api/suricata-config/logging', 'api_config_logging_update', self.update_logging_config, methods=['POST'])
         self.app.add_url_rule('/api/suricata-config/detection', 'api_config_detection_get', self.get_detection_config, methods=['GET'])
@@ -633,6 +639,243 @@ class APIRoutes:
             return jsonify({
                 'success': False,
                 'message': f'Error updating outputs config: {str(e)}'
+            }), 500
+
+
+    def get_af_packet_config(self):
+        """Get AF-Packet configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                default_af_packet = {
+                    'interface': 'eth0',
+                    'threads': 'auto',
+                    'cluster-id': 99,
+                    'cluster-type': 'cluster_flow',
+                    'defrag': True,
+                    'use-mmap': True,
+                    'tpacket-v3': True,
+                    'promisc': True
+                }
+                return jsonify({
+                    'success': True,
+                    'af_packet': default_af_packet,
+                    'warning': 'Config file not found. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
+            af_packet_config = yaml_manager.get_af_packet_config()
+
+            return jsonify({
+                'success': True,
+                'af_packet': af_packet_config or {}
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error loading AF-Packet config: {str(e)}'
+            }), 500
+
+    def update_af_packet_config(self):
+        """Update AF-Packet configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            payload = request.get_json(silent=True) or {}
+            settings = payload.get('af_packet') or {}
+
+            if not isinstance(settings, dict) or not settings:
+                return jsonify({
+                    'success': False,
+                    'message': 'No AF-Packet settings provided'
+                }), 400
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Config file not found at {config_path}'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
+
+            if not yaml_manager.update_af_packet_config(settings):
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to update AF-Packet configuration'
+                }), 500
+
+            return jsonify({
+                'success': True,
+                'message': 'AF-Packet configuration updated successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error updating AF-Packet config: {str(e)}'
+            }), 500
+
+    def get_stream_config(self):
+        """Get stream configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                default_stream = {
+                    'memcap': '32mb',
+                    'checksum-validation': 'auto',
+                    'inline': 'auto',
+                    'prealloc-sessions': 4096,
+                    'reassembly': {
+                        'memcap': '64mb',
+                        'depth': '1mb',
+                        'toserver-chunk-size': 2560,
+                        'toclient-chunk-size': 2560
+                    }
+                }
+                return jsonify({
+                    'success': True,
+                    'stream': default_stream,
+                    'warning': 'Config file not found. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
+            stream_config = yaml_manager.get_stream()
+
+            return jsonify({
+                'success': True,
+                'stream': stream_config or {}
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error loading stream config: {str(e)}'
+            }), 500
+
+    def update_stream_config(self):
+        """Update stream configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            payload = request.get_json(silent=True) or {}
+            settings = payload.get('stream') or {}
+
+            if not isinstance(settings, dict) or not settings:
+                return jsonify({
+                    'success': False,
+                    'message': 'No stream settings provided'
+                }), 400
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Config file not found at {config_path}'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
+
+            if not yaml_manager.update_stream(settings):
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to update stream configuration'
+                }), 500
+
+            return jsonify({
+                'success': True,
+                'message': 'Stream configuration updated successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error updating stream config: {str(e)}'
+            }), 500
+
+    def get_vars_config(self):
+        """Get Suricata variables configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                default_vars = {}
+                return jsonify({
+                    'success': True,
+                    'vars': default_vars,
+                    'warning': 'Config file not found. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
+            vars_config = yaml_manager.get_vars()
+
+            return jsonify({
+                'success': True,
+                'vars': vars_config or {}
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error loading vars config: {str(e)}'
+            }), 500
+
+    def update_vars_config(self):
+        """Update Suricata variables configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            payload = request.get_json(silent=True) or {}
+            vars_settings = payload.get('vars')
+
+            if not isinstance(vars_settings, dict):
+                return jsonify({
+                    'success': False,
+                    'message': 'No vars settings provided'
+                }), 400
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Config file not found at {config_path}'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
+
+            if not yaml_manager.update_vars(vars_settings):
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to update vars configuration'
+                }), 500
+
+            return jsonify({
+                'success': True,
+                'message': 'Variables configuration updated successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error updating vars config: {str(e)}'
             }), 500
 
     def get_logging_config(self):
