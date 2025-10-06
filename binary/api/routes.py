@@ -46,6 +46,8 @@ class APIRoutes:
         # Suricata Config APIs
         self.app.add_url_rule('/api/suricata-config/app-layer', 'api_config_app_layer_get', self.get_app_layer_config, methods=['GET'])
         self.app.add_url_rule('/api/suricata-config/app-layer', 'api_config_app_layer_update', self.update_app_layer_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_get', self.get_outputs_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_update', self.update_outputs_config, methods=['POST'])
 
         # Monitor APIs
         self.app.add_url_rule('/api/monitor/data', 'api_monitor_data', self.get_monitor_data)
@@ -527,5 +529,105 @@ class APIRoutes:
             return jsonify({
                 'success': False,
                 'message': f'Error updating config: {str(e)}'
+            }), 500
+
+    def get_outputs_config(self):
+        """Get outputs configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            config_path = self.controller.config.config_path
+
+            # Check if config file exists
+            if not os.path.exists(config_path):
+                # Return default outputs if config doesn't exist
+                default_outputs = {
+                    'eve-log': {'enabled': 'yes', 'filetype': 'regular'},
+                    'unified2-alert': {'enabled': 'no'},
+                    'fast': {'enabled': 'yes', 'append': 'yes'},
+                    'stats': {'enabled': 'yes'},
+                    'http-log': {'enabled': 'no'},
+                    'tls-log': {'enabled': 'no'},
+                    'dns-log': {'enabled': 'no'},
+                    'pcap-log': {'enabled': 'no'}
+                }
+                return jsonify({
+                    'success': True,
+                    'outputs': default_outputs,
+                    'warning': f'Config file not found at {config_path}. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
+            outputs = yaml_manager.get_outputs()
+
+            return jsonify({
+                'success': True,
+                'outputs': outputs
+            })
+
+        except FileNotFoundError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Config file not found: {str(e)}'
+            }), 404
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error loading outputs config: {str(e)}'
+            }), 500
+
+    def update_outputs_config(self):
+        """Update outputs configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            payload = request.get_json(silent=True) or {}
+            updates = payload.get('outputs', {})
+
+            if not updates:
+                return jsonify({
+                    'success': False,
+                    'message': 'No output updates provided'
+                }), 400
+
+            config_path = self.controller.config.config_path
+
+            # Check if config file exists
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Suricata config file not found at {config_path}. Cannot save changes.'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
+
+            # Update each output
+            for output_name, settings in updates.items():
+                enabled = settings.get('enabled', False)
+                # Remove 'enabled' from settings dict to pass other configs
+                output_settings = {k: v for k, v in settings.items() if k != 'enabled'}
+
+                yaml_manager.update_output(
+                    output_name,
+                    enabled,
+                    output_settings if output_settings else None
+                )
+
+            return jsonify({
+                'success': True,
+                'message': 'Outputs configuration updated successfully. Reload Suricata to apply changes.'
+            })
+
+        except FileNotFoundError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Config file not found: {str(e)}'
+            }), 404
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error updating outputs config: {str(e)}'
             }), 500
 

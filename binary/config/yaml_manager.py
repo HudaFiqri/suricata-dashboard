@@ -124,3 +124,67 @@ class YAMLConfigManager:
         except Exception as e:
             print(f"Error updating variable {var_name}: {e}")
             return False
+
+    def get_outputs(self) -> Dict[str, Any]:
+        """Get outputs configuration"""
+        config = self.load()
+        outputs_list = config.get('outputs', [])
+
+        # Convert list to dict for easier processing
+        outputs_dict = {}
+        if isinstance(outputs_list, list):
+            for output in outputs_list:
+                if isinstance(output, dict):
+                    for key, value in output.items():
+                        outputs_dict[key] = value
+
+        return outputs_dict
+
+    def update_output(self, output_name: str, enabled: bool, settings: Optional[Dict] = None) -> bool:
+        """
+        Update output configuration
+
+        Args:
+            output_name: Output type (e.g., 'eve-log', 'unified2-alert', 'fast', 'stats')
+            enabled: Enable or disable output
+            settings: Additional output-specific settings
+
+        Returns:
+            True if update successful
+        """
+        try:
+            config = self.load()
+
+            if 'outputs' not in config:
+                config['outputs'] = []
+
+            outputs = config['outputs']
+
+            # Find output in list
+            output_found = False
+            for i, output in enumerate(outputs):
+                if output_name in output:
+                    # Update enabled status
+                    if isinstance(output[output_name], dict):
+                        output[output_name]['enabled'] = 'yes' if enabled else 'no'
+                        # Update additional settings
+                        if settings:
+                            output[output_name].update(settings)
+                    else:
+                        # Simple format: just enabled/no
+                        output[output_name] = 'yes' if enabled else 'no'
+                    output_found = True
+                    break
+
+            # If output not found, add it
+            if not output_found:
+                new_output = {output_name: {'enabled': 'yes' if enabled else 'no'}}
+                if settings:
+                    new_output[output_name].update(settings)
+                outputs.append(new_output)
+
+            return self.save(config)
+
+        except Exception as e:
+            print(f"Error updating output {output_name}: {e}")
+            return False
