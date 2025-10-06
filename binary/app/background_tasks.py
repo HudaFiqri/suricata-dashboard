@@ -203,9 +203,10 @@ class BackgroundTasks:
             time.sleep(0.1)
 
     def _send_alert_notification(self, event):
-        """Send alert notification to enabled integrations"""
+        """Send alert notification to enabled integrations with rate limiting"""
         try:
             from binary.integrations.notification_sender import NotificationSender
+            from binary.integrations.rate_limiter import rate_limiter
 
             # Get all integration settings
             integrations = self.engine.integration_manager.get_settings()
@@ -216,26 +217,43 @@ class BackgroundTasks:
                 bot_token = telegram.get('bot_token', '')
                 chat_id = telegram.get('chat_id', '')
                 template = telegram.get('message_template', '')
+                max_messages = telegram.get('rate_limit_messages', 20)
+                interval = telegram.get('rate_limit_interval', 60)
 
                 if bot_token and chat_id:
-                    message = NotificationSender.format_alert_message(event, template)
-                    result = NotificationSender.send_telegram(bot_token, chat_id, message)
-                    if not result.get('success'):
-                        print(f"[TELEGRAM] Failed to send alert: {result.get('message')}")
+                    # Check rate limit
+                    if rate_limiter.can_send('telegram', max_messages, interval):
+                        message = NotificationSender.format_alert_message(event, template)
+                        result = NotificationSender.send_telegram(bot_token, chat_id, message)
+                        if not result.get('success'):
+                            print(f"[TELEGRAM] Failed to send alert: {result.get('message')}")
+                    else:
+                        wait_time = rate_limiter.get_wait_time('telegram', max_messages, interval)
+                        # Only log rate limit warning occasionally (not for every dropped message)
+                        if int(wait_time) % 10 == 0:
+                            print(f"[TELEGRAM] Rate limit exceeded, dropping alert (retry in {int(wait_time)}s)")
 
             # Send to Discord if enabled
             discord = integrations.get('discord', {})
             if discord.get('enabled'):
                 webhook_url = discord.get('webhook_url', '')
                 template = discord.get('message_template', '')
+                max_messages = discord.get('rate_limit_messages', 30)
+                interval = discord.get('rate_limit_interval', 60)
 
                 if webhook_url:
-                    message = NotificationSender.format_alert_message(event, template)
-                    alert_info = event.get('alert', {})
-                    title = f"🚨 {alert_info.get('signature', 'Security Alert')}"
-                    result = NotificationSender.send_discord(webhook_url, message, title)
-                    if not result.get('success'):
-                        print(f"[DISCORD] Failed to send alert: {result.get('message')}")
+                    # Check rate limit
+                    if rate_limiter.can_send('discord', max_messages, interval):
+                        message = NotificationSender.format_alert_message(event, template)
+                        alert_info = event.get('alert', {})
+                        title = f"🚨 {alert_info.get('signature', 'Security Alert')}"
+                        result = NotificationSender.send_discord(webhook_url, message, title)
+                        if not result.get('success'):
+                            print(f"[DISCORD] Failed to send alert: {result.get('message')}")
+                    else:
+                        wait_time = rate_limiter.get_wait_time('discord', max_messages, interval)
+                        if int(wait_time) % 10 == 0:
+                            print(f"[DISCORD] Rate limit exceeded, dropping alert (retry in {int(wait_time)}s)")
 
         except Exception as e:
             print(f"[NOTIFICATION] Error sending alert notification: {e}")
