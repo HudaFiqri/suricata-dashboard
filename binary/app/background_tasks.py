@@ -156,7 +156,7 @@ class BackgroundTasks:
 
     # ==================== Alert Sync ====================
     def _sync_alerts_to_database(self):
-        """Sync alerts from eve.json to database"""
+        """Sync alerts from eve.json to database and send notifications"""
         last_position = 0
         eve_log_path = f"{self.config.SURICATA_LOG_DIR}/eve.json"
 
@@ -187,6 +187,9 @@ class BackgroundTasks:
                                 }
                                 self.engine.db_manager.add_alert(alert_data)
 
+                                # Send notification to enabled integrations
+                                self._send_alert_notification(event)
+
                         except json.JSONDecodeError:
                             continue
 
@@ -198,6 +201,44 @@ class BackgroundTasks:
                 print(f"[ALERT-SYNC] Error: {e}")
 
             time.sleep(0.1)
+
+    def _send_alert_notification(self, event):
+        """Send alert notification to enabled integrations"""
+        try:
+            from binary.integrations.notification_sender import NotificationSender
+
+            # Get all integration settings
+            integrations = self.engine.integration_manager.get_settings()
+
+            # Send to Telegram if enabled
+            telegram = integrations.get('telegram', {})
+            if telegram.get('enabled'):
+                bot_token = telegram.get('bot_token', '')
+                chat_id = telegram.get('chat_id', '')
+                template = telegram.get('message_template', '')
+
+                if bot_token and chat_id:
+                    message = NotificationSender.format_alert_message(event, template)
+                    result = NotificationSender.send_telegram(bot_token, chat_id, message)
+                    if not result.get('success'):
+                        print(f"[TELEGRAM] Failed to send alert: {result.get('message')}")
+
+            # Send to Discord if enabled
+            discord = integrations.get('discord', {})
+            if discord.get('enabled'):
+                webhook_url = discord.get('webhook_url', '')
+                template = discord.get('message_template', '')
+
+                if webhook_url:
+                    message = NotificationSender.format_alert_message(event, template)
+                    alert_info = event.get('alert', {})
+                    title = f"🚨 {alert_info.get('signature', 'Security Alert')}"
+                    result = NotificationSender.send_discord(webhook_url, message, title)
+                    if not result.get('success'):
+                        print(f"[DISCORD] Failed to send alert: {result.get('message')}")
+
+        except Exception as e:
+            print(f"[NOTIFICATION] Error sending alert notification: {e}")
 
     # ==================== Stats Sync ====================
     def _sync_stats_to_database(self):

@@ -227,9 +227,25 @@ class APIRoutes:
             # Get integration settings
             settings = self.integration_manager.get_integration(integration_name)
 
+            # Create sample alert data for testing
+            sample_alert = {
+                'alert': {
+                    'signature': 'ET SCAN Potential SSH Brute Force Attack',
+                    'category': 'Attempted Administrator Privilege Gain',
+                    'severity': 2
+                },
+                'src_ip': '192.168.1.100',
+                'src_port': '54321',
+                'dest_ip': '10.0.0.50',
+                'dest_port': '22',
+                'proto': 'TCP',
+                'timestamp': '2024-01-15T10:30:45.123456+0000'
+            }
+
             if integration_name.lower() == 'telegram':
                 bot_token = settings.get('bot_token', '')
                 chat_id = settings.get('chat_id', '')
+                template = settings.get('message_template', '')
 
                 if not bot_token or not chat_id:
                     return jsonify({
@@ -237,9 +253,11 @@ class APIRoutes:
                         'message': 'Please configure Bot Token and Chat ID first'
                     })
 
-                # Use custom message or default test message
+                # Use custom message from request, or template from settings, or default
                 if custom_message:
-                    message = custom_message
+                    message = NotificationSender.format_alert_message(sample_alert, custom_message)
+                elif template:
+                    message = NotificationSender.format_alert_message(sample_alert, template)
                 else:
                     message = "🧪 <b>Test Message from Suricata Dashboard</b>\n\nThis is a test notification to verify your Telegram integration is working correctly."
 
@@ -248,6 +266,7 @@ class APIRoutes:
 
             elif integration_name.lower() == 'discord':
                 webhook_url = settings.get('webhook_url', '')
+                template = settings.get('message_template', '')
 
                 if not webhook_url:
                     return jsonify({
@@ -255,10 +274,13 @@ class APIRoutes:
                         'message': 'Please configure Webhook URL first'
                     })
 
-                # Use custom message or default test message
+                # Use custom message from request, or template from settings, or default
                 if custom_message:
-                    message = custom_message
-                    title = "Custom Test Message"
+                    message = NotificationSender.format_alert_message(sample_alert, custom_message)
+                    title = "🧪 Test Alert Message"
+                elif template:
+                    message = NotificationSender.format_alert_message(sample_alert, template)
+                    title = "🧪 Test Alert Message"
                 else:
                     message = "This is a test notification to verify your Discord integration is working correctly."
                     title = "🧪 Test Message from Suricata Dashboard"
