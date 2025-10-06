@@ -421,8 +421,42 @@ class APIRoutes:
         """Get app-layer protocols configuration"""
         try:
             from binary.config.yaml_manager import YAMLConfigManager
+            import os
 
-            yaml_manager = YAMLConfigManager(self.controller.config.SURICATA_CONFIG_PATH)
+            config_path = self.controller.config.SURICATA_CONFIG_PATH
+
+            # Check if config file exists
+            if not os.path.exists(config_path):
+                # Return default protocols if config doesn't exist
+                default_protocols = {
+                    'http': {'enabled': 'yes'},
+                    'tls': {'enabled': 'yes'},
+                    'dns': {'enabled': 'yes'},
+                    'ssh': {'enabled': 'yes'},
+                    'smtp': {'enabled': 'yes'},
+                    'ftp': {'enabled': 'no'},
+                    'smb': {'enabled': 'no'},
+                    'dcerpc': {'enabled': 'no'},
+                    'dhcp': {'enabled': 'yes'},
+                    'nfs': {'enabled': 'no'},
+                    'tftp': {'enabled': 'no'},
+                    'ikev2': {'enabled': 'no'},
+                    'krb5': {'enabled': 'no'},
+                    'ntp': {'enabled': 'no'},
+                    'snmp': {'enabled': 'no'},
+                    'sip': {'enabled': 'no'},
+                    'rdp': {'enabled': 'no'},
+                    'rfb': {'enabled': 'no'},
+                    'mqtt': {'enabled': 'no'},
+                    'modbus': {'enabled': 'no'}
+                }
+                return jsonify({
+                    'success': True,
+                    'protocols': default_protocols,
+                    'warning': f'Config file not found at {config_path}. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
             protocols = yaml_manager.get_app_layer_protocols()
 
             return jsonify({
@@ -430,16 +464,22 @@ class APIRoutes:
                 'protocols': protocols
             })
 
+        except FileNotFoundError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Config file not found: {str(e)}'
+            }), 404
         except Exception as e:
             return jsonify({
                 'success': False,
-                'message': str(e)
+                'message': f'Error loading config: {str(e)}'
             }), 500
 
     def update_app_layer_config(self):
         """Update app-layer protocols configuration"""
         try:
             from binary.config.yaml_manager import YAMLConfigManager
+            import os
 
             payload = request.get_json(silent=True) or {}
             updates = payload.get('protocols', {})
@@ -450,7 +490,16 @@ class APIRoutes:
                     'message': 'No protocol updates provided'
                 }), 400
 
-            yaml_manager = YAMLConfigManager(self.controller.config.SURICATA_CONFIG_PATH)
+            config_path = self.controller.config.SURICATA_CONFIG_PATH
+
+            # Check if config file exists
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Suricata config file not found at {config_path}. Cannot save changes.'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
 
             # Update each protocol
             for protocol, settings in updates.items():
@@ -466,12 +515,17 @@ class APIRoutes:
 
             return jsonify({
                 'success': True,
-                'message': 'App-layer configuration updated successfully'
+                'message': 'App-layer configuration updated successfully. Reload Suricata to apply changes.'
             })
 
+        except FileNotFoundError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Config file not found: {str(e)}'
+            }), 404
         except Exception as e:
             return jsonify({
                 'success': False,
-                'message': str(e)
+                'message': f'Error updating config: {str(e)}'
             }), 500
 

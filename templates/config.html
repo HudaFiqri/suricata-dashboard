@@ -638,12 +638,22 @@ function loadAppLayerConfig() {
     $.get('/api/suricata-config/app-layer', function(data) {
         if (data.success) {
             appLayerProtocols = data.protocols || {};
-            renderAppLayerProtocols(appLayerProtocols);
+
+            // Show warning if using defaults
+            if (data.warning) {
+                $('#app-layer-protocols-container').html('<div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> ' + data.warning + '</div>');
+                setTimeout(function() {
+                    renderAppLayerProtocols(appLayerProtocols);
+                }, 1000);
+            } else {
+                renderAppLayerProtocols(appLayerProtocols);
+            }
         } else {
-            $('#app-layer-protocols-container').html('<div class="alert alert-danger">Failed to load protocols: ' + data.message + '</div>');
+            $('#app-layer-protocols-container').html('<div class="alert alert-danger"><i class="fas fa-times-circle"></i> Failed to load protocols: ' + data.message + '</div>');
         }
     }).fail(function(xhr) {
-        $('#app-layer-protocols-container').html('<div class="alert alert-danger">Failed to load protocols</div>');
+        const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Failed to connect to API';
+        $('#app-layer-protocols-container').html('<div class="alert alert-danger"><i class="fas fa-times-circle"></i> ' + message + '</div>');
     });
 }
 
