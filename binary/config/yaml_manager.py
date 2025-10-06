@@ -188,3 +188,59 @@ class YAMLConfigManager:
         except Exception as e:
             print(f"Error updating output {output_name}: {e}")
             return False
+
+    def get_logging(self) -> Dict[str, Any]:
+        """Get logging configuration"""
+        config = self.load()
+        return config.get('logging', {})
+
+    def update_logging(self, settings: Dict[str, Any]) -> bool:
+        """Update logging configuration"""
+        try:
+            config = self.load()
+
+            if 'logging' not in config:
+                config['logging'] = {}
+
+            # Update logging settings
+            config['logging'].update(settings)
+
+            return self.save(config)
+
+        except Exception as e:
+            print(f"Error updating logging config: {e}")
+            return False
+
+    def get_detection(self) -> Dict[str, Any]:
+        """Get detection engine configuration"""
+        config = self.load()
+        detect_config = {}
+
+        # Collect detection-related settings
+        if 'detect' in config:
+            detect_config['detect'] = config['detect']
+        if 'threading' in config:
+            detect_config['threading'] = config['threading']
+        if 'profiling' in config:
+            detect_config['profiling'] = config['profiling']
+        if 'mpm-algo' in config:
+            detect_config['mpm-algo'] = config['mpm-algo']
+        if 'sgh-mpm-context' in config:
+            detect_config['sgh-mpm-context'] = config['sgh-mpm-context']
+
+        return detect_config
+
+    def update_detection(self, settings: Dict[str, Any]) -> bool:
+        """Update detection engine configuration"""
+        try:
+            config = self.load()
+
+            # Update detection settings at root level
+            for key, value in settings.items():
+                config[key] = value
+
+            return self.save(config)
+
+        except Exception as e:
+            print(f"Error updating detection config: {e}")
+            return False

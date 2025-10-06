@@ -48,6 +48,10 @@ class APIRoutes:
         self.app.add_url_rule('/api/suricata-config/app-layer', 'api_config_app_layer_update', self.update_app_layer_config, methods=['POST'])
         self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_get', self.get_outputs_config, methods=['GET'])
         self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_update', self.update_outputs_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/logging', 'api_config_logging_get', self.get_logging_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/logging', 'api_config_logging_update', self.update_logging_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/detection', 'api_config_detection_get', self.get_detection_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/detection', 'api_config_detection_update', self.update_detection_config, methods=['POST'])
 
         # Monitor APIs
         self.app.add_url_rule('/api/monitor/data', 'api_monitor_data', self.get_monitor_data)
@@ -629,5 +633,168 @@ class APIRoutes:
             return jsonify({
                 'success': False,
                 'message': f'Error updating outputs config: {str(e)}'
+            }), 500
+
+    def get_logging_config(self):
+        """Get logging configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                default_logging = {
+                    'default-log-level': 'notice',
+                    'default-output-filter': None,
+                    'outputs': [
+                        {'console': {'enabled': 'yes'}},
+                        {'file': {'enabled': 'yes', 'level': 'info', 'filename': '/var/log/suricata/suricata.log'}},
+                        {'syslog': {'enabled': 'no'}}
+                    ]
+                }
+                return jsonify({
+                    'success': True,
+                    'logging': default_logging,
+                    'warning': f'Config file not found. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
+            logging_config = yaml_manager.get_logging()
+
+            return jsonify({
+                'success': True,
+                'logging': logging_config
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error loading logging config: {str(e)}'
+            }), 500
+
+    def update_logging_config(self):
+        """Update logging configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            payload = request.get_json(silent=True) or {}
+            logging_settings = payload.get('logging', {})
+
+            if not logging_settings:
+                return jsonify({
+                    'success': False,
+                    'message': 'No logging settings provided'
+                }), 400
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Config file not found at {config_path}'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
+            yaml_manager.update_logging(logging_settings)
+
+            return jsonify({
+                'success': True,
+                'message': 'Logging configuration updated successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error updating logging config: {str(e)}'
+            }), 500
+
+    def get_detection_config(self):
+        """Get detection engine configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                default_detection = {
+                    'detect': {
+                        'profile': 'medium',
+                        'custom-values': {
+                            'toclient-groups': 3,
+                            'toserver-groups': 25
+                        }
+                    },
+                    'mpm-algo': 'auto',
+                    'sgh-mpm-context': 'auto',
+                    'threading': {
+                        'set-cpu-affinity': 'no',
+                        'detect-thread-ratio': 1.0
+                    },
+                    'profiling': {
+                        'rules': {'enabled': 'no'},
+                        'keywords': {'enabled': 'no'},
+                        'prefilter': {'enabled': 'no'},
+                        'rulegroups': {'enabled': 'no'},
+                        'packets': {'enabled': 'no'}
+                    }
+                }
+                return jsonify({
+                    'success': True,
+                    'detection': default_detection,
+                    'warning': f'Config file not found. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
+            detection_config = yaml_manager.get_detection()
+
+            return jsonify({
+                'success': True,
+                'detection': detection_config
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error loading detection config: {str(e)}'
+            }), 500
+
+    def update_detection_config(self):
+        """Update detection engine configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            payload = request.get_json(silent=True) or {}
+            detection_settings = payload.get('detection', {})
+
+            if not detection_settings:
+                return jsonify({
+                    'success': False,
+                    'message': 'No detection settings provided'
+                }), 400
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Config file not found at {config_path}'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
+            yaml_manager.update_detection(detection_settings)
+
+            return jsonify({
+                'success': True,
+                'message': 'Detection configuration updated successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error updating detection config: {str(e)}'
             }), 500
 
