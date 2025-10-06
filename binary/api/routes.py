@@ -423,7 +423,7 @@ class APIRoutes:
             from binary.config.yaml_manager import YAMLConfigManager
             import os
 
-            config_path = self.controller.config.SURICATA_CONFIG_PATH
+            config_path = self.controller.config.config_path
 
             # Check if config file exists
             if not os.path.exists(config_path):
@@ -490,7 +490,7 @@ class APIRoutes:
                     'message': 'No protocol updates provided'
                 }), 400
 
-            config_path = self.controller.config.SURICATA_CONFIG_PATH
+            config_path = self.controller.config.config_path
 
             # Check if config file exists
             if not os.path.exists(config_path):
