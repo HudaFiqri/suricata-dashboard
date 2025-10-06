@@ -1,6 +1,226 @@
 {% extends "base.html" %}
-{% block title %}Configuration - Suricata Dashboard
+{% block title %}Configuration - Suricata Dashboard{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-list"></i> Quick Navigation</h6>
+            </div>
+            <div class="card-body p-2">
+                <div class="list-group list-group-flush" id="config-nav">
+                    <!-- Suricata Config Group -->
+                    <div class="list-group-item list-group-item-secondary text-uppercase fw-bold small">
+                        <i class="fas fa-cog"></i> Suricata Config
+                    </div>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="af-packet">
+                        <i class="fas fa-network-wired"></i> AF-Packet
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="app-layer">
+                        <i class="fas fa-layer-group"></i> App Layer
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="outputs">
+                        <i class="fas fa-file-export"></i> Outputs
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="logging">
+                        <i class="fas fa-clipboard-list"></i> Logging
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="vars">
+                        <i class="fas fa-dollar-sign"></i> Variables
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="detection">
+                        <i class="fas fa-shield-alt"></i> Detection
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="stream">
+                        <i class="fas fa-stream"></i> Stream
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="host">
+                        <i class="fas fa-server"></i> Host
+                    </a>
 
+                    <!-- Integration Group -->
+                    <div class="list-group-item list-group-item-secondary text-uppercase fw-bold small mt-2">
+                        <i class="fas fa-plug"></i> Integration
+                    </div>
+                    <a href="#" class="list-group-item list-group-item-action" data-integration="discord">
+                        <i class="fab fa-discord"></i> Discord
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" data-integration="telegram">
+                        <i class="fab fa-telegram"></i> Telegram
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-info-circle"></i> Info</h6>
+            </div>
+            <div class="card-body">
+                <small class="text-muted">
+                    <p><strong>Format:</strong> YAML</p>
+                    <p><strong>Tip:</strong> Use Ctrl+F to search</p>
+                    <p class="mb-0"><strong>Line Count:</strong> <span id="line-count">0</span></p>
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-cog"></i> Suricata Configuration</h5>
+                <div>
+                    <button class="btn btn-sm btn-primary" id="save-config-btn">
+                        <i class="fas fa-save"></i> Save Config
+                    </button>
+                    <button class="btn btn-sm btn-secondary" id="reload-config-btn">
+                        <i class="fas fa-sync"></i> Reload
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="alert alert-warning m-3 mb-0">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> Modifying the configuration requires careful attention.
+                    Invalid configurations may prevent Suricata from starting.
+                </div>
+                <div id="editor-container" style="position: relative; height: 600px; border-top: 1px solid #dee2e6;">
+                    <textarea id="config-editor" class="form-control h-100 border-0" style="font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; resize: none; padding: 15px;">Loading configuration...</textarea>
+                </div>
+                <div class="border-top p-2 bg-light">
+                    <small class="text-muted">
+                        <i class="fas fa-keyboard"></i> Press Ctrl+S to save |
+                        <i class="fas fa-search"></i> Press Ctrl+F to search
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="integrationModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="integrationModalLabel">Integration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger d-none" id="integration-error"></div>
+                <div class="alert alert-success d-none" id="integration-success"></div>
+                <div class="text-muted small d-none" id="integration-hash-wrapper">
+                    MD5 Hash: <code id="integration-hash-value">-</code>
+                </div>
+                <input type="hidden" id="integration-name">
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="integration-enabled">
+                    <label class="form-check-label" for="integration-enabled">Enable integration</label>
+                </div>
+                <div id="discord-fields" class="integration-fields d-none">
+                    <div class="mb-3">
+                        <label for="discord-webhook" class="form-label">Webhook URL</label>
+                        <input type="url" class="form-control" id="discord-webhook" placeholder="https://discord.com/api/webhooks/...">
+                        <div class="form-text">Provide a Discord webhook URL with notification permissions.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="discord-template" class="form-label">Custom Message Template (Optional)</label>
+                        <textarea class="form-control font-monospace" id="discord-template" rows="6" placeholder="🚨 Security Alert&#10;&#10;Signature: {signature}&#10;Category: {category}&#10;Severity: {severity}&#10;Source: {src_ip}:{src_port}&#10;Destination: {dest_ip}:{dest_port}&#10;Protocol: {protocol}"></textarea>
+                        <div class="form-text">
+                            Available variables: {signature}, {category}, {severity}, {src_ip}, {src_port}, {dest_ip}, {dest_port}, {protocol}, {timestamp}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rate Limiting</label>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label for="discord-rate-limit-messages" class="form-label small">Max Messages</label>
+                                <input type="number" class="form-control form-control-sm" id="discord-rate-limit-messages" value="30" min="1" max="100">
+                                <div class="form-text">Maximum messages allowed</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="discord-rate-limit-interval" class="form-label small">Interval (seconds)</label>
+                                <input type="number" class="form-control form-control-sm" id="discord-rate-limit-interval" value="60" min="10" max="3600">
+                                <div class="form-text">Time window in seconds</div>
+                            </div>
+                        </div>
+                        <div class="form-text mt-2">
+                            <i class="fas fa-info-circle"></i> Default: 30 messages per 60 seconds
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-sm btn-info" id="discord-test-btn">
+                            <i class="fas fa-paper-plane"></i> Test Send Message
+                        </button>
+                    </div>
+                </div>
+                <div id="telegram-fields" class="integration-fields d-none">
+                    <div class="mb-3">
+                        <label for="telegram-bot-token" class="form-label">Bot Token</label>
+                        <input type="text" class="form-control" id="telegram-bot-token" placeholder="123456789:ABCDEF...">
+                    </div>
+                    <div class="mb-3">
+                        <label for="telegram-chat-id" class="form-label">Chat ID</label>
+                        <input type="text" class="form-control" id="telegram-chat-id" placeholder="@channel or numeric chat id">
+                        <div class="form-text">Use the numeric chat ID or channel handle for the target destination.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="telegram-template" class="form-label">Custom Message Template (Optional)</label>
+                        <textarea class="form-control font-monospace" id="telegram-template" rows="6" placeholder="🚨 Security Alert&#10;&#10;Signature: {signature}&#10;Category: {category}&#10;Severity: {severity}&#10;Source: {src_ip}:{src_port}&#10;Destination: {dest_ip}:{dest_port}&#10;Protocol: {protocol}"></textarea>
+                        <div class="form-text">
+                            Available variables: {signature}, {category}, {severity}, {src_ip}, {src_port}, {dest_ip}, {dest_port}, {protocol}, {timestamp}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rate Limiting</label>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label for="telegram-rate-limit-messages" class="form-label small">Max Messages</label>
+                                <input type="number" class="form-control form-control-sm" id="telegram-rate-limit-messages" value="20" min="1" max="100">
+                                <div class="form-text">Maximum messages allowed</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="telegram-rate-limit-interval" class="form-label small">Interval (seconds)</label>
+                                <input type="number" class="form-control form-control-sm" id="telegram-rate-limit-interval" value="60" min="10" max="3600">
+                                <div class="form-text">Time window in seconds</div>
+                            </div>
+                        </div>
+                        <div class="form-text mt-2">
+                            <i class="fas fa-info-circle"></i> Default: 20 messages per 60 seconds
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-sm btn-info" id="telegram-test-btn">
+                            <i class="fas fa-paper-plane"></i> Test Send Message
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="integration-save-btn">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configuration Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="config-modal-message">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
+{% block content %}
 <!-- App Layer Config Modal -->
 <div class="modal fade" id="appLayerModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
