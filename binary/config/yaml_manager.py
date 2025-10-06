@@ -355,3 +355,75 @@ class YAMLConfigManager:
         except Exception as e:
             print(f"Error updating host config: {e}")
             return False
+
+    def get_ips(self) -> Dict[str, Any]:
+        """Get IPS/Preventive configuration"""
+        config = self.load()
+        ips_config = {}
+
+        # Collect IPS-related settings from various sections
+        # Action order defines what actions can be taken
+        if "action-order" in config:
+            ips_config["action-order"] = config["action-order"]
+
+        # Default action for rules without explicit action
+        if "default-rule-action" in config:
+            ips_config["default-rule-action"] = config["default-rule-action"]
+
+        # NFQ (NFQUEUE) configuration for inline mode
+        if "nfq" in config:
+            ips_config["nfq"] = config["nfq"]
+
+        # Netmap configuration
+        if "netmap" in config:
+            ips_config["netmap"] = config["netmap"]
+
+        # AF-Packet can run in IPS mode too
+        if "af-packet" in config:
+            af_packets = config["af-packet"]
+            if isinstance(af_packets, list) and len(af_packets) > 0:
+                # Check if any af-packet interface is in copy mode (IPS)
+                for af in af_packets:
+                    if isinstance(af, dict) and af.get("copy-mode"):
+                        ips_config["af-packet-copy-mode"] = af.get("copy-mode")
+                        ips_config["af-packet-copy-iface"] = af.get("copy-iface", "")
+                        break
+
+        return ips_config
+
+    def update_ips(self, settings: Dict[str, Any]) -> bool:
+        """Update IPS/Preventive configuration"""
+        try:
+            config = self.load()
+
+            # Update action-order if provided
+            if "action-order" in settings:
+                config["action-order"] = settings["action-order"]
+
+            # Update default-rule-action if provided
+            if "default-rule-action" in settings:
+                config["default-rule-action"] = settings["default-rule-action"]
+
+            # Update NFQ settings if provided
+            if "nfq" in settings:
+                config["nfq"] = settings["nfq"]
+
+            # Update Netmap settings if provided
+            if "netmap" in settings:
+                config["netmap"] = settings["netmap"]
+
+            # Update AF-Packet copy mode if provided
+            if "af-packet-copy-mode" in settings:
+                if "af-packet" not in config:
+                    config["af-packet"] = [{}]
+
+                if isinstance(config["af-packet"], list) and len(config["af-packet"]) > 0:
+                    config["af-packet"][0]["copy-mode"] = settings["af-packet-copy-mode"]
+                    if "af-packet-copy-iface" in settings:
+                        config["af-packet"][0]["copy-iface"] = settings["af-packet-copy-iface"]
+
+            return self.save(config)
+
+        except Exception as e:
+            print(f"Error updating IPS config: {e}")
+            return False
