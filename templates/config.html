@@ -122,7 +122,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="discord-template" class="form-label">Custom Message Template (Optional)</label>
-                        <textarea class="form-control font-monospace" id="discord-template" rows="6" placeholder="🚨 Security Alert&#10;&#10;Signature: {signature}&#10;Category: {category}&#10;Severity: {severity}&#10;Source: {src_ip}:{src_port}&#10;Destination: {dest_ip}:{dest_port}&#10;Protocol: {protocol}"></textarea>
+                        <textarea class="form-control font-monospace" id="discord-template" rows="6" placeholder="Ã°Å¸Å¡Â¨ Security Alert&#10;&#10;Signature: {signature}&#10;Category: {category}&#10;Severity: {severity}&#10;Source: {src_ip}:{src_port}&#10;Destination: {dest_ip}:{dest_port}&#10;Protocol: {protocol}"></textarea>
                         <div class="form-text">
                             Available variables: {signature}, {category}, {severity}, {src_ip}, {src_port}, {dest_ip}, {dest_port}, {protocol}, {timestamp}
                         </div>
@@ -163,7 +163,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="telegram-template" class="form-label">Custom Message Template (Optional)</label>
-                        <textarea class="form-control font-monospace" id="telegram-template" rows="6" placeholder="🚨 Security Alert&#10;&#10;Signature: {signature}&#10;Category: {category}&#10;Severity: {severity}&#10;Source: {src_ip}:{src_port}&#10;Destination: {dest_ip}:{dest_port}&#10;Protocol: {protocol}"></textarea>
+                        <textarea class="form-control font-monospace" id="telegram-template" rows="6" placeholder="Ã°Å¸Å¡Â¨ Security Alert&#10;&#10;Signature: {signature}&#10;Category: {category}&#10;Severity: {severity}&#10;Source: {src_ip}:{src_port}&#10;Destination: {dest_ip}:{dest_port}&#10;Protocol: {protocol}"></textarea>
                         <div class="form-text">
                             Available variables: {signature}, {category}, {severity}, {src_ip}, {src_port}, {dest_ip}, {dest_port}, {protocol}, {timestamp}
                         </div>
@@ -1007,7 +1007,7 @@ function loadLoggingConfig() {
                 if (data.warning) {
                     $('#logging-error').removeClass('d-none').removeClass('alert-danger').addClass('alert-warning').text(data.warning);
                 }
-                renderLogging(data.config);
+                renderLogging(data.logging || data.config || {});
             } else {
                 $('#logging-error').removeClass('d-none').text(data.message || 'Failed to load logging configuration');
                 $('#logging-container').html('');
@@ -1129,7 +1129,7 @@ function saveLoggingConfig() {
         url: '/api/suricata-config/logging',
         method: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify(config),
+        data: JSON.stringify({ logging: config }),
         success: function(data) {
             if (data.success) {
                 $('#logging-success').removeClass('d-none').text(data.message);
@@ -1171,7 +1171,7 @@ function loadDetectionConfig() {
                 if (data.warning) {
                     $('#detection-error').removeClass('d-none').removeClass('alert-danger').addClass('alert-warning').text(data.warning);
                 }
-                renderDetection(data.config);
+                renderDetection(data.detection || data.config || {});
             } else {
                 $('#detection-error').removeClass('d-none').text(data.message || 'Failed to load detection configuration');
                 $('#detection-container').html('');
@@ -1279,7 +1279,7 @@ function saveDetectionConfig() {
         url: '/api/suricata-config/detection',
         method: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify(config),
+        data: JSON.stringify({ detection: config }),
         success: function(data) {
             if (data.success) {
                 $('#detection-success').removeClass('d-none').text(data.message);
