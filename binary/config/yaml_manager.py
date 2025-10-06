@@ -333,3 +333,25 @@ class YAMLConfigManager:
         except Exception as e:
             print(f"Error updating detection config: {e}")
             return False
+
+    def get_host(self) -> Dict[str, Any]:
+        """Get host configuration"""
+        config = self.load()
+        return config.get("host", {})
+
+    def update_host(self, settings: Dict[str, Any]) -> bool:
+        """Update host configuration"""
+        try:
+            config = self.load()
+
+            if "host" not in config:
+                config["host"] = {}
+
+            # Update host settings
+            config["host"].update(settings)
+
+            return self.save(config)
+
+        except Exception as e:
+            print(f"Error updating host config: {e}")
+            return False

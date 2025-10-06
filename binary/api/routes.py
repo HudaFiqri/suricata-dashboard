@@ -58,6 +58,8 @@ class APIRoutes:
         self.app.add_url_rule('/api/suricata-config/logging', 'api_config_logging_update', self.update_logging_config, methods=['POST'])
         self.app.add_url_rule('/api/suricata-config/detection', 'api_config_detection_get', self.get_detection_config, methods=['GET'])
         self.app.add_url_rule('/api/suricata-config/detection', 'api_config_detection_update', self.update_detection_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/host', 'api_config_host_get', self.get_host_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/host', 'api_config_host_update', self.update_host_config, methods=['POST'])
 
         # Monitor APIs
         self.app.add_url_rule('/api/monitor/data', 'api_monitor_data', self.get_monitor_data)
@@ -1039,5 +1041,76 @@ class APIRoutes:
             return jsonify({
                 'success': False,
                 'message': f'Error updating detection config: {str(e)}'
+            }), 500
+
+    def get_host_config(self):
+        """Get host configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                default_host = {
+                    'hash-size': 4096,
+                    'prealloc': 1000,
+                    'memcap': '32mb'
+                }
+                return jsonify({
+                    'success': True,
+                    'host': default_host,
+                    'warning': f'Config file not found. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
+            host_config = yaml_manager.get_host()
+
+            return jsonify({
+                'success': True,
+                'host': host_config or {}
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error loading host config: {str(e)}'
+            }), 500
+
+    def update_host_config(self):
+        """Update host configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            payload = request.get_json(silent=True) or {}
+            host_settings = payload.get('host', {})
+
+            if not host_settings:
+                return jsonify({
+                    'success': False,
+                    'message': 'No host settings provided'
+                }), 400
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Config file not found at {config_path}'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
+            yaml_manager.update_host(host_settings)
+
+            return jsonify({
+                'success': True,
+                'message': 'Host configuration updated successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error updating host config: {str(e)}'
             }), 500
 
