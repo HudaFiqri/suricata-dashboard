@@ -2,100 +2,130 @@
 {% block title %}Configuration - Suricata Dashboard{% endblock %}
 {% block content %}
 <div class="row">
-    <div class="col-md-3">
-        <div class="card">
+    <div class="col-12">
+        <div class="card mb-4">
             <div class="card-header">
-                <h6><i class="fas fa-list"></i> Quick Navigation</h6>
-            </div>
-            <div class="card-body p-2">
-                <div class="list-group list-group-flush" id="config-nav">
-                    <!-- Suricata Config Group -->
-                    <div class="list-group-item list-group-item-secondary text-uppercase fw-bold small">
-                        <i class="fas fa-cog"></i> Suricata Config
-                    </div>
-                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="af-packet">
-                        <i class="fas fa-network-wired"></i> AF-Packet
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="app-layer">
-                        <i class="fas fa-layer-group"></i> App Layer
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="outputs">
-                        <i class="fas fa-file-export"></i> Outputs
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="logging">
-                        <i class="fas fa-clipboard-list"></i> Logging
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="vars">
-                        <i class="fas fa-dollar-sign"></i> Variables
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="detection">
-                        <i class="fas fa-shield-alt"></i> Detection
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="stream">
-                        <i class="fas fa-stream"></i> Stream
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action config-search" data-search="host">
-                        <i class="fas fa-server"></i> Host
-                    </a>
-
-                    <!-- Integration Group -->
-                    <div class="list-group-item list-group-item-secondary text-uppercase fw-bold small mt-2">
-                        <i class="fas fa-plug"></i> Integration
-                    </div>
-                    <a href="#" class="list-group-item list-group-item-action" data-integration="discord">
-                        <i class="fab fa-discord"></i> Discord
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action" data-integration="telegram">
-                        <i class="fab fa-telegram"></i> Telegram
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6><i class="fas fa-info-circle"></i> Info</h6>
+                <h5><i class="fas fa-cog"></i> Suricata Configuration</h5>
             </div>
             <div class="card-body">
-                <small class="text-muted">
-                    <p><strong>Format:</strong> YAML</p>
-                    <p><strong>Tip:</strong> Use Ctrl+F to search</p>
-                    <p class="mb-0"><strong>Line Count:</strong> <span id="line-count">0</span></p>
-                </small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-9">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-cog"></i> Suricata Configuration</h5>
-                <div>
-                    <button class="btn btn-sm btn-primary" id="save-config-btn">
-                        <i class="fas fa-save"></i> Save Config
-                    </button>
-                    <button class="btn btn-sm btn-secondary" id="reload-config-btn">
-                        <i class="fas fa-sync"></i> Reload
-                    </button>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Configure Suricata settings through an intuitive interface. Click on any section below to modify its configuration.
                 </div>
-            </div>
-            <div class="card-body p-0">
-                <div class="alert alert-warning m-3 mb-0">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <strong>Warning:</strong> Modifying the configuration requires careful attention.
-                    Invalid configurations may prevent Suricata from starting.
+
+                <!-- Suricata Config Cards -->
+                <h6 class="text-uppercase fw-bold text-muted mb-3"><i class="fas fa-cog"></i> Suricata Configuration</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-secondary hover-shadow config-card" data-search="af-packet" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fas fa-network-wired fa-3x text-secondary mb-3"></i>
+                                <h5 class="card-title">AF-Packet</h5>
+                                <p class="card-text text-muted small">Configure AF-Packet capture settings and interface tuning</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-primary hover-shadow config-card" data-search="app-layer" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fas fa-layer-group fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title">App Layer</h5>
+                                <p class="card-text text-muted small">Enable/disable application layer protocols</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-success hover-shadow config-card" data-search="outputs" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fas fa-file-export fa-3x text-success mb-3"></i>
+                                <h5 class="card-title">Outputs</h5>
+                                <p class="card-text text-muted small">Configure logging outputs and event formats</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-warning hover-shadow config-card" data-search="logging" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clipboard-list fa-3x text-warning mb-3"></i>
+                                <h5 class="card-title">Logging</h5>
+                                <p class="card-text text-muted small">Configure log levels and destinations</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-success hover-shadow config-card" data-search="vars" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fas fa-dollar-sign fa-3x text-success mb-3"></i>
+                                <h5 class="card-title">Variables</h5>
+                                <p class="card-text text-muted small">Manage address and port variables</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-info hover-shadow config-card" data-search="detection" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fas fa-shield-alt fa-3x text-info mb-3"></i>
+                                <h5 class="card-title">Detection</h5>
+                                <p class="card-text text-muted small">Configure detection engine and profiling</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-primary hover-shadow config-card" data-search="stream" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fas fa-stream fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title">Stream</h5>
+                                <p class="card-text text-muted small">Configure stream engine and reassembly</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-dark hover-shadow config-card" data-search="host" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fas fa-server fa-3x text-dark mb-3"></i>
+                                <h5 class="card-title">Host</h5>
+                                <p class="card-text text-muted small">Configure host table and tracking settings</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="editor-container" style="position: relative; height: 600px; border-top: 1px solid #dee2e6;">
-                    <textarea id="config-editor" class="form-control h-100 border-0" style="font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; resize: none; padding: 15px;">Loading configuration...</textarea>
-                </div>
-                <div class="border-top p-2 bg-light">
-                    <small class="text-muted">
-                        <i class="fas fa-keyboard"></i> Press Ctrl+S to save |
-                        <i class="fas fa-search"></i> Press Ctrl+F to search
-                    </small>
+
+                <!-- Integration Cards -->
+                <h6 class="text-uppercase fw-bold text-muted mb-3 mt-4"><i class="fas fa-plug"></i> Integrations</h6>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-primary hover-shadow integration-card" data-integration="discord" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fab fa-discord fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title">Discord</h5>
+                                <p class="card-text text-muted small">Configure Discord webhook notifications</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-info hover-shadow integration-card" data-integration="telegram" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="fab fa-telegram fa-3x text-info mb-3"></i>
+                                <h5 class="card-title">Telegram</h5>
+                                <p class="card-text text-muted small">Configure Telegram bot notifications</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.hover-shadow {
+    transition: all 0.3s ease;
+}
+.hover-shadow:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+</style>
 <div class="modal fade" id="integrationModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
@@ -594,42 +624,6 @@ function toBoolean(value, fallback = false) {
     }
     return fallback;
 }
-
-function loadConfig() {
-    $.get('/api/config', function(data) {
-        if (data.config !== undefined) {
-            $('#config-editor').val(data.config);
-            updateLineCount();
-        } else if (data.error) {
-            $('#config-editor').val('Error loading configuration: ' + data.error);
-        }
-    }).fail(function() {
-        $('#config-editor').val('Failed to load configuration');
-    });
-}
-function updateLineCount() {
-    const lines = $('#config-editor').val().split('\n').length;
-    $('#line-count').text(lines);
-}
-function showConfigResult(message, isSuccess = true) {
-    $('#config-modal-message').html('<div class="alert alert-' + (isSuccess ? 'success' : 'danger') + '">' + message + '</div>');
-    $('#configModal').modal('show');
-}
-function saveConfig() {
-    const config = $('#config-editor').val();
-    $.ajax({
-        url: '/api/config',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({config: config}),
-        success: function(data) {
-            showConfigResult(data.message, data.success);
-        },
-        error: function() {
-            showConfigResult('Failed to save configuration', false);
-        }
-    });
-}
 function loadIntegrationSettings() {
     $.get('/api/integration', function(response) {
         if (response.success && response.settings) {
@@ -776,12 +770,6 @@ function saveIntegration() {
         }
     });
 }
-$('#save-config-btn').click(saveConfig);
-$('#reload-config-btn').click(function() {
-    if (confirm('Reload configuration from file? Any unsaved changes will be lost.')) {
-        loadConfig();
-    }
-});
 $('#integration-save-btn').click(saveIntegration);
 $('#integrationModal').on('hidden.bs.modal', function() {
     $('#integration-name').val('');
@@ -882,119 +870,35 @@ $('#telegram-test-btn').click(function() {
 $('#discord-test-btn').click(function() {
     testSendMessage('discord');
 });
-$('.config-search').click(function(e) {
-    e.preventDefault();
+
+// Card click handlers
+$('.config-card').click(function() {
     const searchTerm = $(this).data('search');
 
-    // Special handling for modals - open modal instead of searching
     if (searchTerm === 'af-packet') {
-        $('#config-nav .list-group-item').removeClass('active');
-        $(this).addClass('active');
         openAfPacketModal();
-        return;
-    }
-
-    if (searchTerm === 'app-layer') {
-        $('#config-nav .list-group-item').removeClass('active');
-        $(this).addClass('active');
+    } else if (searchTerm === 'app-layer') {
         openAppLayerModal();
-        return;
-    }
-
-    if (searchTerm === 'outputs') {
-        $('#config-nav .list-group-item').removeClass('active');
-        $(this).addClass('active');
+    } else if (searchTerm === 'outputs') {
         openOutputsModal();
-        return;
-    }
-
-    if (searchTerm === 'logging') {
-        $('#config-nav .list-group-item').removeClass('active');
-        $(this).addClass('active');
+    } else if (searchTerm === 'logging') {
         openLoggingModal();
-        return;
-    }
-
-    if (searchTerm === 'vars') {
-        $('#config-nav .list-group-item').removeClass('active');
-        $(this).addClass('active');
+    } else if (searchTerm === 'vars') {
         openVarsModal();
-        return;
-    }
-
-    if (searchTerm === 'detection') {
-        $('#config-nav .list-group-item').removeClass('active');
-        $(this).addClass('active');
+    } else if (searchTerm === 'detection') {
         openDetectionModal();
-        return;
-    }
-
-    if (searchTerm === 'stream') {
-        $('#config-nav .list-group-item').removeClass('active');
-        $(this).addClass('active');
+    } else if (searchTerm === 'stream') {
         openStreamModal();
-        return;
-    }
-
-    if (searchTerm === 'host') {
-        $('#config-nav .list-group-item').removeClass('active');
-        $(this).addClass('active');
+    } else if (searchTerm === 'host') {
         openHostModal();
-        return;
     }
+});
 
-    // Default behavior: search in YAML editor
-    const editor = $('#config-editor')[0];
-    const content = editor.value;
-    const lines = content.split('\n');
-    let lineNumber = -1;
-    let charPosition = 0;
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].toLowerCase().includes(searchTerm.toLowerCase())) {
-            lineNumber = i;
-            break;
-        }
-        charPosition += lines[i].length + 1;
-    }
-    if (lineNumber !== -1) {
-        editor.focus();
-        const lineHeight = parseInt(window.getComputedStyle(editor).lineHeight);
-        const scrollPosition = lineNumber * lineHeight;
-        editor.scrollTop = scrollPosition - 100;
-        const lineStart = charPosition;
-        const lineEnd = charPosition + lines[lineNumber].length;
-        editor.setSelectionRange(lineStart, lineEnd);
-        $('#config-nav .list-group-item').removeClass('active');
-        $(this).addClass('active');
-    } else {
-        alert('Section "' + searchTerm + '" not found in configuration');
-    }
+$('.integration-card').click(function() {
+    const integration = $(this).data('integration');
+    openIntegrationModal(integration);
 });
-$('#config-nav').on('click', '[data-integration]', function(e) {
-    e.preventDefault();
-    const target = $(this).data('integration');
-    $('#config-nav .list-group-item').removeClass('active');
-    $(this).addClass('active');
-    openIntegrationModal(target);
-});
-$('#config-editor').on('input', updateLineCount);
-$(document).on('keydown', function(e) {
-    if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        saveConfig();
-    }
-});
-$('#config-editor').on('keydown', function(e) {
-    if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = this.selectionStart;
-        const end = this.selectionEnd;
-        const value = this.value;
-        this.value = value.substring(0, start) + '  ' + value.substring(end);
-        this.selectionStart = this.selectionEnd = start + 2;
-    }
-});
-loadConfig();
+
 loadIntegrationSettings();
 
 // ==================== App Layer Configuration ====================
