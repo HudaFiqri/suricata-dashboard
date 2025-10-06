@@ -43,6 +43,10 @@ class APIRoutes:
         self.app.add_url_rule('/api/integration/<integration_name>/test', 'api_integration_test', self.test_integration, methods=['POST'])
         self.app.add_url_rule('/api/integration/<integration_name>/template', 'api_integration_template', self.save_template, methods=['POST'])
 
+        # Suricata Config APIs
+        self.app.add_url_rule('/api/suricata-config/app-layer', 'api_config_app_layer_get', self.get_app_layer_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/app-layer', 'api_config_app_layer_update', self.update_app_layer_config, methods=['POST'])
+
         # Monitor APIs
         self.app.add_url_rule('/api/monitor/data', 'api_monitor_data', self.get_monitor_data)
         self.app.add_url_rule('/api/monitor/graph/<metric>/<timespan>', 'api_monitor_graph', self.get_monitor_graph)
@@ -411,4 +415,63 @@ class APIRoutes:
     def debug_eve(self):
         """Debug endpoint to check eve.json"""
         return jsonify(self.monitor_api.get_debug_info())
+
+    # ==================== Suricata Config ====================
+    def get_app_layer_config(self):
+        """Get app-layer protocols configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+
+            yaml_manager = YAMLConfigManager(self.controller.config.SURICATA_CONFIG_PATH)
+            protocols = yaml_manager.get_app_layer_protocols()
+
+            return jsonify({
+                'success': True,
+                'protocols': protocols
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': str(e)
+            }), 500
+
+    def update_app_layer_config(self):
+        """Update app-layer protocols configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+
+            payload = request.get_json(silent=True) or {}
+            updates = payload.get('protocols', {})
+
+            if not updates:
+                return jsonify({
+                    'success': False,
+                    'message': 'No protocol updates provided'
+                }), 400
+
+            yaml_manager = YAMLConfigManager(self.controller.config.SURICATA_CONFIG_PATH)
+
+            # Update each protocol
+            for protocol, settings in updates.items():
+                enabled = settings.get('enabled', False)
+                # Remove 'enabled' from settings dict to pass other configs
+                protocol_settings = {k: v for k, v in settings.items() if k != 'enabled'}
+
+                yaml_manager.update_app_layer_protocol(
+                    protocol,
+                    enabled,
+                    protocol_settings if protocol_settings else None
+                )
+
+            return jsonify({
+                'success': True,
+                'message': 'App-layer configuration updated successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': str(e)
+            }), 500
 
