@@ -62,6 +62,9 @@ class APIRoutes:
         self.app.add_url_rule('/api/suricata-config/host', 'api_config_host_update', self.update_host_config, methods=['POST'])
         self.app.add_url_rule('/api/suricata-config/ips', 'api_config_ips_get', self.get_ips_config, methods=['GET'])
         self.app.add_url_rule('/api/suricata-config/ips', 'api_config_ips_update', self.update_ips_config, methods=['POST'])
+        self.app.add_url_rule('/api/system/interfaces', 'api_system_interfaces', self.get_system_interfaces, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/interfaces', 'api_config_interfaces_get', self.get_interfaces_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/interfaces', 'api_config_interfaces_update', self.update_interfaces_config, methods=['POST'])
 
         # Monitor APIs
         self.app.add_url_rule('/api/monitor/data', 'api_monitor_data', self.get_monitor_data)
@@ -1184,5 +1187,113 @@ class APIRoutes:
             return jsonify({
                 'success': False,
                 'message': f'Error updating IPS config: {str(e)}'
+            }), 500
+
+    def get_system_interfaces(self):
+        """Get available network interfaces from system"""
+        try:
+            import psutil
+
+            interfaces = []
+            net_if_addrs = psutil.net_if_addrs()
+            net_if_stats = psutil.net_if_stats()
+
+            for interface_name, addrs in net_if_addrs.items():
+                # Get interface stats
+                stats = net_if_stats.get(interface_name, None)
+                is_up = stats.isup if stats else False
+
+                # Get IP addresses
+                ipv4_addr = None
+                ipv6_addr = None
+                mac_addr = None
+
+                for addr in addrs:
+                    if addr.family == 2:  # AF_INET (IPv4)
+                        ipv4_addr = addr.address
+                    elif addr.family == 23:  # AF_INET6 (IPv6)
+                        ipv6_addr = addr.address
+                    elif addr.family == -1 or addr.family == 17:  # AF_LINK/AF_PACKET (MAC)
+                        mac_addr = addr.address
+
+                interfaces.append({
+                    'name': interface_name,
+                    'ipv4': ipv4_addr,
+                    'ipv6': ipv6_addr,
+                    'mac': mac_addr,
+                    'is_up': is_up,
+                    'speed': stats.speed if stats else 0
+                })
+
+            return jsonify({
+                'success': True,
+                'interfaces': interfaces
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error getting system interfaces: {str(e)}',
+                'interfaces': []
+            }), 500
+
+    def get_interfaces_config(self):
+        """Get interface configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': True,
+                    'interfaces': [],
+                    'warning': f'Config file not found. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
+            interfaces_config = yaml_manager.get_interfaces()
+
+            return jsonify({
+                'success': True,
+                'interfaces': interfaces_config or []
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error loading interfaces config: {str(e)}'
+            }), 500
+
+    def update_interfaces_config(self):
+        """Update interface configuration"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+            import os
+
+            payload = request.get_json(silent=True) or {}
+            interfaces_settings = payload.get('interfaces', [])
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Config file not found at {config_path}'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
+            yaml_manager.update_interfaces(interfaces_settings)
+
+            return jsonify({
+                'success': True,
+                'message': 'Interface configuration updated successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error updating interfaces config: {str(e)}'
             }), 500
 

@@ -427,3 +427,78 @@ class YAMLConfigManager:
         except Exception as e:
             print(f"Error updating IPS config: {e}")
             return False
+
+    def get_interfaces(self) -> list:
+        """Get configured interfaces from af-packet or pcap sections"""
+        config = self.load()
+        interfaces = []
+
+        # Check af-packet interfaces
+        if "af-packet" in config:
+            af_packets = config["af-packet"]
+            if isinstance(af_packets, list):
+                for af in af_packets:
+                    if isinstance(af, dict) and "interface" in af:
+                        interfaces.append({
+                            'type': 'af-packet',
+                            'interface': af.get('interface', ''),
+                            'threads': af.get('threads', 'auto'),
+                            'cluster-id': af.get('cluster-id', 99),
+                            'cluster-type': af.get('cluster-type', 'cluster_flow'),
+                            'enabled': True
+                        })
+
+        # Check pcap interfaces
+        if "pcap" in config:
+            pcaps = config["pcap"]
+            if isinstance(pcaps, list):
+                for pcap in pcaps:
+                    if isinstance(pcap, dict) and "interface" in pcap:
+                        interfaces.append({
+                            'type': 'pcap',
+                            'interface': pcap.get('interface', ''),
+                            'enabled': True
+                        })
+
+        return interfaces
+
+    def update_interfaces(self, interfaces: list) -> bool:
+        """Update interfaces configuration"""
+        try:
+            config = self.load()
+
+            # Separate interfaces by type
+            af_packet_interfaces = [i for i in interfaces if i.get('type') == 'af-packet']
+            pcap_interfaces = [i for i in interfaces if i.get('type') == 'pcap']
+
+            # Update af-packet interfaces
+            if af_packet_interfaces:
+                af_packet_configs = []
+                for iface in af_packet_interfaces:
+                    if iface.get('enabled'):
+                        af_config = {
+                            'interface': iface.get('interface', ''),
+                            'threads': iface.get('threads', 'auto'),
+                            'cluster-id': iface.get('cluster-id', 99),
+                            'cluster-type': iface.get('cluster-type', 'cluster_flow')
+                        }
+                        af_packet_configs.append(af_config)
+
+                config["af-packet"] = af_packet_configs
+
+            # Update pcap interfaces
+            if pcap_interfaces:
+                pcap_configs = []
+                for iface in pcap_interfaces:
+                    if iface.get('enabled'):
+                        pcap_configs.append({
+                            'interface': iface.get('interface', '')
+                        })
+
+                config["pcap"] = pcap_configs
+
+            return self.save(config)
+
+        except Exception as e:
+            print(f"Error updating interfaces config: {e}")
+            return False
