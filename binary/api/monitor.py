@@ -4,26 +4,29 @@ Monitor API - Handles traffic monitoring and statistics
 import os
 import json
 from datetime import datetime, timedelta, timezone
-from flask import jsonify
+from flask import jsonify, request, send_file
 
 
 class MonitorAPI:
     """API for monitoring traffic and statistics from eve.json"""
 
-    def __init__(self, config):
+    def __init__(self, config, rrd_manager=None):
         self.config = config
+        self.rrd_manager = rrd_manager
         self.eve_log_path = f"{config.SURICATA_LOG_DIR}/eve.json"
 
-    def get_monitor_data(self, timespan='1h'):
+    def get_monitor_data(self):
         """Get monitoring data (TCP, UDP, Alerts counts)"""
+        timespan = request.args.get('timespan', '1h')
+
         if not os.path.exists(self.eve_log_path):
-            return {
+            return jsonify({
                 'success': False,
                 'tcp_traffic': 0,
                 'udp_traffic': 0,
                 'total_alerts': 0,
                 'error': f'eve.json not found at {self.eve_log_path}'
-            }
+            })
 
         try:
             hours = self._parse_timespan(timespan)
@@ -71,7 +74,7 @@ class MonitorAPI:
                     except (json.JSONDecodeError, ValueError, KeyError):
                         continue
 
-            return {
+            return jsonify({
                 'success': True,
                 'tcp_traffic': counts['tcp'],
                 'udp_traffic': counts['udp'],
@@ -81,16 +84,27 @@ class MonitorAPI:
                 'total_events': counts['total'],
                 'timespan': timespan,
                 'path': self.eve_log_path
-            }
+            })
 
         except Exception as e:
-            return {
+            return jsonify({
                 'success': False,
                 'tcp_traffic': 0,
                 'udp_traffic': 0,
                 'total_alerts': 0,
                 'error': f'{str(e)} (path: {self.eve_log_path})'
-            }
+            })
+
+    def get_monitor_graph(self, metric, timespan):
+        """Generate monitoring graph"""
+        if not self.rrd_manager:
+            return jsonify({'success': False, 'message': 'RRD manager not available'}), 400
+
+        result = self.rrd_manager.generate_graph(metric, timespan)
+        if result.get('success'):
+            return send_file(result['graph_path'], mimetype='image/png')
+        else:
+            return jsonify(result), 400
 
     def get_debug_info(self):
         """Debug endpoint to check eve.json status"""

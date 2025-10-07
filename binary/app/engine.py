@@ -3,7 +3,7 @@ Application Engine - Core initialization and setup
 """
 import os
 from binary import SuricataFrontendController, SuricataRRDManager, DatabaseManager, IntegrationManager
-from binary.api import MonitorAPI, AlertsAPI, DatabaseAPI, APIRoutes
+from binary.api.routes import APIRoutes
 
 
 def _is_reloader_process():
@@ -20,14 +20,10 @@ class AppEngine:
         self.rrd_manager = None
         self.db_manager = None
         self.integration_manager = None
-        self.monitor_api = None
-        self.alerts_api = None
-        self.database_api = None
         self.api_routes = None
 
         self._init_directories()
         self._init_components()
-        self._init_apis()
 
     def _init_directories(self):
         """Ensure application directories exist"""
@@ -88,21 +84,14 @@ class AppEngine:
         else:
             raise ValueError(f"Unsupported database type: {self.config.DB_TYPE}")
 
-    def _init_apis(self):
-        """Initialize API modules"""
-        self.monitor_api = MonitorAPI(self.config)
-        self.alerts_api = AlertsAPI(self.config)
-        self.database_api = DatabaseAPI(self.db_manager)
-
     def register_routes(self, app):
         """Register API routes to Flask app"""
         self.api_routes = APIRoutes(
             app,
             self.controller,
             self.rrd_manager,
-            self.monitor_api,
-            self.alerts_api,
-            self.database_api,
+            self.config,
+            self.db_manager,
             self.integration_manager
         )
         return self.api_routes
