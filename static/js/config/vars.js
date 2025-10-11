@@ -192,11 +192,8 @@ function saveVarsConfig() {
     });
 }
 
-$('#save-af-packet-btn').off('click').on('click', saveAfPacketConfig);
-$('#save-stream-btn').off('click').on('click', saveStreamConfig);
 $('#save-vars-btn').off('click').on('click', saveVarsConfig);
 
-$('#save-detection-btn').click(saveDetectionConfig);
 
 
     // Public API

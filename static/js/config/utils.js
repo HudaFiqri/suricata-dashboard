@@ -194,6 +194,14 @@ function runConfigSelfCheck() {
     ];
     globals.forEach(fn => add(fn, typeof window[fn] === 'function'));
 
+    // DOM presence checks for modals (without opening)
+    const modals = [
+        '#packetCaptureModal', '#appLayerModal', '#outputsModal', '#loggingModal',
+        '#detectionModal', '#varsModal', '#streamModal', '#hostModal', '#ipsModal',
+        '#interfaceModal'
+    ];
+    modals.forEach(sel => add(`DOM ${sel}`, document.querySelector(sel) !== null));
+
     // Minimal API pings
     const endpoints = [
         '/api/suricata-config/app-layer',
