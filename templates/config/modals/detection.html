@@ -1,0 +1,28 @@
+<!-- Detection Modal -->
+<div class="modal fade" id="detectionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="fas fa-search"></i> Detection Engine Configuration</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Configure detection engine settings including profile, threading, and performance tuning.
+                </div>
+                <div class="alert alert-danger d-none" id="detection-error"></div>
+                <div class="alert alert-success d-none" id="detection-success"></div>
+
+                <div id="detection-container">
+                    <p class="text-muted"><i class="fas fa-spinner fa-spin"></i> Loading detection configuration...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" id="save-detection-btn">
+                    <i class="fas fa-save"></i> Save Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
