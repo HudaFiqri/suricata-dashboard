@@ -1,5 +1,6 @@
 from .suricata_config import SuricataConfig
 from .suricata_rule_manager import SuricataRuleManager
+from .integrations import IntegrationManager
 from .suricata_log_manager import SuricataLogManager
 from .suricata_process import SuricataProcess
 from .suricata_rrd_manager import SuricataRRDManager
@@ -17,7 +18,9 @@ __all__ = [
     'DatabaseManager',
     'Alert',
     'Log',
-    'Statistics'
+    'Statistics',
+    'IntegrationManager'
 ]
 
 __version__ = '1.0.0'
+

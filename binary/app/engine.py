@@ -2,8 +2,13 @@
 Application Engine - Core initialization and setup
 """
 import os
-from binary import SuricataFrontendController, SuricataRRDManager, DatabaseManager
-from binary.api import MonitorAPI, AlertsAPI, DatabaseAPI, APIRoutes
+from binary import SuricataFrontendController, SuricataRRDManager, DatabaseManager, IntegrationManager
+from binary.api.routes import APIRoutes
+
+
+def _is_reloader_process():
+    """Check if running in Flask reloader child process"""
+    return os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
 
 
 class AppEngine:
@@ -14,25 +19,22 @@ class AppEngine:
         self.controller = None
         self.rrd_manager = None
         self.db_manager = None
-        self.monitor_api = None
-        self.alerts_api = None
-        self.database_api = None
+        self.integration_manager = None
         self.api_routes = None
 
         self._init_directories()
         self._init_components()
-        self._init_apis()
 
     def _init_directories(self):
         """Ensure application directories exist"""
         try:
             os.makedirs(self.config.APP_DATA_DIR, exist_ok=True)
             os.makedirs(self.config.APP_LOG_DIR, exist_ok=True)
-            print(f"✓ Application directories initialized:")
-            print(f"  - Data: {self.config.APP_DATA_DIR}")
-            print(f"  - Logs: {self.config.APP_LOG_DIR}")
+            if not _is_reloader_process():
+                print(f"[APP] Directories initialized: data={self.config.APP_DATA_DIR}, logs={self.config.APP_LOG_DIR}")
         except Exception as e:
-            print(f"⚠ Warning: Could not create application directories: {e}")
+            if not _is_reloader_process():
+                print(f"[APP] Warning: Could not create directories: {e}")
 
     def _init_components(self):
         """Initialize core components"""
@@ -50,6 +52,9 @@ class AppEngine:
             db_type=self.config.DB_TYPE,
             db_config=db_config
         )
+
+        # Integration manager
+        self.integration_manager = IntegrationManager(self.config.APP_DATA_DIR, db_manager=self.db_manager)
 
         # RRD Manager (with database integration)
         self.rrd_manager = SuricataRRDManager(
@@ -79,20 +84,15 @@ class AppEngine:
         else:
             raise ValueError(f"Unsupported database type: {self.config.DB_TYPE}")
 
-    def _init_apis(self):
-        """Initialize API modules"""
-        self.monitor_api = MonitorAPI(self.config)
-        self.alerts_api = AlertsAPI(self.config)
-        self.database_api = DatabaseAPI(self.db_manager)
-
     def register_routes(self, app):
         """Register API routes to Flask app"""
         self.api_routes = APIRoutes(
             app,
             self.controller,
             self.rrd_manager,
-            self.monitor_api,
-            self.alerts_api,
-            self.database_api
+            self.config,
+            self.db_manager,
+            self.integration_manager
         )
         return self.api_routes
+

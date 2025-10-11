@@ -8,6 +8,11 @@ import threading
 from datetime import datetime
 
 
+def _is_reloader_process():
+    """Check if running in Flask reloader child process"""
+    return os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+
+
 class BackgroundTasks:
     """Manages all background tasks for the application"""
 
@@ -18,26 +23,36 @@ class BackgroundTasks:
 
     def start_all(self):
         """Start all background tasks"""
+        # Skip logging on Flask reloader child process
+        is_reloader = _is_reloader_process()
+
         # Traffic aggregation (eve.json → database)
         self._start_thread(self._aggregate_traffic_data, "Traffic Aggregation")
-        interval_min = self.config.TRAFFIC_AGGREGATION_INTERVAL // 60
-        print(f"[TRAFFIC-AGG] Traffic aggregation enabled - Interval: {interval_min}m ({self.config.TRAFFIC_AGGREGATION_INTERVAL}s)")
+        if not is_reloader:
+            interval_min = self.config.TRAFFIC_AGGREGATION_INTERVAL // 60
+            print(f"[TRAFFIC-AGG] Traffic aggregation enabled - Interval: {interval_min}m ({self.config.TRAFFIC_AGGREGATION_INTERVAL}s)")
 
         # RRD metrics update (database → RRD files)
         self._start_thread(self._update_rrd_metrics, "RRD Metrics")
 
         # Alert sync from eve.json to database
         self._start_thread(self._sync_alerts_to_database, "Alert Sync")
+        if not is_reloader:
+            print(f"[ALERT-SYNC] Alert synchronization enabled - Real-time mode")
 
         # Statistics sync from stats.log to database
         self._start_thread(self._sync_stats_to_database, "Stats Sync")
+        if not is_reloader:
+            print(f"[STATS-SYNC] Statistics synchronization enabled - Real-time mode")
 
         # Database retention cleanup
         if self.config.DB_RETENTION_DAYS > 0:
             self._start_thread(self._database_retention_worker, "DB Cleanup")
-            print(f"[DB-CLEANUP] Retention worker active (retention: {self.config.DB_RETENTION_DAYS} days)")
+            if not is_reloader:
+                print(f"[DB-CLEANUP] Retention worker active (retention: {self.config.DB_RETENTION_DAYS} days)")
         else:
-            print("[DB-CLEANUP] Retention worker disabled (DB_RETENTION_DAYS=0)")
+            if not is_reloader:
+                print("[DB-CLEANUP] Retention worker disabled (DB_RETENTION_DAYS=0)")
 
         # Auto-restart monitor
         if self.config.AUTO_RESTART_ENABLED:
@@ -112,8 +127,10 @@ class BackgroundTasks:
                     })
 
                 if aggregated:
-                    protocols = ', '.join([f"{p}:{v['flow_count']}" for p, v in aggregated.items()])
-                    print(f"[TRAFFIC-AGG] Stored: {protocols} flows")
+                    # Only show protocols with non-zero flows
+                    proto_stats = [f"{p.upper()}={v['flow_count']}" for p, v in aggregated.items() if v['flow_count'] > 0]
+                    if proto_stats:
+                        print(f"[TRAFFIC-AGG] Stored traffic stats: {' '.join(proto_stats)}")
 
             except FileNotFoundError:
                 pass
@@ -139,11 +156,9 @@ class BackgroundTasks:
 
     # ==================== Alert Sync ====================
     def _sync_alerts_to_database(self):
-        """Sync alerts from eve.json to database"""
+        """Sync alerts from eve.json to database and send notifications"""
         last_position = 0
         eve_log_path = f"{self.config.SURICATA_LOG_DIR}/eve.json"
-
-        print(f"[ALERT-SYNC] Alert synchronization enabled - Real-time mode")
 
         while True:
             try:
@@ -172,6 +187,9 @@ class BackgroundTasks:
                                 }
                                 self.engine.db_manager.add_alert(alert_data)
 
+                                # Send notification to enabled integrations
+                                self._send_alert_notification(event)
+
                         except json.JSONDecodeError:
                             continue
 
@@ -184,14 +202,68 @@ class BackgroundTasks:
 
             time.sleep(0.1)
 
+    def _send_alert_notification(self, event):
+        """Send alert notification to enabled integrations with rate limiting"""
+        try:
+            from binary.integrations.notification_sender import NotificationSender
+            from binary.integrations.rate_limiter import rate_limiter
+
+            # Get all integration settings
+            integrations = self.engine.integration_manager.get_settings()
+
+            # Send to Telegram if enabled
+            telegram = integrations.get('telegram', {})
+            if telegram.get('enabled'):
+                bot_token = telegram.get('bot_token', '')
+                chat_id = telegram.get('chat_id', '')
+                template = telegram.get('message_template', '')
+                max_messages = telegram.get('rate_limit_messages', 20)
+                interval = telegram.get('rate_limit_interval', 60)
+
+                if bot_token and chat_id:
+                    # Check rate limit
+                    if rate_limiter.can_send('telegram', max_messages, interval):
+                        message = NotificationSender.format_alert_message(event, template)
+                        result = NotificationSender.send_telegram(bot_token, chat_id, message)
+                        if not result.get('success'):
+                            print(f"[TELEGRAM] Failed to send alert: {result.get('message')}")
+                    else:
+                        wait_time = rate_limiter.get_wait_time('telegram', max_messages, interval)
+                        # Only log rate limit warning occasionally (not for every dropped message)
+                        if int(wait_time) % 10 == 0:
+                            print(f"[TELEGRAM] Rate limit exceeded, dropping alert (retry in {int(wait_time)}s)")
+
+            # Send to Discord if enabled
+            discord = integrations.get('discord', {})
+            if discord.get('enabled'):
+                webhook_url = discord.get('webhook_url', '')
+                template = discord.get('message_template', '')
+                max_messages = discord.get('rate_limit_messages', 30)
+                interval = discord.get('rate_limit_interval', 60)
+
+                if webhook_url:
+                    # Check rate limit
+                    if rate_limiter.can_send('discord', max_messages, interval):
+                        message = NotificationSender.format_alert_message(event, template)
+                        alert_info = event.get('alert', {})
+                        title = f"🚨 {alert_info.get('signature', 'Security Alert')}"
+                        result = NotificationSender.send_discord(webhook_url, message, title)
+                        if not result.get('success'):
+                            print(f"[DISCORD] Failed to send alert: {result.get('message')}")
+                    else:
+                        wait_time = rate_limiter.get_wait_time('discord', max_messages, interval)
+                        if int(wait_time) % 10 == 0:
+                            print(f"[DISCORD] Rate limit exceeded, dropping alert (retry in {int(wait_time)}s)")
+
+        except Exception as e:
+            print(f"[NOTIFICATION] Error sending alert notification: {e}")
+
     # ==================== Stats Sync ====================
     def _sync_stats_to_database(self):
         """Sync statistics from stats.log to database"""
         stats_log_path = os.path.join(self.config.SURICATA_LOG_DIR, 'stats.log')
         last_position = 0
         current_timestamp = None
-
-        print(f"[STATS-SYNC] Statistics synchronization enabled - Real-time mode")
 
         def _parse_timestamp(line: str):
             try:

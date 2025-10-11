@@ -4,9 +4,14 @@ Suricata Dashboard - Main Application Entry Point
 A lightweight, modular web dashboard for Suricata IDS monitoring.
 All core logic is separated into binary/app and binary/api modules.
 """
+import logging
 from flask import Flask
 from config import Config
 from binary.app import AppEngine, BackgroundTasks, WebRoutes
+
+# Disable Flask's default request logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 # Initialize Flask
 app = Flask(__name__)

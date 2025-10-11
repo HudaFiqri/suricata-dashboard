@@ -1,253 +1,124 @@
 """
 API Routes - Centralized API endpoint definitions
 """
-from flask import request, jsonify, send_file
 
 
 class APIRoutes:
     """Centralized API routes handler"""
 
-    def __init__(self, app, controller, rrd_manager, monitor_api, alerts_api, database_api):
+    def __init__(self, app, controller, rrd_manager, config, db_manager, integration_manager):
+        """
+        Initialize API Routes
+
+        Args:
+            app: Flask application instance
+            controller: Suricata controller instance
+            rrd_manager: RRD manager for graphs
+            config: Configuration object
+            db_manager: Database manager instance
+            integration_manager: Integration manager instance
+        """
+        from binary.api.status_controll import StatusControlAPI
+        from binary.api.logging import LoggingAPI
+        from binary.api.rules import RulesAPI
+        from binary.api.config import ConfigAPI
+        from binary.api.integrations import IntegrationsAPI
+        from binary.api.suricata import SuricataConfigAPI
+        from binary.api.monitor import MonitorAPI
+        from binary.api.database import DatabaseAPI
+        from binary.api.debug import DebugAPI
+        from binary.api.alerts import AlertsAPI
+
         self.app = app
         self.controller = controller
         self.rrd_manager = rrd_manager
-        self.monitor_api = monitor_api
-        self.alerts_api = alerts_api
-        self.database_api = database_api
+        self.config = config
+        self.db_manager = db_manager
+        self.integration_manager = integration_manager
+
+        # Initialize all API modules
+        self.alerts_api = AlertsAPI(config)
+        self.status_api = StatusControlAPI(controller)
+        self.logging_api = LoggingAPI(controller)
+        self.rules_api = RulesAPI(controller)
+        self.config_api = ConfigAPI(controller)
+        self.integrations_api = IntegrationsAPI(integration_manager)
+        self.suricata_config_api = SuricataConfigAPI(controller)
+        self.monitor_api = MonitorAPI(config, rrd_manager)
+        self.database_api = DatabaseAPI(db_manager, self.alerts_api)
+        self.debug_api = DebugAPI(self.monitor_api)
+
+        # Register all routes
         self._register_routes()
 
     def _register_routes(self):
         """Register all API routes"""
         # Status & Control APIs
-        self.app.add_url_rule('/api/status', 'api_status', self.get_status)
-        self.app.add_url_rule('/api/start', 'api_start', self.start_suricata, methods=['POST'])
-        self.app.add_url_rule('/api/stop', 'api_stop', self.stop_suricata, methods=['POST'])
-        self.app.add_url_rule('/api/restart', 'api_restart', self.restart_suricata, methods=['POST'])
-        self.app.add_url_rule('/api/reload-rules', 'api_reload_rules', self.reload_rules, methods=['POST'])
+        self.app.add_url_rule('/api/status', 'api_status', self.status_api.get_status)
+        self.app.add_url_rule('/api/start', 'api_start', self.status_api.start_suricata, methods=['POST'])
+        self.app.add_url_rule('/api/stop', 'api_stop', self.status_api.stop_suricata, methods=['POST'])
+        self.app.add_url_rule('/api/restart', 'api_restart', self.status_api.restart_suricata, methods=['POST'])
+        self.app.add_url_rule('/api/reload-rules', 'api_reload_rules', self.status_api.reload_rules, methods=['POST'])
 
         # Logs API
-        self.app.add_url_rule('/api/logs', 'api_logs', self.get_logs)
+        self.app.add_url_rule('/api/logs', 'api_logs', self.logging_api.get_logs)
 
         # Rules API
-        self.app.add_url_rule('/api/rules', 'api_rules', self.get_rules)
+        self.app.add_url_rule('/api/rules', 'api_rules', self.rules_api.get_rules)
 
         # Config API
-        self.app.add_url_rule('/api/config', 'api_config_get', self.get_config, methods=['GET'])
-        self.app.add_url_rule('/api/config', 'api_config_post', self.save_config, methods=['POST'])
+        self.app.add_url_rule('/api/config', 'api_config_get', self.config_api.get_config, methods=['GET'])
+        self.app.add_url_rule('/api/config', 'api_config_post', self.config_api.save_config, methods=['POST'])
+
+        # Integration APIs
+        self.app.add_url_rule('/api/integration', 'api_integration_get_all', self.integrations_api.get_integrations, methods=['GET'])
+        self.app.add_url_rule('/api/integration/<integration_name>', 'api_integration_get', self.integrations_api.get_integration, methods=['GET'])
+        self.app.add_url_rule('/api/integration/<integration_name>', 'api_integration_save', self.integrations_api.save_integration, methods=['POST'])
+        self.app.add_url_rule('/api/integration/<integration_name>/test', 'api_integration_test', self.integrations_api.test_integration, methods=['POST'])
+        self.app.add_url_rule('/api/integration/<integration_name>/template', 'api_integration_template', self.integrations_api.save_template, methods=['POST'])
+
+        # Suricata Config APIs (Advanced Configuration)
+        self.app.add_url_rule('/api/suricata-config/app-layer', 'api_config_app_layer_get', self.suricata_config_api.get_app_layer_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/app-layer', 'api_config_app_layer_update', self.suricata_config_api.update_app_layer_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_get', self.suricata_config_api.get_outputs_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_update', self.suricata_config_api.update_outputs_config, methods=['POST'])
+
+        # Packet Capture APIs (new unified endpoint)
+        self.app.add_url_rule('/api/suricata-config/packet-capture/<capture_type>', 'api_config_packet_capture_get', self.suricata_config_api.get_packet_capture_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/packet-capture/<capture_type>', 'api_config_packet_capture_update', self.suricata_config_api.update_packet_capture_config, methods=['POST'])
+
+        # Backward compatibility - AF-Packet
+        self.app.add_url_rule('/api/suricata-config/af-packet', 'api_config_af_packet_get', self.suricata_config_api.get_af_packet_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/af-packet', 'api_config_af_packet_update', self.suricata_config_api.update_af_packet_config, methods=['POST'])
+
+        self.app.add_url_rule('/api/suricata-config/stream', 'api_config_stream_get', self.suricata_config_api.get_stream_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/stream', 'api_config_stream_update', self.suricata_config_api.update_stream_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/vars', 'api_config_vars_get', self.suricata_config_api.get_vars_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/vars', 'api_config_vars_update', self.suricata_config_api.update_vars_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/logging', 'api_config_logging_get', self.suricata_config_api.get_logging_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/logging', 'api_config_logging_update', self.suricata_config_api.update_logging_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/detection', 'api_config_detection_get', self.suricata_config_api.get_detection_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/detection', 'api_config_detection_update', self.suricata_config_api.update_detection_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/host', 'api_config_host_get', self.suricata_config_api.get_host_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/host', 'api_config_host_update', self.suricata_config_api.update_host_config, methods=['POST'])
+        self.app.add_url_rule('/api/suricata-config/ips', 'api_config_ips_get', self.suricata_config_api.get_ips_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/ips', 'api_config_ips_update', self.suricata_config_api.update_ips_config, methods=['POST'])
+        self.app.add_url_rule('/api/system/interfaces', 'api_system_interfaces', self.suricata_config_api.get_system_interfaces, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/interfaces', 'api_config_interfaces_get', self.suricata_config_api.get_interfaces_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/interfaces', 'api_config_interfaces_update', self.suricata_config_api.update_interfaces_config, methods=['POST'])
 
         # Monitor APIs
-        self.app.add_url_rule('/api/monitor/data', 'api_monitor_data', self.get_monitor_data)
-        self.app.add_url_rule('/api/monitor/graph/<metric>/<timespan>', 'api_monitor_graph', self.get_monitor_graph)
+        self.app.add_url_rule('/api/monitor/data', 'api_monitor_data', self.monitor_api.get_monitor_data)
+        self.app.add_url_rule('/api/monitor/graph/<metric>/<timespan>', 'api_monitor_graph', self.monitor_api.get_monitor_graph)
 
         # Database APIs
-        self.app.add_url_rule('/api/database/info', 'api_database_info', self.get_database_info)
-        self.app.add_url_rule('/api/database/alerts', 'api_database_alerts', self.get_database_alerts)
-        self.app.add_url_rule('/api/database/stats', 'api_database_stats', self.get_database_stats)
-        self.app.add_url_rule('/api/database/check', 'api_database_check', self.check_database)
-        self.app.add_url_rule('/api/database/traffic/latest', 'api_traffic_latest', self.get_latest_traffic)
-        self.app.add_url_rule('/api/database/traffic/recent', 'api_traffic_recent', self.get_recent_traffic)
-        self.app.add_url_rule('/api/database/reset-counter', 'api_reset_counter', self.reset_counter, methods=['POST'])
+        self.app.add_url_rule('/api/database/info', 'api_database_info', self.database_api.get_info)
+        self.app.add_url_rule('/api/database/alerts', 'api_database_alerts', self.database_api.get_alerts)
+        self.app.add_url_rule('/api/database/stats', 'api_database_stats', self.database_api.get_stats)
+        self.app.add_url_rule('/api/database/check', 'api_database_check', self.database_api.check_connection)
+        self.app.add_url_rule('/api/database/traffic/latest', 'api_traffic_latest', self.database_api.get_latest_traffic)
+        self.app.add_url_rule('/api/database/traffic/recent', 'api_traffic_recent', self.database_api.get_recent_traffic)
+        self.app.add_url_rule('/api/database/reset-counter', 'api_reset_counter', self.database_api.reset_counter, methods=['POST'])
 
         # Debug APIs
-        self.app.add_url_rule('/api/debug/eve', 'api_debug_eve', self.debug_eve)
-
-    # ==================== Status & Control ====================
-    def get_status(self):
-        """Get Suricata status"""
-        return jsonify(self.controller.get_status())
-
-    def start_suricata(self):
-        """Start Suricata"""
-        return jsonify(self.controller.start())
-
-    def stop_suricata(self):
-        """Stop Suricata"""
-        return jsonify(self.controller.stop())
-
-    def restart_suricata(self):
-        """Restart Suricata"""
-        return jsonify(self.controller.restart())
-
-    def reload_rules(self):
-        """Reload Suricata rules"""
-        return jsonify(self.controller.reload_rules())
-
-    # ==================== Logs ====================
-    def get_logs(self):
-        """Get Suricata logs"""
-        try:
-            eve_logs = self.controller.log_manager.get_eve_log(100)
-
-            if eve_logs:
-                formatted_logs = self._format_logs(eve_logs)
-                return jsonify({'logs': formatted_logs})
-            else:
-                return jsonify({'logs': []})
-
-        except Exception as e:
-            return jsonify({'error': str(e), 'logs': []})
-
-    def _format_logs(self, logs):
-        """Format eve.json logs for display"""
-        formatted = []
-        for log in logs:
-            event_type = log.get('event_type', 'unknown')
-            timestamp = log.get('timestamp', '')
-
-            if event_type == 'alert':
-                alert = log.get('alert', {})
-                formatted.append(
-                    f"[ALERT] {timestamp} - {alert.get('signature', 'Unknown')} | "
-                    f"{log.get('src_ip', '')} -> {log.get('dest_ip', '')} "
-                    f"[{log.get('proto', '')}] (Severity: {alert.get('severity', 0)})"
-                )
-            elif event_type == 'stats':
-                formatted.append(f"[STATS] {timestamp} - Statistics Update")
-            elif event_type == 'flow':
-                src = f"{log.get('src_ip', '')}:{log.get('src_port', '')}"
-                dest = f"{log.get('dest_ip', '')}:{log.get('dest_port', '')}"
-                service = self._detect_service(log.get('src_port'), log.get('dest_port'))
-                formatted.append(f"[FLOW] {timestamp} - {src} -> {dest} [{log.get('proto', '')}]{service}")
-            elif event_type == 'http':
-                http = log.get('http', {})
-                formatted.append(f"[HTTP] {timestamp} - {http.get('hostname', '')}{http.get('url', '')}")
-            elif event_type == 'dns':
-                dns = log.get('dns', {})
-                formatted.append(f"[DNS] {timestamp} - Query: {dns.get('rrname', '')}")
-            elif event_type == 'ssh':
-                formatted.append(f"[SSH] {timestamp} - {log.get('src_ip', '')} -> {log.get('dest_ip', '')}")
-            elif event_type == 'tls':
-                tls = log.get('tls', {})
-                formatted.append(f"[TLS] {timestamp} - SNI: {tls.get('sni', '')}")
-            else:
-                formatted.append(f"[{event_type.upper()}] {timestamp}")
-
-        return formatted
-
-    def _detect_service(self, src_port, dest_port):
-        """Detect service by port number"""
-        services = {
-            22: 'SSH', 80: 'HTTP', 443: 'HTTPS', 53: 'DNS',
-            67: 'DHCP', 68: 'DHCP', 21: 'FTP', 25: 'SMTP'
-        }
-        for port in [src_port, dest_port]:
-            if port in services:
-                return f" ({services[port]})"
-        return ''
-
-    # ==================== Rules ====================
-    def get_rules(self):
-        """Get Suricata rules"""
-        try:
-            rules = self.controller.rule_manager.get_rule_files()
-            return jsonify({'rules': rules})
-        except Exception as e:
-            return jsonify({'error': str(e)})
-
-    # ==================== Config ====================
-    def get_config(self):
-        """Get Suricata configuration"""
-        try:
-            import yaml
-            config_data = self.controller.config.load()
-            config_string = yaml.dump(config_data, default_flow_style=False, indent=2)
-            return jsonify({'config': config_string})
-        except Exception as e:
-            return jsonify({'error': str(e)})
-
-    def save_config(self):
-        """Save Suricata configuration"""
-        try:
-            import yaml
-            config_content = request.json.get('config', '')
-            config_data = yaml.safe_load(config_content)
-            self.controller.config.save(config_data)
-            return jsonify({'success': True, 'message': 'Configuration saved successfully'})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)})
-
-    # ==================== Monitor ====================
-    def get_monitor_data(self):
-        """Get monitoring data from eve.json"""
-        timespan = request.args.get('timespan', '1h')
-        return jsonify(self.monitor_api.get_monitor_data(timespan))
-
-    def get_monitor_graph(self, metric, timespan):
-        """Generate monitoring graph"""
-        result = self.rrd_manager.generate_graph(metric, timespan)
-        if result.get('success'):
-            return send_file(result['graph_path'], mimetype='image/png')
-        else:
-            return jsonify(result), 400
-
-    # ==================== Database ====================
-    def get_database_info(self):
-        """Get database information"""
-        return jsonify(self.database_api.get_info())
-
-    def get_database_alerts(self):
-        """Get all events from eve.json"""
-        limit = request.args.get('limit', 100, type=int)
-        category = request.args.get('category', None)
-        protocol = request.args.get('protocol', None)
-        return jsonify(self.alerts_api.get_all_events(limit, category, protocol))
-
-    def get_database_stats(self):
-        """Get latest statistics"""
-        return jsonify(self.database_api.get_stats())
-
-    def check_database(self):
-        """Check database connection status"""
-        return jsonify(self.database_api.check_connection())
-
-    def get_latest_traffic(self):
-        """Get latest traffic statistics from database"""
-        try:
-            # Access db_manager through database_api
-            stats = self.database_api.db_manager.get_latest_traffic_stats()
-            return jsonify({
-                'success': True,
-                'stats': stats
-            })
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            })
-
-    def get_recent_traffic(self):
-        """Get recent traffic statistics from database"""
-        try:
-            from datetime import datetime, timedelta
-
-            limit = request.args.get('limit', 20, type=int)
-            protocol = request.args.get('protocol', None)
-            hours = request.args.get('hours', 24, type=int)
-
-            start_time = datetime.utcnow() - timedelta(hours=hours)
-
-            # Access db_manager through database_api
-            stats = self.database_api.db_manager.get_traffic_stats(
-                protocol=protocol,
-                start_time=start_time,
-                limit=limit
-            )
-
-            return jsonify({
-                'success': True,
-                'stats': [stat.to_dict() for stat in stats]
-            })
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            })
-
-    def reset_counter(self):
-        """Reset traffic counter"""
-        return jsonify(self.database_api.reset_counter())
-
-    # ==================== Debug ====================
-    def debug_eve(self):
-        """Debug endpoint to check eve.json"""
-        return jsonify(self.monitor_api.get_debug_info())
+        self.app.add_url_rule('/api/debug/eve', 'api_debug_eve', self.debug_api.debug_eve)
