@@ -1935,12 +1935,33 @@ function renderAfXdpFields(config) {
 
 function renderDpdkFields(config) {
     const procType = config['eal-params'] ? config['eal-params']['proc-type'] || 'primary' : 'primary';
+    const interfaces = config.interfaces || [];
+    const firstInterface = interfaces.length > 0 ? interfaces[0] : {};
+
+    const interfacePCI = firstInterface.interface || '0000:3b:00.0';
+    const threads = firstInterface.threads || 'auto';
+    const promisc = toBoolean(firstInterface.promisc, true);
+    const multicast = toBoolean(firstInterface.multicast, true);
+    const checksumChecks = toBoolean(firstInterface['checksum-checks'], true);
+    const checksumOffload = toBoolean(firstInterface['checksum-checks-offload'], true);
+    const mtu = firstInterface.mtu || 1500;
+    const mempoolSize = firstInterface['mempool-size'] || 65535;
+    const mempoolCacheSize = firstInterface['mempool-cache-size'] || 257;
+    const rxDescriptors = firstInterface['rx-descriptors'] || 1024;
+    const txDescriptors = firstInterface['tx-descriptors'] || 1024;
+    const copyMode = firstInterface['copy-mode'] || 'none';
+    const copyIface = firstInterface['copy-iface'] || 'none';
 
     return `
         <div class="col-md-12">
             <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle"></i> DPDK configuration is advanced. Ensure your system has DPDK properly installed and configured.
+                <i class="fas fa-exclamation-triangle"></i> <strong>DPDK configuration is advanced.</strong> Ensure your system has DPDK properly installed and configured with hugepages.
             </div>
+        </div>
+
+        <!-- EAL Parameters Section -->
+        <div class="col-md-12">
+            <h6 class="border-bottom pb-2"><i class="fas fa-cogs"></i> EAL Parameters</h6>
         </div>
         <div class="col-md-6">
             <label class="form-label">Process Type</label>
@@ -1948,10 +1969,115 @@ function renderDpdkFields(config) {
                 <option value="primary"${procType === 'primary' ? ' selected' : ''}>Primary</option>
                 <option value="secondary"${procType === 'secondary' ? ' selected' : ''}>Secondary</option>
             </select>
-            <small class="text-muted">DPDK process type.</small>
+            <small class="text-muted">DPDK EAL process type.</small>
         </div>
-        <div class="col-md-12">
-            <p class="text-muted"><i class="fas fa-info-circle"></i> For detailed DPDK configuration, please edit the Suricata YAML file directly.</p>
+
+        <!-- Interface Configuration Section -->
+        <div class="col-md-12 mt-3">
+            <h6 class="border-bottom pb-2"><i class="fas fa-network-wired"></i> Interface Configuration</h6>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">PCIe Address <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="capture-pci-address" value="${escapeHtml(interfacePCI)}" placeholder="0000:3b:00.0">
+            <small class="text-muted">PCIe address of the NIC port (use <code>lspci | grep Ethernet</code>)</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Threads</label>
+            <input type="text" class="form-control" id="capture-threads" value="${escapeHtml(threads)}" placeholder="auto">
+            <small class="text-muted">Number of RX/TX queues (<code>auto</code> = all available cores)</small>
+        </div>
+
+        <!-- Network Settings -->
+        <div class="col-md-12 mt-3">
+            <h6 class="border-bottom pb-2"><i class="fas fa-sliders-h"></i> Network Settings</h6>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">MTU</label>
+            <input type="number" class="form-control" id="capture-mtu" value="${escapeHtml(mtu)}" placeholder="1500">
+            <small class="text-muted">Maximum Transmission Unit (bytes)</small>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check form-switch mt-4">
+                <input type="checkbox" class="form-check-input" id="capture-promisc" ${promisc ? 'checked' : ''}>
+                <label class="form-check-label" for="capture-promisc">Promiscuous Mode</label>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check form-switch mt-4">
+                <input type="checkbox" class="form-check-input" id="capture-multicast" ${multicast ? 'checked' : ''}>
+                <label class="form-check-label" for="capture-multicast">Multicast</label>
+            </div>
+        </div>
+
+        <!-- Checksum Settings -->
+        <div class="col-md-6">
+            <div class="form-check form-switch">
+                <input type="checkbox" class="form-check-input" id="capture-checksum-checks" ${checksumChecks ? 'checked' : ''}>
+                <label class="form-check-label" for="capture-checksum-checks">Checksum Validation</label>
+            </div>
+            <small class="text-muted">Enable checksum validation by Suricata</small>
+        </div>
+        <div class="col-md-6">
+            <div class="form-check form-switch">
+                <input type="checkbox" class="form-check-input" id="capture-checksum-offload" ${checksumOffload ? 'checked' : ''}>
+                <label class="form-check-label" for="capture-checksum-offload">Checksum Offload</label>
+            </div>
+            <small class="text-muted">Offload checksum validation to NIC (saves CPU)</small>
+        </div>
+
+        <!-- Memory Settings -->
+        <div class="col-md-12 mt-3">
+            <h6 class="border-bottom pb-2"><i class="fas fa-memory"></i> Memory Pool Settings</h6>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Mempool Size</label>
+            <input type="number" class="form-control" id="capture-mempool-size" value="${escapeHtml(mempoolSize)}" placeholder="65535">
+            <small class="text-muted">Number of elements in mbuf pool (optimum: 2^n - 1)</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Mempool Cache Size</label>
+            <input type="number" class="form-control" id="capture-mempool-cache-size" value="${escapeHtml(mempoolCacheSize)}" placeholder="257">
+            <small class="text-muted">Cache size (≤ 512 and ≤ mempool-size/1.5)</small>
+        </div>
+
+        <!-- Descriptors -->
+        <div class="col-md-12 mt-3">
+            <h6 class="border-bottom pb-2"><i class="fas fa-layer-group"></i> Ring Descriptors</h6>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">RX Descriptors</label>
+            <input type="number" class="form-control" id="capture-rx-descriptors" value="${escapeHtml(rxDescriptors)}" placeholder="1024">
+            <small class="text-muted">Number of receive descriptors</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">TX Descriptors</label>
+            <input type="number" class="form-control" id="capture-tx-descriptors" value="${escapeHtml(txDescriptors)}" placeholder="1024">
+            <small class="text-muted">Number of transmit descriptors</small>
+        </div>
+
+        <!-- IPS Mode -->
+        <div class="col-md-12 mt-3">
+            <h6 class="border-bottom pb-2"><i class="fas fa-shield-alt"></i> IPS Mode</h6>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Copy Mode</label>
+            <select class="form-select" id="capture-copy-mode">
+                <option value="none"${copyMode === 'none' ? ' selected' : ''}>None (IDS Mode)</option>
+                <option value="tap"${copyMode === 'tap' ? ' selected' : ''}>TAP (Forward All + Alerts)</option>
+                <option value="ips"${copyMode === 'ips' ? ' selected' : ''}>IPS (Forward + Drop)</option>
+            </select>
+            <small class="text-muted">IPS mode for inline deployment</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Copy Interface</label>
+            <input type="text" class="form-control" id="capture-copy-iface" value="${escapeHtml(copyIface)}" placeholder="0000:3b:00.1">
+            <small class="text-muted">PCIe address of second interface (for IPS mode)</small>
+        </div>
+
+        <div class="col-md-12 mt-3">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> <strong>Memory Calculation:</strong> Required hugepages ≈ (mempool-size × MTU) bytes per interface
+            </div>
         </div>
     `;
 }
@@ -2006,6 +2132,36 @@ function savePacketCaptureConfig() {
         payload['eal-params'] = {
             'proc-type': $('#capture-proc-type').val()
         };
+
+        // Build interface configuration
+        const interfaceConfig = {
+            'interface': $('#capture-pci-address').val().trim() || '0000:3b:00.0',
+            'threads': $('#capture-threads').val().trim() || 'auto',
+            'promisc': $('#capture-promisc').is(':checked'),
+            'multicast': $('#capture-multicast').is(':checked'),
+            'checksum-checks': $('#capture-checksum-checks').is(':checked'),
+            'checksum-checks-offload': $('#capture-checksum-offload').is(':checked'),
+        };
+
+        const mtu = parseInt($('#capture-mtu').val(), 10);
+        if (!isNaN(mtu)) interfaceConfig.mtu = mtu;
+
+        const mempoolSize = parseInt($('#capture-mempool-size').val(), 10);
+        if (!isNaN(mempoolSize)) interfaceConfig['mempool-size'] = mempoolSize;
+
+        const mempoolCacheSize = parseInt($('#capture-mempool-cache-size').val(), 10);
+        if (!isNaN(mempoolCacheSize)) interfaceConfig['mempool-cache-size'] = mempoolCacheSize;
+
+        const rxDescriptors = parseInt($('#capture-rx-descriptors').val(), 10);
+        if (!isNaN(rxDescriptors)) interfaceConfig['rx-descriptors'] = rxDescriptors;
+
+        const txDescriptors = parseInt($('#capture-tx-descriptors').val(), 10);
+        if (!isNaN(txDescriptors)) interfaceConfig['tx-descriptors'] = txDescriptors;
+
+        interfaceConfig['copy-mode'] = $('#capture-copy-mode').val();
+        interfaceConfig['copy-iface'] = $('#capture-copy-iface').val().trim() || 'none';
+
+        payload.interfaces = [interfaceConfig];
     } else if (captureType === 'pcap') {
         payload.interface = $('#capture-interface').val().trim();
     }

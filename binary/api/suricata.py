@@ -242,7 +242,23 @@ class SuricataConfigAPI:
                     'eal-params': {
                         'proc-type': 'primary',
                     },
-                    'interfaces': []
+                    'interfaces': [
+                        {
+                            'interface': '0000:3b:00.0',
+                            'threads': 'auto',
+                            'promisc': True,
+                            'multicast': True,
+                            'checksum-checks': True,
+                            'checksum-checks-offload': True,
+                            'mtu': 1500,
+                            'mempool-size': 65535,
+                            'mempool-cache-size': 257,
+                            'rx-descriptors': 1024,
+                            'tx-descriptors': 1024,
+                            'copy-mode': 'none',
+                            'copy-iface': 'none'
+                        }
+                    ]
                 },
                 'pcap': {
                     'interface': 'eth0'
