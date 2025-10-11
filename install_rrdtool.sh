@@ -16,10 +16,6 @@ elif [ -f /etc/arch-release ]; then
 else
     echo "Unknown OS. Please install rrdtool development libraries manually."
     exit 1
-fi
-
-echo "Installing Python rrdtool package..."
-pip install rrdtool==0.1.16
 
 if [ $? -eq 0 ]; then
     echo "✓ RRDtool installed successfully!"
