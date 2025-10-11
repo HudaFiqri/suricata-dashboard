@@ -203,7 +203,8 @@ function saveStreamConfig() {
     return {
         init: function() {
             console.log('Stream module initialized');
-        }
+        },
+        openModal: openStreamModal
     };
 })();
 
@@ -211,3 +212,10 @@ function saveStreamConfig() {
 $(document).ready(function() {
     StreamConfig.init();
 });
+
+// Expose global function for compatibility with template click handlers
+function openStreamModal() {
+    if (StreamConfig && typeof StreamConfig.openModal === 'function') {
+        StreamConfig.openModal();
+    }
+}

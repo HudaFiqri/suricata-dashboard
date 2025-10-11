@@ -203,7 +203,8 @@ $('#save-detection-btn').click(saveDetectionConfig);
     return {
         init: function() {
             console.log('Variables module initialized');
-        }
+        },
+        openModal: openVarsModal
     };
 })();
 
@@ -211,3 +212,10 @@ $('#save-detection-btn').click(saveDetectionConfig);
 $(document).ready(function() {
     VarsConfig.init();
 });
+
+// Expose global function for compatibility with template click handlers
+function openVarsModal() {
+    if (VarsConfig && typeof VarsConfig.openModal === 'function') {
+        VarsConfig.openModal();
+    }
+}

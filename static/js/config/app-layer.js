@@ -117,7 +117,8 @@ $('#save-app-layer-btn').click(saveAppLayerConfig);
     return {
         init: function() {
             console.log('App Layer module initialized');
-        }
+        },
+        openModal: openAppLayerModal
     };
 })();
 
@@ -125,3 +126,10 @@ $('#save-app-layer-btn').click(saveAppLayerConfig);
 $(document).ready(function() {
     ApplayerConfig.init();
 });
+
+// Expose global function for compatibility with template click handlers
+function openAppLayerModal() {
+    if (ApplayerConfig && typeof ApplayerConfig.openModal === 'function') {
+        ApplayerConfig.openModal();
+    }
+}

@@ -171,3 +171,70 @@ function apiPost(url, data, onSuccess, onError) {
         }
     });
 }
+
+/**
+ * Run a lightweight self-check for the configuration page.
+ * Verifies global handlers and a few API endpoints, then prints a summary
+ * into an alert container with id `self-check-result` if present.
+ */
+function runConfigSelfCheck() {
+    const checks = [];
+    const add = (name, ok, extra = '') => checks.push({ name, ok, extra });
+
+    // Global deps
+    add('jQuery ($)', typeof window.$ === 'function');
+    add('Bootstrap (modal)', !!(window.bootstrap && bootstrap.Modal));
+
+    // Global handlers used by cards
+    const globals = [
+        'openPacketCaptureModal', 'openAppLayerModal', 'openOutputsModal',
+        'openLoggingModal', 'openDetectionModal', 'openVarsModal',
+        'openStreamModal', 'openHostModal', 'openIpsModal', 'openInterfaceModal',
+        'openIntegrationModal'
+    ];
+    globals.forEach(fn => add(fn, typeof window[fn] === 'function'));
+
+    // Minimal API pings
+    const endpoints = [
+        '/api/suricata-config/app-layer',
+        '/api/suricata-config/outputs'
+    ];
+
+    const requests = endpoints.map(url =>
+        $.get(url)
+            .then(() => ({ url, ok: true }))
+            .catch(() => ({ url, ok: false }))
+    );
+
+    const $out = $('#self-check-result');
+    if ($out.length) {
+        $out.removeClass('d-none alert-danger alert-success')
+            .addClass('alert-info')
+            .html('<i class="fas fa-spinner fa-spin"></i> Running self-check...');
+    }
+
+    return Promise.all(requests).then(results => {
+        const all = checks.concat(results.map(r => ({ name: `GET ${r.url}` , ok: r.ok })));
+        const failed = all.filter(i => !i.ok);
+        const okCount = all.length - failed.length;
+
+        let html = '';
+        if (failed.length === 0) {
+            html = `<i class=\"fas fa-check-circle\"></i> Self-check passed (${okCount}/${all.length}).`;
+        } else {
+            html = `<i class=\"fas fa-exclamation-triangle\"></i> Self-check found issues (${okCount}/${all.length} ok).`;
+            html += '<ul class="mb-0 mt-2">' + failed.map(f => `<li>${escapeHtml(f.name)}</li>`).join('') + '</ul>';
+        }
+
+        if ($out.length) {
+            $out.removeClass('alert-info')
+                .addClass(failed.length ? 'alert-danger' : 'alert-success')
+                .html(html);
+        } else {
+            // Fallback to console
+            console[(failed.length ? 'error' : 'log')](html);
+        }
+
+        return { ok: failed.length === 0, details: all };
+    });
+}

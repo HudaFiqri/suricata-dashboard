@@ -475,7 +475,10 @@ function saveDetectionConfig() {
     return {
         init: function() {
             console.log('Outputs module initialized');
-        }
+        },
+        openModal: openOutputsModal,
+        openLogging: openLoggingModal,
+        openDetection: openDetectionModal
     };
 })();
 
@@ -483,3 +486,22 @@ function saveDetectionConfig() {
 $(document).ready(function() {
     OutputsConfig.init();
 });
+
+// Expose global functions for compatibility with template click handlers
+function openOutputsModal() {
+    if (OutputsConfig && typeof OutputsConfig.openModal === 'function') {
+        OutputsConfig.openModal();
+    }
+}
+
+function openLoggingModal() {
+    if (OutputsConfig && typeof OutputsConfig.openLogging === 'function') {
+        OutputsConfig.openLogging();
+    }
+}
+
+function openDetectionModal() {
+    if (OutputsConfig && typeof OutputsConfig.openDetection === 'function') {
+        OutputsConfig.openDetection();
+    }
+}

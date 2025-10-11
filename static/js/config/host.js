@@ -159,7 +159,8 @@ $('#save-host-btn').off('click').on('click', saveHostConfig);
     return {
         init: function() {
             console.log('Host module initialized');
-        }
+        },
+        openModal: openHostModal
     };
 })();
 
@@ -167,3 +168,10 @@ $('#save-host-btn').off('click').on('click', saveHostConfig);
 $(document).ready(function() {
     HostConfig.init();
 });
+
+// Expose global function for compatibility with template click handlers
+function openHostModal() {
+    if (HostConfig && typeof HostConfig.openModal === 'function') {
+        HostConfig.openModal();
+    }
+}

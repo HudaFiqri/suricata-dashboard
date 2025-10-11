@@ -185,7 +185,8 @@ $('#save-ips-btn').off('click').on('click', saveIpsConfig);
     return {
         init: function() {
             console.log('IPS/Preventive module initialized');
-        }
+        },
+        openModal: openIpsModal
     };
 })();
 
@@ -193,3 +194,10 @@ $('#save-ips-btn').off('click').on('click', saveIpsConfig);
 $(document).ready(function() {
     IpsConfig.init();
 });
+
+// Expose global function for compatibility with template click handlers
+function openIpsModal() {
+    if (IpsConfig && typeof IpsConfig.openModal === 'function') {
+        IpsConfig.openModal();
+    }
+}

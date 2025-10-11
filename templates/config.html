@@ -12,6 +12,12 @@
                     <i class="fas fa-info-circle"></i>
                     Configure Suricata settings through an intuitive interface. Click on any section below to modify its configuration.
                 </div>
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="run-self-check">
+                        <i class="fas fa-stethoscope"></i> Self-check
+                    </button>
+                    <div class="alert d-none py-1 px-2 mb-0" id="self-check-result"></div>
+                </div>
 
                 <!-- Suricata Config Cards -->
                 <h6 class="text-uppercase fw-bold text-muted mb-3"><i class="fas fa-cog"></i> Suricata Configuration</h6>
@@ -619,6 +625,8 @@ $('.integration-card').click(function() {
 });
 
 loadIntegrationSettings();
+// Bind self-check button if present
+$('#run-self-check').on('click', function() { try { runConfigSelfCheck(); } catch (e) { console.error('Self-check failed to start', e); } });
 
 // App Layer Configuration (Moved to app-layer.js)
 // Outputs Configuration (Moved to outputs.js)

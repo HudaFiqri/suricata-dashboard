@@ -252,7 +252,8 @@ $('#save-interface-btn').off('click').on('click', saveInterfaceConfig);
     return {
         init: function() {
             console.log('Interface module initialized');
-        }
+        },
+        openModal: openInterfaceModal
     };
 })();
 
@@ -260,3 +261,10 @@ $('#save-interface-btn').off('click').on('click', saveInterfaceConfig);
 $(document).ready(function() {
     InterfacesConfig.init();
 });
+
+// Expose global function for compatibility with template click handlers
+function openInterfaceModal() {
+    if (InterfacesConfig && typeof InterfacesConfig.openModal === 'function') {
+        InterfacesConfig.openModal();
+    }
+}
