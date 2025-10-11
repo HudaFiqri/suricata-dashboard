@@ -1,25 +1,33 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "Installing RRDtool dependencies..."
+echo "Installing RRDtool build dependencies..."
 
 # Detect OS
 if [ -f /etc/debian_version ]; then
     echo "Detected Debian/Ubuntu"
     sudo apt-get update
-    sudo apt-get install -y librrd-dev libpython3-dev
+    # Headers + toolchain + pkg-config for detecting rrdtool
+    sudo apt-get install -y rrdtool librrd-dev python3-dev build-essential pkg-config
 elif [ -f /etc/redhat-release ]; then
     echo "Detected RHEL/CentOS/Fedora"
-    sudo yum install -y rrdtool-devel python3-devel
+    # Toolchain + headers
+    if command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y rrdtool rrdtool-devel python3-devel gcc make pkgconfig
+    else
+        sudo yum install -y rrdtool rrdtool-devel python3-devel gcc make pkgconfig
+    fi
 elif [ -f /etc/arch-release ]; then
     echo "Detected Arch Linux"
-    sudo pacman -S --noconfirm rrdtool
+    sudo pacman -Syu --noconfirm rrdtool base-devel pkgconf python
 else
-    echo "Unknown OS. Please install rrdtool development libraries manually."
+    echo "Unknown OS. Please install RRDtool dev libraries and a compiler toolchain manually."
+    echo "Required: rrdtool, librrd-dev/rrdtool-devel, python3-dev, gcc/make, pkg-config"
     exit 1
-
-if [ $? -eq 0 ]; then
-    echo "✓ RRDtool installed successfully!"
-else
-    echo "✗ Failed to install rrdtool. Monitoring features will be disabled."
-    echo "   The application will still work without RRDtool."
 fi
+
+echo "Installing Python rrdtool package..."
+pip install rrdtool==0.1.16
+
+echo "RRDtool Python package installed. Graphing features enabled."
+
