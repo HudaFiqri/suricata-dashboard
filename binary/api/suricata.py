@@ -228,15 +228,31 @@ class SuricataConfigAPI:
                     'cluster-type': 'cluster_flow',
                     'defrag': True,
                     'use-mmap': True,
+                    'mmap-locked': True,
                     'tpacket-v3': True,
-                    'promisc': True
+                    'ring-size': 2048,
+                    'block-size': 32768,
+                    'block-timeout': 10,
+                    'use-emergency-flush': True,
+                    'buffer-size': 32768,
+                    'disable-promisc': False,
+                    'checksum-checks': 'kernel',
+                    'bpf-filter': '',
+                    'copy-mode': '',
+                    'copy-iface': ''
                 },
                 'af-xdp': {
-                    'interface': 'eth0',
+                    'interface': 'default',
                     'threads': 'auto',
+                    'disable-promisc': False,
+                    'force-xdp-mode': 'none',
+                    'force-bind-mode': 'none',
+                    'mem-unaligned': False,
                     'enable-busy-poll': True,
                     'busy-poll-time': 20,
                     'busy-poll-budget': 64,
+                    'gro-flush-timeout': 2000000,
+                    'napi-defer-hard-irq': 2
                 },
                 'dpdk': {
                     'eal-params': {
@@ -261,7 +277,13 @@ class SuricataConfigAPI:
                     ]
                 },
                 'pcap': {
-                    'interface': 'eth0'
+                    'interface': 'eth0',
+                    'buffer-size': 16777216,
+                    'bpf-filter': '',
+                    'checksum-checks': 'auto',
+                    'threads': 16,
+                    'promisc': True,
+                    'snaplen': 1518
                 }
             }
 

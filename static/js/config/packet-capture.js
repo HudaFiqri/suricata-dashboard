@@ -94,10 +94,26 @@ const PacketCaptureConfig = (function() {
         const clusterType = config['cluster-type'] || 'cluster_flow';
         const defrag = toBoolean(config.defrag, true);
         const useMmap = toBoolean(config['use-mmap'], true);
+        const mmapLocked = toBoolean(config['mmap-locked'], true);
         const tpacketV3 = toBoolean(config['tpacket-v3'], true);
-        const promisc = toBoolean(config.promisc, true);
+        const ringSize = config['ring-size'] || 2048;
+        const blockSize = config['block-size'] || 32768;
+        const blockTimeout = config['block-timeout'] || 10;
+        const useEmergencyFlush = toBoolean(config['use-emergency-flush'], true);
+        const bufferSize = config['buffer-size'] || 32768;
+        const disablePromisc = toBoolean(config['disable-promisc'], false);
+        const checksumChecks = config['checksum-checks'] || 'kernel';
+        const bpfFilter = config['bpf-filter'] || '';
+        const copyMode = config['copy-mode'] || '';
+        const copyIface = config['copy-iface'] || '';
 
         return `
+            <!-- Basic Settings -->
+            <div class="col-md-12">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-network-wired"></i> Basic Settings
+                </h6>
+            </div>
             <div class="col-md-6">
                 <label class="form-label">Interface</label>
                 <input type="text" class="form-control"
@@ -118,6 +134,13 @@ const PacketCaptureConfig = (function() {
                     Number of reader threads (use <code>auto</code>)
                 </small>
             </div>
+
+            <!-- Cluster Settings -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-server"></i> Cluster Settings
+                </h6>
+            </div>
             <div class="col-md-6">
                 <label class="form-label">Cluster ID</label>
                 <input type="number" class="form-control"
@@ -134,6 +157,101 @@ const PacketCaptureConfig = (function() {
                         }>${opt}</option>`).join('')}
                 </select>
             </div>
+
+            <!-- Ring Buffer Settings -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-ring"></i> Ring Buffer Settings
+                </h6>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Ring Size</label>
+                <input type="number" class="form-control"
+                    id="capture-ring-size"
+                    value="${escapeHtml(ringSize)}"
+                    placeholder="2048">
+                <small class="text-muted">Number of packets in ring</small>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Block Size</label>
+                <input type="number" class="form-control"
+                    id="capture-block-size"
+                    value="${escapeHtml(blockSize)}"
+                    placeholder="32768">
+                <small class="text-muted">Block size in bytes (tpacket_v3)</small>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Block Timeout (ms)</label>
+                <input type="number" class="form-control"
+                    id="capture-block-timeout"
+                    value="${escapeHtml(blockTimeout)}"
+                    placeholder="10">
+                <small class="text-muted">Timeout for incomplete blocks</small>
+            </div>
+
+            <!-- Buffer Settings -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-memory"></i> Buffer Settings
+                </h6>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Buffer Size</label>
+                <input type="number" class="form-control"
+                    id="capture-buffer-size"
+                    value="${escapeHtml(bufferSize)}"
+                    placeholder="32768">
+                <small class="text-muted">Receive buffer size in bytes</small>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Checksum Checks</label>
+                <select class="form-select" id="capture-checksum-checks">
+                    ${['kernel', 'yes', 'no', 'auto']
+                        .map(opt => `<option value="${opt}"${
+                            opt === checksumChecks ? ' selected' : ''
+                        }>${opt}</option>`).join('')}
+                </select>
+                <small class="text-muted">Checksum validation mode</small>
+            </div>
+
+            <!-- Filter Settings -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-filter"></i> Filter & IPS Settings
+                </h6>
+            </div>
+            <div class="col-md-12">
+                <label class="form-label">BPF Filter</label>
+                <input type="text" class="form-control"
+                    id="capture-bpf-filter"
+                    value="${escapeHtml(bpfFilter)}"
+                    placeholder="port 80 or udp">
+                <small class="text-muted">Berkeley Packet Filter expression (optional)</small>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Copy Mode</label>
+                <select class="form-select" id="capture-copy-mode">
+                    <option value=""${copyMode === '' ? ' selected' : ''}>None</option>
+                    <option value="ips"${copyMode === 'ips' ? ' selected' : ''}>IPS</option>
+                    <option value="tap"${copyMode === 'tap' ? ' selected' : ''}>TAP</option>
+                </select>
+                <small class="text-muted">IPS/TAP mode for packet forwarding</small>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Copy Interface</label>
+                <input type="text" class="form-control"
+                    id="capture-copy-iface"
+                    value="${escapeHtml(copyIface)}"
+                    placeholder="eth1">
+                <small class="text-muted">Target interface for copy mode</small>
+            </div>
+
+            <!-- Feature Toggles -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-toggle-on"></i> Feature Toggles
+                </h6>
+            </div>
             <div class="col-md-12">
                 <div class="row">
                     ${renderCheckbox(
@@ -147,14 +265,24 @@ const PacketCaptureConfig = (function() {
                         useMmap
                     )}
                     ${renderCheckbox(
+                        'capture-mmap-locked',
+                        'Lock Memory Map',
+                        mmapLocked
+                    )}
+                    ${renderCheckbox(
                         'capture-tpacket-v3',
                         'TPACKET v3',
                         tpacketV3
                     )}
                     ${renderCheckbox(
-                        'capture-promisc',
-                        'Promiscuous Mode',
-                        promisc
+                        'capture-use-emergency-flush',
+                        'Emergency Flush',
+                        useEmergencyFlush
+                    )}
+                    ${renderCheckbox(
+                        'capture-disable-promisc',
+                        'Disable Promiscuous',
+                        disablePromisc
                     )}
                 </div>
             </div>
@@ -182,19 +310,31 @@ const PacketCaptureConfig = (function() {
      * Render AF-XDP configuration fields
      */
     function renderAfXdpFields(config) {
-        const interfaceName = config.interface || '';
+        const interfaceName = config.interface || 'default';
         const threads = config.threads || 'auto';
+        const disablePromisc = toBoolean(config['disable-promisc'], false);
+        const forceXdpMode = config['force-xdp-mode'] || 'none';
+        const forceBindMode = config['force-bind-mode'] || 'none';
+        const memUnaligned = toBoolean(config['mem-unaligned'], false);
         const busyPoll = toBoolean(config['enable-busy-poll'], true);
         const busyPollTime = config['busy-poll-time'] || 20;
         const busyPollBudget = config['busy-poll-budget'] || 64;
+        const groFlushTimeout = config['gro-flush-timeout'] || 2000000;
+        const napiDeferHardIrq = config['napi-defer-hard-irq'] || 2;
 
         return `
+            <!-- Basic Settings -->
+            <div class="col-md-12">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-network-wired"></i> Basic Settings
+                </h6>
+            </div>
             <div class="col-md-6">
                 <label class="form-label">Interface</label>
                 <input type="text" class="form-control"
                     id="capture-interface"
                     value="${escapeHtml(interfaceName)}"
-                    placeholder="eth0">
+                    placeholder="default">
                 <small class="text-muted">
                     Network interface for AF-XDP capture.
                 </small>
@@ -205,10 +345,44 @@ const PacketCaptureConfig = (function() {
                     id="capture-threads"
                     value="${escapeHtml(threads)}"
                     placeholder="auto">
-                <small class="text-muted">Number of reader threads.</small>
+                <small class="text-muted">Number of reader threads (auto = cores or RX queues).</small>
+            </div>
+
+            <!-- XDP Mode Settings -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-cogs"></i> XDP Mode Settings
+                </h6>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Force XDP Mode</label>
+                <select class="form-select" id="capture-force-xdp-mode">
+                    ${['none', 'drv', 'skb']
+                        .map(opt => `<option value="${opt}"${
+                            opt === forceXdpMode ? ' selected' : ''
+                        }>${opt.toUpperCase()}</option>`).join('')}
+                </select>
+                <small class="text-muted">XDP mode: DRV (driver), SKB (generic), or None (auto)</small>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Force Bind Mode</label>
+                <select class="form-select" id="capture-force-bind-mode">
+                    ${['none', 'zero', 'copy']
+                        .map(opt => `<option value="${opt}"${
+                            opt === forceBindMode ? ' selected' : ''
+                        }>${opt === 'none' ? 'None (Auto)' : opt === 'zero' ? 'Zero-Copy' : 'Copy'}</option>`).join('')}
+                </select>
+                <small class="text-muted">Socket bind mode (zero-copy or copy)</small>
+            </div>
+
+            <!-- Busy Polling Settings -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-clock"></i> Busy Polling Settings
+                </h6>
             </div>
             <div class="col-md-4">
-                <label class="form-label">Busy Poll Time</label>
+                <label class="form-label">Busy Poll Time (μs)</label>
                 <input type="number" class="form-control"
                     id="capture-busy-poll-time"
                     value="${escapeHtml(busyPollTime)}"
@@ -230,6 +404,50 @@ const PacketCaptureConfig = (function() {
                     <label class="form-check-label" for="capture-busy-poll">
                         Enable Busy Poll
                     </label>
+                </div>
+            </div>
+
+            <!-- NAPI Settings -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-microchip"></i> NAPI Context Settings
+                </h6>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">GRO Flush Timeout</label>
+                <input type="number" class="form-control"
+                    id="capture-gro-flush-timeout"
+                    value="${escapeHtml(groFlushTimeout)}"
+                    placeholder="2000000">
+                <small class="text-muted">GRO flush timeout in nanoseconds</small>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">NAPI Defer Hard IRQ</label>
+                <input type="number" class="form-control"
+                    id="capture-napi-defer-hard-irq"
+                    value="${escapeHtml(napiDeferHardIrq)}"
+                    placeholder="2">
+                <small class="text-muted">Defer hard IRQ count for NAPI</small>
+            </div>
+
+            <!-- Feature Toggles -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-toggle-on"></i> Feature Toggles
+                </h6>
+            </div>
+            <div class="col-md-12">
+                <div class="row">
+                    ${renderCheckbox(
+                        'capture-disable-promisc',
+                        'Disable Promiscuous Mode',
+                        disablePromisc
+                    )}
+                    ${renderCheckbox(
+                        'capture-mem-unaligned',
+                        'Unaligned Memory (requires hugepages)',
+                        memUnaligned
+                    )}
                 </div>
             </div>
         `;
@@ -484,10 +702,22 @@ const PacketCaptureConfig = (function() {
      * Render PCAP configuration fields
      */
     function renderPcapFields(config) {
-        const interfaceName = config.interface || '';
+        const interfaceName = config.interface || 'eth0';
+        const bufferSize = config['buffer-size'] || 16777216;
+        const bpfFilter = config['bpf-filter'] || '';
+        const checksumChecks = config['checksum-checks'] || 'auto';
+        const threads = config.threads || 16;
+        const promisc = toBoolean(config.promisc, true);
+        const snaplen = config.snaplen || 1518;
 
         return `
+            <!-- Basic Settings -->
             <div class="col-md-12">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-network-wired"></i> Basic Settings
+                </h6>
+            </div>
+            <div class="col-md-6">
                 <label class="form-label">Interface</label>
                 <input type="text" class="form-control"
                     id="capture-interface"
@@ -497,11 +727,79 @@ const PacketCaptureConfig = (function() {
                     Network interface for PCAP capture.
                 </small>
             </div>
+            <div class="col-md-6">
+                <label class="form-label">Threads</label>
+                <input type="number" class="form-control"
+                    id="capture-threads"
+                    value="${escapeHtml(threads)}"
+                    placeholder="16">
+                <small class="text-muted">
+                    Number of capture threads (typically 16)
+                </small>
+            </div>
+
+            <!-- Buffer Settings -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-memory"></i> Buffer Settings
+                </h6>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Buffer Size</label>
+                <input type="number" class="form-control"
+                    id="capture-buffer-size"
+                    value="${escapeHtml(bufferSize)}"
+                    placeholder="16777216">
+                <small class="text-muted">Total ring memory (> 1% of bandwidth)</small>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Snaplen</label>
+                <input type="number" class="form-control"
+                    id="capture-snaplen"
+                    value="${escapeHtml(snaplen)}"
+                    placeholder="1518">
+                <small class="text-muted">Maximum bytes per packet (defaults to MTU)</small>
+            </div>
+
+            <!-- Checksum & Filter Settings -->
+            <div class="col-md-12 mt-3">
+                <h6 class="border-bottom pb-2">
+                    <i class="fas fa-filter"></i> Checksum & Filter Settings
+                </h6>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Checksum Checks</label>
+                <select class="form-select" id="capture-checksum-checks">
+                    ${['auto', 'yes', 'no']
+                        .map(opt => `<option value="${opt}"${
+                            opt === checksumChecks ? ' selected' : ''
+                        }>${opt}</option>`).join('')}
+                </select>
+                <small class="text-muted">Checksum validation mode</small>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch mt-4">
+                    <input type="checkbox" class="form-check-input"
+                        id="capture-promisc" ${promisc ? 'checked' : ''}>
+                    <label class="form-check-label" for="capture-promisc">
+                        Promiscuous Mode
+                    </label>
+                </div>
+            </div>
             <div class="col-md-12">
+                <label class="form-label">BPF Filter</label>
+                <input type="text" class="form-control"
+                    id="capture-bpf-filter"
+                    value="${escapeHtml(bpfFilter)}"
+                    placeholder="tcp and port 25">
+                <small class="text-muted">Berkeley Packet Filter expression (optional)</small>
+            </div>
+
+            <div class="col-md-12 mt-3">
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i>
-                    PCAP is the legacy packet capture method.
-                    Consider using AF-Packet or AF-XDP for better performance.
+                    <strong>Note:</strong> PCAP is the legacy packet capture method.
+                    Consider using AF-Packet or AF-XDP for better performance on Linux.
                 </div>
             </div>
         `;
@@ -522,27 +820,62 @@ const PacketCaptureConfig = (function() {
         if (captureType === 'af-packet') {
             payload.interface = $('#capture-interface').val().trim();
             payload.threads = $('#capture-threads').val().trim() || 'auto';
+
             const clusterId = parseInt($('#capture-cluster-id').val(), 10);
             if (!isNaN(clusterId)) payload['cluster-id'] = clusterId;
             payload['cluster-type'] = $('#capture-cluster-type').val();
+
+            const ringSize = parseInt($('#capture-ring-size').val(), 10);
+            if (!isNaN(ringSize)) payload['ring-size'] = ringSize;
+
+            const blockSize = parseInt($('#capture-block-size').val(), 10);
+            if (!isNaN(blockSize)) payload['block-size'] = blockSize;
+
+            const blockTimeout = parseInt($('#capture-block-timeout').val(), 10);
+            if (!isNaN(blockTimeout)) payload['block-timeout'] = blockTimeout;
+
+            const bufferSize = parseInt($('#capture-buffer-size').val(), 10);
+            if (!isNaN(bufferSize)) payload['buffer-size'] = bufferSize;
+
+            payload['checksum-checks'] = $('#capture-checksum-checks').val();
+            payload['bpf-filter'] = $('#capture-bpf-filter').val().trim();
+            payload['copy-mode'] = $('#capture-copy-mode').val();
+            payload['copy-iface'] = $('#capture-copy-iface').val().trim();
+
             payload.defrag = $('#capture-defrag').is(':checked');
             payload['use-mmap'] = $('#capture-use-mmap').is(':checked');
+            payload['mmap-locked'] = $('#capture-mmap-locked').is(':checked');
             payload['tpacket-v3'] = $('#capture-tpacket-v3').is(':checked');
-            payload.promisc = $('#capture-promisc').is(':checked');
+            payload['use-emergency-flush'] = $('#capture-use-emergency-flush').is(':checked');
+            payload['disable-promisc'] = $('#capture-disable-promisc').is(':checked');
         } else if (captureType === 'af-xdp') {
             payload.interface = $('#capture-interface').val().trim();
             payload.threads = $('#capture-threads').val().trim() || 'auto';
-            payload['enable-busy-poll'] =
-                $('#capture-busy-poll').is(':checked');
-            const busyPollTime =
-                parseInt($('#capture-busy-poll-time').val(), 10);
+
+            payload['disable-promisc'] = $('#capture-disable-promisc').is(':checked');
+            payload['force-xdp-mode'] = $('#capture-force-xdp-mode').val();
+            payload['force-bind-mode'] = $('#capture-force-bind-mode').val();
+            payload['mem-unaligned'] = $('#capture-mem-unaligned').is(':checked');
+            payload['enable-busy-poll'] = $('#capture-busy-poll').is(':checked');
+
+            const busyPollTime = parseInt($('#capture-busy-poll-time').val(), 10);
             if (!isNaN(busyPollTime)) {
                 payload['busy-poll-time'] = busyPollTime;
             }
-            const busyPollBudget =
-                parseInt($('#capture-busy-poll-budget').val(), 10);
+
+            const busyPollBudget = parseInt($('#capture-busy-poll-budget').val(), 10);
             if (!isNaN(busyPollBudget)) {
                 payload['busy-poll-budget'] = busyPollBudget;
+            }
+
+            const groFlushTimeout = parseInt($('#capture-gro-flush-timeout').val(), 10);
+            if (!isNaN(groFlushTimeout)) {
+                payload['gro-flush-timeout'] = groFlushTimeout;
+            }
+
+            const napiDeferHardIrq = parseInt($('#capture-napi-defer-hard-irq').val(), 10);
+            if (!isNaN(napiDeferHardIrq)) {
+                payload['napi-defer-hard-irq'] = napiDeferHardIrq;
             }
         } else if (captureType === 'dpdk') {
             payload['eal-params'] = {
@@ -595,6 +928,19 @@ const PacketCaptureConfig = (function() {
             payload.interfaces = [interfaceConfig];
         } else if (captureType === 'pcap') {
             payload.interface = $('#capture-interface').val().trim();
+
+            const threads = parseInt($('#capture-threads').val(), 10);
+            if (!isNaN(threads)) payload.threads = threads;
+
+            const bufferSize = parseInt($('#capture-buffer-size').val(), 10);
+            if (!isNaN(bufferSize)) payload['buffer-size'] = bufferSize;
+
+            const snaplen = parseInt($('#capture-snaplen').val(), 10);
+            if (!isNaN(snaplen)) payload.snaplen = snaplen;
+
+            payload['checksum-checks'] = $('#capture-checksum-checks').val();
+            payload['bpf-filter'] = $('#capture-bpf-filter').val().trim();
+            payload.promisc = $('#capture-promisc').is(':checked');
         }
 
         apiPost(
