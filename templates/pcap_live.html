@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-satellite-dish"></i> Live Packet Capture</h5>
+                <div>
+                    <select class="form-select form-select-sm d-inline-block w-auto me-2" id="event-type-select">
+                        <option value="">All Events</option>
+                        <option value="alert">Alerts</option>
+                        <option value="http">HTTP</option>
+                        <option value="dns">DNS</option>
+                        <option value="tls">TLS/SSL</option>
+                        <option value="ssh">SSH</option>
+                        <option value="flow">Flow</option>
+                        <option value="fileinfo">File Info</option>
+                    </select>
+                    <select class="form-select form-select-sm d-inline-block w-auto me-2" id="protocol-select">
+                        <option value="">All Protocols</option>
+                        <option value="tcp">TCP</option>
+                        <option value="udp">UDP</option>
+                        <option value="icmp">ICMP</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" id="refresh-packets">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                    <button class="btn btn-sm btn-secondary" id="toggle-auto-refresh">
+                        <i class="fas fa-pause"></i> Pause
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Real-time packet monitoring from Suricata PCAP capture. Auto-refresh every 5 seconds.
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 id="total-packets" class="text-primary">-</h4>
+                                <small class="text-muted">Total Packets</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 id="tcp-packets" class="text-info">-</h4>
+                                <small class="text-muted">TCP Packets</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 id="udp-packets" class="text-warning">-</h4>
+                                <small class="text-muted">UDP Packets</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 id="other-packets" class="text-secondary">-</h4>
+                                <small class="text-muted">Other Protocols</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-list"></i> Packet Details</h5>
+                <div>
+                    <input type="text" class="form-control form-control-sm d-inline-block w-auto me-2" id="packet-search" placeholder="Search packets...">
+                    <span class="badge bg-success" id="packet-count">0 packets</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th style="width: 10%;">Timestamp</th>
+                                <th style="width: 8%;">Event Type</th>
+                                <th style="width: 7%;">Protocol</th>
+                                <th style="width: 12%;">Source</th>
+                                <th style="width: 12%;">Destination</th>
+                                <th style="width: 8%;">Interface</th>
+                                <th style="width: 43%;">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="packet-table-body">
+                            <tr>
+                                <td colspan="7" class="text-center">Loading packets...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Packet Detail Modal -->
+<div class="modal fade" id="packetDetailModal" tabindex="-1" aria-labelledby="packetDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="packetDetailModalLabel">Packet Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="packet-detail-content">
+                    <!-- Packet details will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let autoRefresh = true;
+let refreshInterval = null;
+let allPackets = [];
+
+// Initialize on page load
+$(document).ready(function() {
+    loadPackets();
+    loadStats();
+    startAutoRefresh();
+
+    // Event listeners
+    $('#refresh-packets').click(function() {
+        loadPackets();
+        loadStats();
+    });
+
+    $('#toggle-auto-refresh').click(function() {
+        autoRefresh = !autoRefresh;
+        if (autoRefresh) {
+            $(this).html('<i class="fas fa-pause"></i> Pause');
+            $(this).removeClass('btn-success').addClass('btn-secondary');
+            startAutoRefresh();
+        } else {
+            $(this).html('<i class="fas fa-play"></i> Resume');
+            $(this).removeClass('btn-secondary').addClass('btn-success');
+            stopAutoRefresh();
+        }
+    });
+
+    $('#event-type-select, #protocol-select').on('change', loadPackets);
+    $('#packet-search').on('input', filterPackets);
+});
+
+function startAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(function() {
+        if (autoRefresh) {
+            loadPackets();
+            loadStats();
+        }
+    }, 5000); // Refresh every 5 seconds
+}
+
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
+}
+
+function loadPackets() {
+    const eventType = $('#event-type-select').val();
+    const protocol = $('#protocol-select').val();
+    const limit = 100;
+
+    let url = `/api/pcap/live?limit=${limit}`;
+    if (eventType) url += `&type=${eventType}`;
+    if (protocol) url += `&protocol=${protocol}`;
+
+    $.get(url, function(response) {
+        if (response.success && response.packets) {
+            allPackets = response.packets;
+            displayPackets(allPackets);
+            $('#packet-count').text(`${response.total} packets`);
+        } else {
+            $('#packet-table-body').html(`
+                <tr>
+                    <td colspan="7" class="text-center text-warning">
+                        ${response.error || 'No packets found. Make sure Suricata is running and generating events.'}
+                    </td>
+                </tr>
+            `);
+            $('#packet-count').text('0 packets');
+        }
+    }).fail(function() {
+        $('#packet-table-body').html(`
+            <tr>
+                <td colspan="7" class="text-center text-danger">
+                    Failed to load packets. Check if Suricata is running.
+                </td>
+            </tr>
+        `);
+        $('#packet-count').text('0 packets');
+    });
+}
+
+function displayPackets(packets) {
+    if (packets.length === 0) {
+        $('#packet-table-body').html('<tr><td colspan="7" class="text-center text-muted">No packets match your filters</td></tr>');
+        return;
+    }
+
+    let html = '';
+    packets.forEach((packet, index) => {
+        const eventTypeClass = getEventTypeClass(packet.event_type);
+        const timestamp = packet.timestamp.replace('T', ' ').split('.')[0];
+        const srcAddress = packet.src_port ? `${packet.src_ip}:${packet.src_port}` : packet.src_ip;
+        const destAddress = packet.dest_port ? `${packet.dest_ip}:${packet.dest_port}` : packet.dest_ip;
+
+        html += `
+            <tr class="packet-row" data-packet-index="${index}" style="cursor: pointer;">
+                <td><small>${timestamp}</small></td>
+                <td><span class="badge ${eventTypeClass}">${packet.event_type}</span></td>
+                <td><span class="badge bg-secondary">${packet.protocol}</span></td>
+                <td><code class="small">${srcAddress}</code></td>
+                <td><code class="small">${destAddress}</code></td>
+                <td><small>${packet.in_iface || '-'}</small></td>
+                <td><small>${escapeHtml(packet.packet_info.description)}</small></td>
+            </tr>
+        `;
+    });
+
+    $('#packet-table-body').html(html);
+
+    // Add click event to show details
+    $('.packet-row').click(function() {
+        const index = $(this).data('packet-index');
+        showPacketDetail(allPackets[index]);
+    });
+}
+
+function getEventTypeClass(eventType) {
+    const classMap = {
+        'alert': 'bg-danger',
+        'http': 'bg-primary',
+        'dns': 'bg-info',
+        'tls': 'bg-success',
+        'ssh': 'bg-warning',
+        'flow': 'bg-secondary',
+        'fileinfo': 'bg-dark',
+        'stats': 'bg-light text-dark'
+    };
+    return classMap[eventType] || 'bg-secondary';
+}
+
+function showPacketDetail(packet) {
+    let detailHtml = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Basic Information</h6>
+                <table class="table table-sm table-bordered">
+                    <tr><th>Timestamp</th><td>${packet.timestamp}</td></tr>
+                    <tr><th>Event Type</th><td><span class="badge ${getEventTypeClass(packet.event_type)}">${packet.event_type}</span></td></tr>
+                    <tr><th>Protocol</th><td>${packet.protocol}</td></tr>
+                    <tr><th>Flow ID</th><td><code>${packet.flow_id || 'N/A'}</code></td></tr>
+                    <tr><th>Interface</th><td>${packet.in_iface || 'N/A'}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Network Information</h6>
+                <table class="table table-sm table-bordered">
+                    <tr><th>Source IP</th><td><code>${packet.src_ip}</code></td></tr>
+                    <tr><th>Source Port</th><td>${packet.src_port || 'N/A'}</td></tr>
+                    <tr><th>Destination IP</th><td><code>${packet.dest_ip}</code></td></tr>
+                    <tr><th>Destination Port</th><td>${packet.dest_port || 'N/A'}</td></tr>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // Add flow information if available
+    if (packet.flow) {
+        detailHtml += `
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <h6>Flow Information</h6>
+                    <table class="table table-sm table-bordered">
+                        <tr>
+                            <th>Packets to Server</th><td>${packet.flow.pkts_toserver}</td>
+                            <th>Packets to Client</th><td>${packet.flow.pkts_toclient}</td>
+                        </tr>
+                        <tr>
+                            <th>Bytes to Server</th><td>${packet.flow.bytes_toserver}</td>
+                            <th>Bytes to Client</th><td>${packet.flow.bytes_toclient}</td>
+                        </tr>
+                        <tr>
+                            <th>Flow Start</th><td colspan="3">${packet.flow.start || 'N/A'}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    // Add packet-specific details
+    detailHtml += `
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <h6>Event Details</h6>
+                <div class="alert alert-info">
+                    <strong>${packet.packet_info.description}</strong>
+                </div>
+                <table class="table table-sm table-bordered">
+    `;
+
+    // Add specific fields based on event type
+    Object.keys(packet.packet_info).forEach(key => {
+        if (key !== 'description' && key !== 'type') {
+            detailHtml += `<tr><th>${key}</th><td>${packet.packet_info[key]}</td></tr>`;
+        }
+    });
+
+    detailHtml += `
+                </table>
+            </div>
+        </div>
+    `;
+
+    $('#packet-detail-content').html(detailHtml);
+    $('#packetDetailModal').modal('show');
+}
+
+function loadStats() {
+    $.get('/api/pcap/stats', function(response) {
+        if (response.success && response.stats) {
+            const stats = response.stats;
+            $('#total-packets').text(stats.total_packets || 0);
+            $('#tcp-packets').text(stats.protocols.TCP || 0);
+            $('#udp-packets').text(stats.protocols.UDP || 0);
+
+            const otherProtocols = Object.keys(stats.protocols)
+                .filter(p => p !== 'TCP' && p !== 'UDP')
+                .reduce((sum, p) => sum + stats.protocols[p], 0);
+            $('#other-packets').text(otherProtocols);
+        }
+    });
+}
+
+function filterPackets() {
+    const searchTerm = $('#packet-search').val().toLowerCase();
+
+    if (!searchTerm) {
+        displayPackets(allPackets);
+        return;
+    }
+
+    const filtered = allPackets.filter(packet => {
+        return (packet.src_ip && packet.src_ip.includes(searchTerm)) ||
+               (packet.dest_ip && packet.dest_ip.includes(searchTerm)) ||
+               (packet.event_type && packet.event_type.toLowerCase().includes(searchTerm)) ||
+               (packet.protocol && packet.protocol.toLowerCase().includes(searchTerm)) ||
+               (packet.packet_info.description && packet.packet_info.description.toLowerCase().includes(searchTerm));
+    });
+
+    displayPackets(filtered);
+    $('#packet-count').text(`${filtered.length} packets`);
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+</script>
+
+<style>
+.packet-row:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table-responsive {
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+}
+</style>
+{% endblock %}

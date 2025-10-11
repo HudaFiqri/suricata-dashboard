@@ -28,6 +28,7 @@ class APIRoutes:
         from binary.api.database import DatabaseAPI
         from binary.api.debug import DebugAPI
         from binary.api.alerts import AlertsAPI
+        from binary.api.pcap_live import LivePacketCaptureAPI
 
         self.app = app
         self.controller = controller
@@ -47,6 +48,7 @@ class APIRoutes:
         self.monitor_api = MonitorAPI(config, rrd_manager)
         self.database_api = DatabaseAPI(db_manager, self.alerts_api)
         self.debug_api = DebugAPI(self.monitor_api)
+        self.pcap_live_api = LivePacketCaptureAPI(config)
 
         # Register all routes
         self._register_routes()
@@ -122,3 +124,7 @@ class APIRoutes:
 
         # Debug APIs
         self.app.add_url_rule('/api/debug/eve', 'api_debug_eve', self.debug_api.debug_eve)
+
+        # Live Packet Capture APIs
+        self.app.add_url_rule('/api/pcap/live', 'api_pcap_live', self.pcap_live_api.get_live_packets)
+        self.app.add_url_rule('/api/pcap/stats', 'api_pcap_stats', self.pcap_live_api.get_packet_stats)
