@@ -211,9 +211,111 @@ class SuricataConfigAPI:
                 'message': f'Error updating outputs config: {str(e)}'
             }), 500
 
-    # ==================== AF-Packet ====================
+    # ==================== Packet Capture (Unified) ====================
+    def get_packet_capture_config(self, capture_type):
+        """Get Packet Capture configuration for any capture type"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+
+            config_path = self.controller.config.config_path
+
+            # Define defaults for each capture type
+            defaults = {
+                'af-packet': {
+                    'interface': 'eth0',
+                    'threads': 'auto',
+                    'cluster-id': 99,
+                    'cluster-type': 'cluster_flow',
+                    'defrag': True,
+                    'use-mmap': True,
+                    'tpacket-v3': True,
+                    'promisc': True
+                },
+                'af-xdp': {
+                    'interface': 'eth0',
+                    'threads': 'auto',
+                    'enable-busy-poll': True,
+                    'busy-poll-time': 20,
+                    'busy-poll-budget': 64,
+                },
+                'dpdk': {
+                    'eal-params': {
+                        'proc-type': 'primary',
+                    },
+                    'interfaces': []
+                },
+                'pcap': {
+                    'interface': 'eth0'
+                }
+            }
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': True,
+                    'capture_type': capture_type,
+                    'config': defaults.get(capture_type, {}),
+                    'warning': 'Config file not found. Using defaults.'
+                })
+
+            yaml_manager = YAMLConfigManager(config_path)
+            capture_config = yaml_manager.get_packet_capture_config(capture_type)
+
+            return jsonify({
+                'success': True,
+                'capture_type': capture_type,
+                'config': capture_config or {}
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error loading {capture_type} config: {str(e)}'
+            }), 500
+
+    def update_packet_capture_config(self, capture_type):
+        """Update Packet Capture configuration for any capture type"""
+        try:
+            from binary.config.yaml_manager import YAMLConfigManager
+
+            payload = request.get_json(silent=True) or {}
+            settings = payload.get('config') or {}
+
+            if not isinstance(settings, dict) or not settings:
+                return jsonify({
+                    'success': False,
+                    'message': f'No {capture_type} settings provided'
+                }), 400
+
+            config_path = self.controller.config.config_path
+
+            if not os.path.exists(config_path):
+                return jsonify({
+                    'success': False,
+                    'message': f'Config file not found at {config_path}'
+                }), 404
+
+            yaml_manager = YAMLConfigManager(config_path)
+
+            if not yaml_manager.update_packet_capture_config(capture_type, settings):
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to update {capture_type} configuration'
+                }), 500
+
+            return jsonify({
+                'success': True,
+                'message': f'{capture_type.upper()} configuration updated successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Error updating {capture_type} config: {str(e)}'
+            }), 500
+
+    # ==================== AF-Packet (Backward Compatibility) ====================
     def get_af_packet_config(self):
-        """Get AF-Packet configuration"""
+        """Get AF-Packet configuration - Legacy method for backward compatibility"""
         try:
             from binary.config.yaml_manager import YAMLConfigManager
 
@@ -251,7 +353,7 @@ class SuricataConfigAPI:
             }), 500
 
     def update_af_packet_config(self):
-        """Update AF-Packet configuration"""
+        """Update AF-Packet configuration - Legacy method for backward compatibility"""
         try:
             from binary.config.yaml_manager import YAMLConfigManager
 

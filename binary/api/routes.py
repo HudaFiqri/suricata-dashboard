@@ -82,8 +82,15 @@ class APIRoutes:
         self.app.add_url_rule('/api/suricata-config/app-layer', 'api_config_app_layer_update', self.suricata_config_api.update_app_layer_config, methods=['POST'])
         self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_get', self.suricata_config_api.get_outputs_config, methods=['GET'])
         self.app.add_url_rule('/api/suricata-config/outputs', 'api_config_outputs_update', self.suricata_config_api.update_outputs_config, methods=['POST'])
+
+        # Packet Capture APIs (new unified endpoint)
+        self.app.add_url_rule('/api/suricata-config/packet-capture/<capture_type>', 'api_config_packet_capture_get', self.suricata_config_api.get_packet_capture_config, methods=['GET'])
+        self.app.add_url_rule('/api/suricata-config/packet-capture/<capture_type>', 'api_config_packet_capture_update', self.suricata_config_api.update_packet_capture_config, methods=['POST'])
+
+        # Backward compatibility - AF-Packet
         self.app.add_url_rule('/api/suricata-config/af-packet', 'api_config_af_packet_get', self.suricata_config_api.get_af_packet_config, methods=['GET'])
         self.app.add_url_rule('/api/suricata-config/af-packet', 'api_config_af_packet_update', self.suricata_config_api.update_af_packet_config, methods=['POST'])
+
         self.app.add_url_rule('/api/suricata-config/stream', 'api_config_stream_get', self.suricata_config_api.get_stream_config, methods=['GET'])
         self.app.add_url_rule('/api/suricata-config/stream', 'api_config_stream_update', self.suricata_config_api.update_stream_config, methods=['POST'])
         self.app.add_url_rule('/api/suricata-config/vars', 'api_config_vars_get', self.suricata_config_api.get_vars_config, methods=['GET'])

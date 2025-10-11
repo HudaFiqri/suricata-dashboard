@@ -17,11 +17,11 @@
                 <h6 class="text-uppercase fw-bold text-muted mb-3"><i class="fas fa-cog"></i> Suricata Configuration</h6>
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
-                        <div class="card h-100 border-secondary hover-shadow config-card" data-search="af-packet" style="cursor: pointer;">
+                        <div class="card h-100 border-secondary hover-shadow config-card" data-search="packet-capture" style="cursor: pointer;">
                             <div class="card-body text-center">
                                 <i class="fas fa-network-wired fa-3x text-secondary mb-3"></i>
-                                <h5 class="card-title">AF-Packet</h5>
-                                <p class="card-text text-muted small">Configure AF-Packet capture settings and interface tuning</p>
+                                <h5 class="card-title">Packet Capture</h5>
+                                <p class="card-text text-muted small">Configure packet capture methods: AF-Packet, AF-XDP, DPDK, PCAP</p>
                             </div>
                         </div>
                     </div>
@@ -386,17 +386,17 @@
 
 
 
-<!-- AF-Packet Modal -->
+<!-- Packet Capture Modal -->
 
-<div class="modal fade" id="afPacketModal" tabindex="-1">
+<div class="modal fade" id="packetCaptureModal" tabindex="-1">
 
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
 
         <div class="modal-content">
 
             <div class="modal-header bg-secondary text-white">
 
-                <h5 class="modal-title"><i class="fas fa-network-wired"></i> AF-Packet Configuration</h5>
+                <h5 class="modal-title"><i class="fas fa-network-wired"></i> Packet Capture Configuration</h5>
 
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
 
@@ -406,19 +406,29 @@
 
                 <div class="alert alert-info">
 
-                    <i class="fas fa-info-circle"></i> Configure AF-Packet capture settings including interface tuning and performance options.
+                    <i class="fas fa-info-circle"></i> Configure packet capture methods: AF-Packet, AF-XDP, DPDK, or PCAP.
 
                 </div>
 
-                <div class="alert alert-danger d-none" id="af-packet-error"></div>
+                <div class="alert alert-danger d-none" id="packet-capture-error"></div>
 
-                <div class="alert alert-success d-none" id="af-packet-success"></div>
+                <div class="alert alert-success d-none" id="packet-capture-success"></div>
 
+                <!-- Capture Type Selector -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Capture Method</label>
+                    <select class="form-select" id="capture-type-selector">
+                        <option value="af-packet">AF-Packet (Linux Native)</option>
+                        <option value="af-xdp">AF-XDP (Express Data Path)</option>
+                        <option value="dpdk">DPDK (Data Plane Development Kit)</option>
+                        <option value="pcap">PCAP (Packet Capture)</option>
+                    </select>
+                    <small class="text-muted">Select the packet capture method to configure</small>
+                </div>
 
+                <div id="packet-capture-container">
 
-                <div id="af-packet-container">
-
-                    <p class="text-muted text-center"><i class="fas fa-spinner fa-spin"></i> Loading AF-Packet configuration...</p>
+                    <p class="text-muted text-center"><i class="fas fa-spinner fa-spin"></i> Loading packet capture configuration...</p>
 
                 </div>
 
@@ -428,7 +438,7 @@
 
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
 
-                <button type="button" class="btn btn-secondary" id="save-af-packet-btn">
+                <button type="button" class="btn btn-secondary" id="save-packet-capture-btn">
 
                     <i class="fas fa-save"></i> Save Configuration
 
@@ -952,8 +962,11 @@ $('#discord-test-btn').click(function() {
 $('.config-card').click(function() {
     const searchTerm = $(this).data('search');
 
-    if (searchTerm === 'af-packet') {
-        openAfPacketModal();
+    if (searchTerm === 'packet-capture') {
+        openPacketCaptureModal();
+    } else if (searchTerm === 'af-packet') {
+        // Backward compatibility - redirect to packet capture
+        openPacketCaptureModal('af-packet');
     } else if (searchTerm === 'app-layer') {
         openAppLayerModal();
     } else if (searchTerm === 'outputs') {
@@ -1757,6 +1770,274 @@ function saveAfPacketConfig() {
     });
 }
 
+// ==================== Packet Capture Configuration (New Unified) ====================
+let currentCaptureType = 'af-packet';
+let packetCaptureConfig = {};
+
+function openPacketCaptureModal(captureType = 'af-packet') {
+    currentCaptureType = captureType;
+    $('#packet-capture-error').addClass('d-none').removeClass('alert-warning').addClass('alert-danger').text('');
+    $('#packet-capture-success').addClass('d-none').text('');
+    $('#capture-type-selector').val(captureType);
+    $('#packet-capture-container').html('<p class="text-muted text-center"><i class="fas fa-spinner fa-spin"></i> Loading packet capture configuration...</p>');
+    $('#packetCaptureModal').modal('show');
+    loadPacketCaptureConfig(captureType);
+}
+
+$('#capture-type-selector').on('change', function() {
+    const captureType = $(this).val();
+    currentCaptureType = captureType;
+    loadPacketCaptureConfig(captureType);
+});
+
+function loadPacketCaptureConfig(captureType) {
+    $.ajax({
+        url: `/api/suricata-config/packet-capture/${captureType}`,
+        method: 'GET',
+        success: function(data) {
+            if (data.success) {
+                if (data.warning) {
+                    $('#packet-capture-error').removeClass('d-none').removeClass('alert-danger').addClass('alert-warning').text(data.warning);
+                } else {
+                    $('#packet-capture-error').addClass('d-none').removeClass('alert-warning').addClass('alert-danger');
+                }
+                packetCaptureConfig = data.config || {};
+                renderPacketCapture(captureType, packetCaptureConfig);
+            } else {
+                $('#packet-capture-error').removeClass('d-none').removeClass('alert-warning').addClass('alert-danger').text(data.message || 'Failed to load packet capture configuration');
+                $('#packet-capture-container').html('');
+            }
+        },
+        error: function(xhr) {
+            const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Failed to load packet capture configuration';
+            $('#packet-capture-error').removeClass('d-none').removeClass('alert-warning').addClass('alert-danger').text(message);
+            $('#packet-capture-container').html('');
+        }
+    });
+}
+
+function renderPacketCapture(captureType, config) {
+    packetCaptureConfig = config || {};
+    let html = '<div class="row g-3">';
+
+    if (captureType === 'af-packet') {
+        html += renderAfPacketFields(config);
+    } else if (captureType === 'af-xdp') {
+        html += renderAfXdpFields(config);
+    } else if (captureType === 'dpdk') {
+        html += renderDpdkFields(config);
+    } else if (captureType === 'pcap') {
+        html += renderPcapFields(config);
+    }
+
+    html += '</div>';
+    $('#packet-capture-container').html(html);
+}
+
+function renderAfPacketFields(config) {
+    const interfaceName = config.interface || '';
+    const threads = config.threads || 'auto';
+    const clusterId = config['cluster-id'] !== undefined ? config['cluster-id'] : 99;
+    const clusterType = config['cluster-type'] || 'cluster_flow';
+    const defrag = toBoolean(config.defrag, true);
+    const useMmap = toBoolean(config['use-mmap'], true);
+    const tpacketV3 = toBoolean(config['tpacket-v3'], true);
+    const promisc = toBoolean(config.promisc, true);
+
+    return `
+        <div class="col-md-6">
+            <label class="form-label">Interface</label>
+            <input type="text" class="form-control" id="capture-interface" value="${escapeHtml(interfaceName)}" placeholder="eth0">
+            <small class="text-muted">Network interface for AF-Packet capture.</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Threads</label>
+            <input type="text" class="form-control" id="capture-threads" value="${escapeHtml(threads)}" placeholder="auto">
+            <small class="text-muted">Number of reader threads (use <code>auto</code> to match CPU cores).</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Cluster ID</label>
+            <input type="number" class="form-control" id="capture-cluster-id" value="${escapeHtml(clusterId)}" placeholder="99">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Cluster Type</label>
+            <select class="form-select" id="capture-cluster-type">
+                ${['cluster_flow', 'cluster_cpu', 'cluster_qm'].map(option => `<option value="${option}"${option === clusterType ? ' selected' : ''}>${option}</option>`).join('')}
+            </select>
+        </div>
+        <div class="col-md-12">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" id="capture-defrag" ${defrag ? 'checked' : ''}>
+                        <label class="form-check-label" for="capture-defrag">Enable Defrag</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" id="capture-use-mmap" ${useMmap ? 'checked' : ''}>
+                        <label class="form-check-label" for="capture-use-mmap">Use mmap()</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" id="capture-tpacket-v3" ${tpacketV3 ? 'checked' : ''}>
+                        <label class="form-check-label" for="capture-tpacket-v3">TPACKET v3</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" id="capture-promisc" ${promisc ? 'checked' : ''}>
+                        <label class="form-check-label" for="capture-promisc">Promiscuous Mode</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderAfXdpFields(config) {
+    const interfaceName = config.interface || '';
+    const threads = config.threads || 'auto';
+    const busyPoll = toBoolean(config['enable-busy-poll'], true);
+    const busyPollTime = config['busy-poll-time'] || 20;
+    const busyPollBudget = config['busy-poll-budget'] || 64;
+
+    return `
+        <div class="col-md-6">
+            <label class="form-label">Interface</label>
+            <input type="text" class="form-control" id="capture-interface" value="${escapeHtml(interfaceName)}" placeholder="eth0">
+            <small class="text-muted">Network interface for AF-XDP capture.</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Threads</label>
+            <input type="text" class="form-control" id="capture-threads" value="${escapeHtml(threads)}" placeholder="auto">
+            <small class="text-muted">Number of reader threads.</small>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Busy Poll Time</label>
+            <input type="number" class="form-control" id="capture-busy-poll-time" value="${escapeHtml(busyPollTime)}" placeholder="20">
+            <small class="text-muted">Microseconds to busy poll.</small>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Busy Poll Budget</label>
+            <input type="number" class="form-control" id="capture-busy-poll-budget" value="${escapeHtml(busyPollBudget)}" placeholder="64">
+            <small class="text-muted">Number of packets to process per poll.</small>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check form-switch mt-4">
+                <input type="checkbox" class="form-check-input" id="capture-busy-poll" ${busyPoll ? 'checked' : ''}>
+                <label class="form-check-label" for="capture-busy-poll">Enable Busy Poll</label>
+            </div>
+        </div>
+    `;
+}
+
+function renderDpdkFields(config) {
+    const procType = config['eal-params'] ? config['eal-params']['proc-type'] || 'primary' : 'primary';
+
+    return `
+        <div class="col-md-12">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> DPDK configuration is advanced. Ensure your system has DPDK properly installed and configured.
+            </div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Process Type</label>
+            <select class="form-select" id="capture-proc-type">
+                <option value="primary"${procType === 'primary' ? ' selected' : ''}>Primary</option>
+                <option value="secondary"${procType === 'secondary' ? ' selected' : ''}>Secondary</option>
+            </select>
+            <small class="text-muted">DPDK process type.</small>
+        </div>
+        <div class="col-md-12">
+            <p class="text-muted"><i class="fas fa-info-circle"></i> For detailed DPDK configuration, please edit the Suricata YAML file directly.</p>
+        </div>
+    `;
+}
+
+function renderPcapFields(config) {
+    const interfaceName = config.interface || '';
+
+    return `
+        <div class="col-md-12">
+            <label class="form-label">Interface</label>
+            <input type="text" class="form-control" id="capture-interface" value="${escapeHtml(interfaceName)}" placeholder="eth0">
+            <small class="text-muted">Network interface for PCAP capture.</small>
+        </div>
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> PCAP is the legacy packet capture method. Consider using AF-Packet or AF-XDP for better performance.
+            </div>
+        </div>
+    `;
+}
+
+function savePacketCaptureConfig() {
+    $('#packet-capture-error').addClass('d-none').removeClass('alert-warning').addClass('alert-danger').text('');
+    $('#packet-capture-success').addClass('d-none').text('');
+
+    const $btn = $('#save-packet-capture-btn');
+    const originalHtml = $btn.html();
+    $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+
+    const payload = {};
+    const captureType = currentCaptureType;
+
+    if (captureType === 'af-packet') {
+        payload.interface = $('#capture-interface').val().trim();
+        payload.threads = $('#capture-threads').val().trim() || 'auto';
+        const clusterId = parseInt($('#capture-cluster-id').val(), 10);
+        if (!isNaN(clusterId)) payload['cluster-id'] = clusterId;
+        payload['cluster-type'] = $('#capture-cluster-type').val();
+        payload.defrag = $('#capture-defrag').is(':checked');
+        payload['use-mmap'] = $('#capture-use-mmap').is(':checked');
+        payload['tpacket-v3'] = $('#capture-tpacket-v3').is(':checked');
+        payload.promisc = $('#capture-promisc').is(':checked');
+    } else if (captureType === 'af-xdp') {
+        payload.interface = $('#capture-interface').val().trim();
+        payload.threads = $('#capture-threads').val().trim() || 'auto';
+        payload['enable-busy-poll'] = $('#capture-busy-poll').is(':checked');
+        const busyPollTime = parseInt($('#capture-busy-poll-time').val(), 10);
+        if (!isNaN(busyPollTime)) payload['busy-poll-time'] = busyPollTime;
+        const busyPollBudget = parseInt($('#capture-busy-poll-budget').val(), 10);
+        if (!isNaN(busyPollBudget)) payload['busy-poll-budget'] = busyPollBudget;
+    } else if (captureType === 'dpdk') {
+        payload['eal-params'] = {
+            'proc-type': $('#capture-proc-type').val()
+        };
+    } else if (captureType === 'pcap') {
+        payload.interface = $('#capture-interface').val().trim();
+    }
+
+    $.ajax({
+        url: `/api/suricata-config/packet-capture/${captureType}`,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ config: payload }),
+        success: function(data) {
+            if (data.success) {
+                packetCaptureConfig = payload;
+                $('#packet-capture-success').removeClass('d-none').text(data.message || 'Configuration saved.');
+                setTimeout(function() {
+                    $('#packetCaptureModal').modal('hide');
+                }, 1200);
+            } else {
+                $('#packet-capture-error').removeClass('d-none').removeClass('alert-warning').addClass('alert-danger').text(data.message || 'Failed to save packet capture configuration');
+            }
+        },
+        error: function(xhr) {
+            const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Failed to save packet capture configuration';
+            $('#packet-capture-error').removeClass('d-none').removeClass('alert-warning').addClass('alert-danger').text(message);
+        },
+        complete: function() {
+            $btn.prop('disabled', false).html(originalHtml);
+        }
+    });
+}
+
+$('#save-packet-capture-btn').off('click').on('click', savePacketCaptureConfig);
+
 // ==================== Stream Configuration ====================
 function openStreamModal() {
     $('#stream-error').addClass('d-none').removeClass('alert-warning').addClass('alert-danger').text('');
@@ -2521,6 +2802,8 @@ function renderInterfaces() {
         html += `<td><strong>${escapeHtml(iface.name)}</strong></td>`;
         html += `<td><select class="form-select form-select-sm interface-type" data-interface="${escapeHtml(iface.name)}">`;
         html += `<option value="af-packet"${isConfigured && isConfigured.type === 'af-packet' ? ' selected' : ''}>AF-Packet</option>`;
+        html += `<option value="af-xdp"${isConfigured && isConfigured.type === 'af-xdp' ? ' selected' : ''}>AF-XDP</option>`;
+        html += `<option value="dpdk"${isConfigured && isConfigured.type === 'dpdk' ? ' selected' : ''}>DPDK</option>`;
         html += `<option value="pcap"${isConfigured && isConfigured.type === 'pcap' ? ' selected' : ''}>PCAP</option>`;
         html += `</select></td>`;
         html += `<td class="text-muted small">${iface.ipv4 || '-'}</td>`;
@@ -2536,7 +2819,7 @@ function renderInterfaces() {
 
     // Info section
     html += '<div class="alert alert-info mt-3 mb-0">';
-    html += '<i class="fas fa-info-circle"></i> <strong>Tip:</strong> Select interfaces to monitor, choose capture type (AF-Packet or PCAP), and click settings to configure advanced options.';
+    html += '<i class="fas fa-info-circle"></i> <strong>Tip:</strong> Select interfaces to monitor, choose capture type (AF-Packet, AF-XDP, DPDK, or PCAP), and click settings to configure advanced options.';
     html += '</div>';
 
     $('#interface-container').html(html);
@@ -2561,7 +2844,7 @@ function showInterfaceSettings(ifaceName) {
     const configured = configuredInterfaces.find(c => c.interface === ifaceName) || {};
     const type = $(`.interface-type[data-interface="${ifaceName}"]`).val();
 
-    let settingsHtml = `<div class="modal-body"><h6>Settings for ${ifaceName}</h6>`;
+    let settingsHtml = `<div class="modal-body"><h6>Settings for ${ifaceName} (${type.toUpperCase()})</h6>`;
 
     if (type === 'af-packet') {
         settingsHtml += '<div class="mb-3">';
@@ -2579,6 +2862,28 @@ function showInterfaceSettings(ifaceName) {
         settingsHtml += `<option value="cluster_cpu"${configured['cluster-type'] === 'cluster_cpu' ? ' selected' : ''}>Cluster CPU</option>`;
         settingsHtml += `<option value="cluster_qm"${configured['cluster-type'] === 'cluster_qm' ? ' selected' : ''}>Cluster QM</option>`;
         settingsHtml += `</select></div>`;
+    } else if (type === 'af-xdp') {
+        settingsHtml += '<div class="mb-3">';
+        settingsHtml += '<label class="form-label">Threads</label>';
+        settingsHtml += `<input type="text" class="form-control" id="iface-threads" value="${configured.threads || 'auto'}" placeholder="auto">`;
+        settingsHtml += '<small class="text-muted">Number of reader threads</small>';
+        settingsHtml += '</div>';
+        settingsHtml += '<div class="alert alert-info">';
+        settingsHtml += '<i class="fas fa-info-circle"></i> AF-XDP requires kernel 4.18+ and proper XDP support.';
+        settingsHtml += '</div>';
+    } else if (type === 'dpdk') {
+        settingsHtml += '<div class="mb-3">';
+        settingsHtml += '<label class="form-label">Threads</label>';
+        settingsHtml += `<input type="text" class="form-control" id="iface-threads" value="${configured.threads || 'auto'}" placeholder="auto">`;
+        settingsHtml += '<small class="text-muted">Number of reader threads</small>';
+        settingsHtml += '</div>';
+        settingsHtml += '<div class="alert alert-warning">';
+        settingsHtml += '<i class="fas fa-exclamation-triangle"></i> DPDK requires proper DPDK installation and configuration.';
+        settingsHtml += '</div>';
+    } else if (type === 'pcap') {
+        settingsHtml += '<div class="alert alert-info">';
+        settingsHtml += '<i class="fas fa-info-circle"></i> PCAP is the legacy packet capture method. No additional settings required.';
+        settingsHtml += '</div>';
     }
 
     settingsHtml += `<button class="btn btn-primary" onclick="saveInterfaceSettings('${ifaceName}', '${type}')">Save</button>`;
@@ -2596,21 +2901,26 @@ function showInterfaceSettings(ifaceName) {
 function saveInterfaceSettings(ifaceName, type) {
     const existing = configuredInterfaces.find(c => c.interface === ifaceName);
 
-    if (type === 'af-packet') {
-        const settings = {
-            interface: ifaceName,
-            type: type,
-            enabled: true,
-            threads: $('#iface-threads').val() || 'auto',
-            'cluster-id': parseInt($('#iface-cluster-id').val()) || 99,
-            'cluster-type': $('#iface-cluster-type').val() || 'cluster_flow'
-        };
+    const settings = {
+        interface: ifaceName,
+        type: type,
+        enabled: true
+    };
 
-        if (existing) {
-            Object.assign(existing, settings);
-        } else {
-            configuredInterfaces.push(settings);
-        }
+    if (type === 'af-packet') {
+        settings.threads = $('#iface-threads').val() || 'auto';
+        settings['cluster-id'] = parseInt($('#iface-cluster-id').val()) || 99;
+        settings['cluster-type'] = $('#iface-cluster-type').val() || 'cluster_flow';
+    } else if (type === 'af-xdp' || type === 'dpdk') {
+        settings.threads = $('#iface-threads').val() || 'auto';
+    } else if (type === 'pcap') {
+        // PCAP has no additional settings
+    }
+
+    if (existing) {
+        Object.assign(existing, settings);
+    } else {
+        configuredInterfaces.push(settings);
     }
 
     $(`.interface-settings-btn[data-interface="${ifaceName}"]`).closest('tr').next('.settings-row').remove();
@@ -2634,14 +2944,23 @@ function saveInterfaceConfig() {
         if (existing) {
             interfaces.push(existing);
         } else {
-            interfaces.push({
+            // Default settings based on capture type
+            const defaultSettings = {
                 interface: ifaceName,
                 type: type,
-                enabled: true,
-                threads: 'auto',
-                'cluster-id': 99,
-                'cluster-type': 'cluster_flow'
-            });
+                enabled: true
+            };
+
+            if (type === 'af-packet') {
+                defaultSettings.threads = 'auto';
+                defaultSettings['cluster-id'] = 99;
+                defaultSettings['cluster-type'] = 'cluster_flow';
+            } else if (type === 'af-xdp' || type === 'dpdk') {
+                defaultSettings.threads = 'auto';
+            }
+            // PCAP doesn't need additional settings
+
+            interfaces.push(defaultSettings);
         }
     });
 

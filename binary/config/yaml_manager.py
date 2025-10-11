@@ -42,10 +42,21 @@ class YAMLConfigManager:
         return self.app_layer.update_protocol(protocol, enabled, settings)
 
     # Capture -----------------------------------------------------------
+    def get_packet_capture_config(self, capture_type: str = "af-packet") -> Dict[str, Any]:
+        """Get packet capture configuration for a specific capture type."""
+        return self.capture.get_packet_capture_config(capture_type)
+
+    def update_packet_capture_config(self, capture_type: str, settings: Dict[str, Any]) -> bool:
+        """Update packet capture configuration for a specific capture type."""
+        return self.capture.update_packet_capture_config(capture_type, settings)
+
+    # Backward compatibility for AF-Packet
     def get_af_packet_config(self) -> Dict[str, Any]:
+        """Legacy method for backward compatibility."""
         return self.capture.get_af_packet_config()
 
     def update_af_packet_config(self, settings: Dict[str, Any]) -> bool:
+        """Legacy method for backward compatibility."""
         return self.capture.update_af_packet_config(settings)
 
     def get_interfaces(self) -> List[Dict[str, Any]]:
