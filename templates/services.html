@@ -1,27 +1,28 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block content %}
 <div class="row">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h5><i class="fas fa-cogs"></i> Service Control</h5>
+                <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Suricata Controll</h5>
             </div>
             <div class="card-body">
-                <div class="d-grid gap-2">
-                    <button class="btn btn-success" id="start-btn">
+                <div class="d-flex flex-column flex-md-row gap-2" role="group" aria-label="Suricata Controll">
+                    <button class="btn btn-success flex-fill" id="start-btn">
                         <i class="fas fa-play"></i> Start
                     </button>
-                    <button class="btn btn-danger" id="stop-btn">
+                    <button class="btn btn-danger flex-fill" id="stop-btn">
                         <i class="fas fa-stop"></i> Stop
                     </button>
-                    <button class="btn btn-warning" id="restart-btn">
+                    <button class="btn btn-warning flex-fill" id="restart-btn">
                         <i class="fas fa-redo"></i> Restart
                     </button>
                 </div>
             </div>
         </div>
     </div>
+
 
     <div class="col-md-6">
         <div class="card">
@@ -143,3 +144,4 @@ $('#reset-counter-btn').click(function() {
 });
 </script>
 {% endblock %}
+

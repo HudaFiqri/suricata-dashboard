@@ -11,6 +11,12 @@ except ImportError:
     HAS_RRDTOOL = False
     print("WARNING: python-rrdtool not installed. Monitoring features will be disabled.")
 
+
+def _is_reloader_process():
+    """Check if running in Flask reloader child process"""
+    return os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+
+
 class SuricataRRDManager:
     """Manager for RRDtool-based metrics collection and graphing"""
 
@@ -52,11 +58,22 @@ class SuricataRRDManager:
             'alerts': self.alerts_rrd
         }
 
-        for name, rrd_file in rrd_files.items():
-            if not os.path.exists(rrd_file):
-                self._create_rrd(rrd_file, name)
+        if not _is_reloader_process():
+            files_created = []
+            for name, rrd_file in rrd_files.items():
+                if not os.path.exists(rrd_file):
+                    self._create_rrd(rrd_file, name)
+                    files_created.append(name.upper())
+
+            if files_created:
+                print(f"[RRD] Created databases: {', '.join(files_created)}")
             else:
-                print(f"RRD database already exists: {rrd_file}")
+                print(f"[RRD] All databases already exist")
+        else:
+            # Still create files if needed, just don't log
+            for name, rrd_file in rrd_files.items():
+                if not os.path.exists(rrd_file):
+                    self._create_rrd(rrd_file, name)
 
     def regenerate_rrd_databases(self):
         """Force regenerate all RRD databases"""
@@ -124,9 +141,8 @@ class SuricataRRDManager:
                     'RRA:MAX:0.5:5:2016',        # 5 min max for 7 days
                     'RRA:MAX:0.5:60:744'         # 1 hour max for 31 days
                 )
-            print(f"Created RRD database: {rrd_file}")
         except Exception as e:
-            print(f"Error creating RRD {rrd_file}: {e}")
+            print(f"[RRD] Error creating {name.upper()}: {e}")
 
     def update_metrics(self):
         """Update RRD databases with current metrics from database"""

@@ -10,6 +10,10 @@ SQLAlchemy==2.0.23
 PyMySQL==1.1.0
 psycopg2-binary==2.9.9
 
+# Integration dependencies
+requests==2.32.5
+rrdtool==0.1.16
+
 # Optional: RRDtool (requires system librrd-dev)
 # Install with: apt-get install librrd-dev (Debian/Ubuntu)
 # or: yum install rrdtool-devel (RHEL/CentOS)

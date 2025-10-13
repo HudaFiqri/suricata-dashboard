@@ -124,3 +124,25 @@ class TrafficStats(Base):
             'alert_count': self.alert_count,
             'interval_seconds': self.interval_seconds
         }
+
+class IntegrationConfig(Base):
+    """Model for integration configuration hashes."""
+    __tablename__ = 'integration_config'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(64), unique=True, nullable=False, index=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+    config_hash = Column(String(32), nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<IntegrationConfig(name='{self.name}', hash='{self.config_hash}')>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'enabled': self.enabled,
+            'config_hash': self.config_hash,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
