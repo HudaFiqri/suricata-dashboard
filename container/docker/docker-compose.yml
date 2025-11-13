@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # Suricata Dashboard Application
+  dashboard:
+    build:
+      context: ..
+      dockerfile: container/Dockerfile
+    container_name: suricata-dashboard
+    restart: unless-stopped
+    ports:
+      - "${FLASK_PORT:-5000}:5000"
+    environment:
+      # Flask Configuration
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 5000
+      FLASK_DEBUG: ${FLASK_DEBUG:-False}
+
+      # Dashboard Settings
+      DASHBOARD_NAME: ${DASHBOARD_NAME:-Suricata Dashboard}
+      TRAFFIC_AGGREGATION_INTERVAL: ${TRAFFIC_AGGREGATION_INTERVAL:-300}
+      DB_STORE_TIME: ${DB_STORE_TIME:-60}
+
+      # Suricata Paths (mounted from host)
+      SURICATA_BINARY_PATH: ${SURICATA_BINARY_PATH:-suricata}
+      SURICATA_CONFIG_PATH: ${SURICATA_CONFIG_PATH:-/etc/suricata/suricata.yaml}
+      SURICATA_RULES_DIR: ${SURICATA_RULES_DIR:-/etc/suricata/rules}
+      SURICATA_LOG_DIR: ${SURICATA_LOG_DIR:-/var/log/suricata}
+
+      # RRD Settings
+      RRD_DIR: /var/lib/suricata/rrd
+
+      # Database Configuration
+      DB_TYPE: ${DB_TYPE:-postgresql}
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-suricata}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_NAME: ${DB_NAME:-suricata}
+      DB_RETENTION_DAYS: ${DB_RETENTION_DAYS:-30}
+
+      # Application Storage
+      APP_DATA_DIR: /opt/suricata_monitoring/data
+      APP_LOG_DIR: /opt/suricata_monitoring/log
+
+      # Optional Features
+      AUTO_REFRESH_INTERVAL: ${AUTO_REFRESH_INTERVAL:-5000}
+      LOG_LINES_LIMIT: ${LOG_LINES_LIMIT:-100}
+      MAX_RULE_FILE_SIZE: ${MAX_RULE_FILE_SIZE:-1048576}
+      AUTO_RESTART_ENABLED: ${AUTO_RESTART_ENABLED:-False}
+      AUTO_RESTART_MAX_RETRIES: ${AUTO_RESTART_MAX_RETRIES:-3}
+      AUTO_RESTART_CHECK_INTERVAL: ${AUTO_RESTART_CHECK_INTERVAL:-30}
+
+      # SSL/TLS (optional)
+      USE_HTTPS: ${USE_HTTPS:-False}
+      SSL_CERT_PATH: ${SSL_CERT_PATH:-binary/certificates/cert.pem}
+      SSL_KEY_PATH: ${SSL_KEY_PATH:-binary/certificates/key.pem}
+
+    volumes:
+      # Suricata configuration and logs (read-only recommended)
+      - ${HOST_SURICATA_CONFIG:-/etc/suricata}:/etc/suricata:ro
+      - ${HOST_SURICATA_LOG:-/var/log/suricata}:/var/log/suricata:ro
+
+      # Application data persistence
+      - dashboard-data:/opt/suricata_monitoring/data
+      - dashboard-logs:/opt/suricata_monitoring/log
+      - dashboard-rrd:/var/lib/suricata/rrd
+
+      # Optional: SSL certificates
+      # - ./certificates:/app/binary/certificates:ro
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - suricata-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: suricata-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-suricata}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:-suricata}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - suricata-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-suricata}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Uncomment to expose PostgreSQL port (for debugging)
+    # ports:
+    #   - "5432:5432"
+
+  # Optional: MySQL/MariaDB Database
+  # Uncomment this section and comment out postgres if you prefer MySQL
+  # mysql:
+  #   image: mysql:8.0
+  #   container_name: suricata-mysql
+  #   restart: unless-stopped
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-changeme}
+  #     MYSQL_DATABASE: ${DB_NAME:-suricata}
+  #     MYSQL_USER: ${DB_USER:-suricata}
+  #     MYSQL_PASSWORD: ${DB_PASSWORD:-changeme}
+  #   volumes:
+  #     - mysql-data:/var/lib/mysql
+  #   networks:
+  #     - suricata-network
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  postgres-data:
+    driver: local
+  # mysql-data:
+  #   driver: local
+  dashboard-data:
+    driver: local
+  dashboard-logs:
+    driver: local
+  dashboard-rrd:
+    driver: local
+
+networks:
+  suricata-network:
+    driver: bridge

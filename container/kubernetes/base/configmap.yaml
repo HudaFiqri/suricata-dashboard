@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-config
+  namespace: suricata-monitoring
+  labels:
+    app: suricata-dashboard
+data:
+  # Flask Configuration
+  FLASK_HOST: "0.0.0.0"
+  FLASK_PORT: "5000"
+  FLASK_DEBUG: "False"
+
+  # Dashboard Settings
+  DASHBOARD_NAME: "Suricata Dashboard"
+  TRAFFIC_AGGREGATION_INTERVAL: "300"
+  DB_STORE_TIME: "60"
+
+  # Suricata Paths
+  SURICATA_BINARY_PATH: "suricata"
+  SURICATA_CONFIG_PATH: "/etc/suricata/suricata.yaml"
+  SURICATA_RULES_DIR: "/etc/suricata/rules"
+  SURICATA_LOG_DIR: "/var/log/suricata"
+
+  # RRD Settings
+  RRD_DIR: "/var/lib/suricata/rrd"
+
+  # Database Configuration
+  DB_TYPE: "postgresql"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_USER: "suricata"
+  DB_NAME: "suricata"
+  DB_RETENTION_DAYS: "30"
+
+  # Application Storage
+  APP_DATA_DIR: "/opt/suricata_monitoring/data"
+  APP_LOG_DIR: "/opt/suricata_monitoring/log"
+
+  # Optional Features
+  AUTO_REFRESH_INTERVAL: "5000"
+  LOG_LINES_LIMIT: "100"
+  MAX_RULE_FILE_SIZE: "1048576"
+  AUTO_RESTART_ENABLED: "False"
+  AUTO_RESTART_MAX_RETRIES: "3"
+  AUTO_RESTART_CHECK_INTERVAL: "30"
+
+  # SSL/TLS
+  USE_HTTPS: "False"
+  SSL_CERT_PATH: "binary/certificates/cert.pem"
+  SSL_KEY_PATH: "binary/certificates/key.pem"

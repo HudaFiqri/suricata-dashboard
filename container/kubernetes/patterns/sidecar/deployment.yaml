@@ -1,0 +1,300 @@
+# Pattern 4: Sidecar - Suricata + Dashboard in Same Pod
+#
+# Use case: Fully containerized solution, Suricata dan Dashboard dalam 1 pod
+# Requires: Suricata container image
+#
+# Prerequisites:
+# 1. Network interface accessible dari pod (untuk packet capture)
+# 2. Privileged mode atau CAP_NET_RAW capability
+# 3. Host network mode (recommended untuk Suricata)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: suricata-stack
+  namespace: suricata-monitoring
+  labels:
+    app: suricata-stack
+    pattern: sidecar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: suricata-stack
+  template:
+    metadata:
+      labels:
+        app: suricata-stack
+        pattern: sidecar
+    spec:
+      # Use host network for Suricata to capture traffic
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+
+      # Node selector jika ingin pin ke specific node
+      # nodeSelector:
+      #   network-monitoring: enabled
+
+      securityContext:
+        fsGroup: 1000
+
+      # Init container untuk setup
+      initContainers:
+      - name: init-suricata
+        image: jasonish/suricata:latest
+        command:
+        - sh
+        - -c
+        - |
+          echo "Initializing Suricata configuration..."
+          if [ ! -f /etc/suricata/suricata.yaml ]; then
+            cp -r /etc/suricata.dist/* /etc/suricata/
+          fi
+          echo "Updating rules..."
+          suricata-update || true
+          echo "Initialization complete"
+        volumeMounts:
+        - name: suricata-config
+          mountPath: /etc/suricata
+        - name: suricata-rules
+          mountPath: /var/lib/suricata/rules
+
+      containers:
+      # Suricata Container
+      - name: suricata
+        image: jasonish/suricata:latest
+        command:
+        - suricata
+        - -c
+        - /etc/suricata/suricata.yaml
+        - -i
+        - eth0  # Change to your interface
+        - --pidfile
+        - /var/run/suricata.pid
+        - -v
+
+        securityContext:
+          # Suricata needs network privileges
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+            - SYS_NICE
+          # Alternative: Use privileged (less secure)
+          # privileged: true
+
+        env:
+        - name: SURICATA_OPTIONS
+          value: "-v"
+
+        volumeMounts:
+        - name: suricata-config
+          mountPath: /etc/suricata
+        - name: suricata-logs
+          mountPath: /var/log/suricata
+        - name: suricata-rules
+          mountPath: /var/lib/suricata/rules
+        - name: suricata-run
+          mountPath: /var/run
+
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "kill -0 $(cat /var/run/suricata.pid)"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "test -f /var/log/suricata/eve.json"
+          initialDelaySeconds: 20
+          periodSeconds: 5
+
+      # Dashboard Container
+      - name: dashboard
+        image: ghcr.io/yourusername/suricata-dashboard:latest  # Change this!
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 5000
+          name: http
+
+        envFrom:
+        - configMapRef:
+            name: dashboard-config
+
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dashboard-secrets
+              key: DB_PASSWORD
+
+        # Pod info
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+
+        volumeMounts:
+        # Shared volumes with Suricata
+        - name: suricata-logs
+          mountPath: /var/log/suricata
+          readOnly: true
+
+        - name: suricata-config
+          mountPath: /etc/suricata
+
+        # Dashboard data
+        - name: app-data
+          mountPath: /opt/suricata_monitoring/data
+
+        - name: app-logs
+          mountPath: /opt/suricata_monitoring/log
+
+        - name: rrd-data
+          mountPath: /var/lib/suricata/rrd
+
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+
+      volumes:
+      # Shared volume untuk Suricata config
+      - name: suricata-config
+        persistentVolumeClaim:
+          claimName: suricata-config-pvc
+
+      # Shared volume untuk logs (emptyDir karena ephemeral)
+      - name: suricata-logs
+        emptyDir:
+          sizeLimit: 10Gi
+
+      # Suricata rules
+      - name: suricata-rules
+        persistentVolumeClaim:
+          claimName: suricata-rules-pvc
+
+      # Suricata PID file
+      - name: suricata-run
+        emptyDir: {}
+
+      # Dashboard data
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: dashboard-data-pvc
+
+      - name: app-logs
+        persistentVolumeClaim:
+          claimName: dashboard-logs-pvc
+
+      - name: rrd-data
+        persistentVolumeClaim:
+          claimName: dashboard-rrd-pvc
+
+---
+# PersistentVolumeClaims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: suricata-config-pvc
+  namespace: suricata-monitoring
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: suricata-rules-pvc
+  namespace: suricata-monitoring
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dashboard-data-pvc
+  namespace: suricata-monitoring
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dashboard-logs-pvc
+  namespace: suricata-monitoring
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dashboard-rrd-pvc
+  namespace: suricata-monitoring
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
