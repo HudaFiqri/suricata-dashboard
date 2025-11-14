@@ -1,21 +1,43 @@
-# Core dependencies
-Flask==2.3.3
-psutil==5.9.5
-PyYAML==6.0.1
-Werkzeug==2.3.7
-python-dotenv==1.0.0
+# Suricata Dashboard Dependencies
 
-# Database dependencies
-SQLAlchemy==2.0.23
-PyMySQL==1.1.0
-psycopg2-binary==2.9.9
+# Flask Framework
+Flask>=3.0.0
+Flask-SocketIO>=5.3.0
+Flask-CORS>=4.0.0
+Werkzeug>=3.0.0
 
-# Integration dependencies
-requests==2.32.5
-rrdtool==0.1.16
+# WSGI Server
+gunicorn>=21.2.0
+gevent>=23.9.1
+eventlet>=0.33.3
 
-# Optional: RRDtool (requires system librrd-dev)
-# Install with: apt-get install librrd-dev (Debian/Ubuntu)
+# Database - PostgreSQL
+psycopg2-binary>=2.9.9
+SQLAlchemy>=2.0.23
+
+# Database - MongoDB
+pymongo>=4.6.0
+
+# Authentication & Security
+PyJWT>=2.8.0
+bcrypt>=4.1.2
+cryptography>=41.0.0
+
+# HTTP Client
+requests>=2.31.0
+
+# Data Processing
+PyYAML>=6.0.0
+python-dateutil>=2.8.2
+
+# Monitoring & Metrics
+prometheus-client>=0.19.0
+psutil>=5.9.0
+
+# Development
+python-dotenv>=1.0.0
+
+# Optional: RRDtool (legacy support)
+# rrdtool==0.1.16
+# Install system libs first: apt-get install librrd-dev (Debian/Ubuntu)
 # or: yum install rrdtool-devel (RHEL/CentOS)
-# then: pip install rrdtool==0.1.16
-# If not installed, monitoring features will be disabled but app will still work

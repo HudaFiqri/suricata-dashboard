@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-config
+  namespace: suricata
+data:
+  FLASK_HOST: "0.0.0.0"
+  FLASK_PORT: "5000"
+  FLASK_DEBUG: "False"
+  POSTGRES_HOST: postgresql
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: suricata_dashboard
+  POSTGRES_USER: suricata
+  MONGO_HOST: mongodb
+  MONGO_PORT: "27017"
+  MONGO_DB: suricata
+  JWT_EXPIRATION_HOURS: "24"
+  EVENTS_RETENTION_DAYS: "90"
+  LOGS_RETENTION_DAYS: "30"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dashboard-secret
+  namespace: suricata
+type: Opaque
+stringData:
+  SECRET_KEY: change-me-in-production
+  JWT_SECRET_KEY: change-me-in-production
+  POSTGRES_PASSWORD: suricata123
+  MONGO_USER: ""
+  MONGO_PASSWORD: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: suricata
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+      - name: dashboard
+        image: suricata-dashboard:latest  # Build and push your image
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: dashboard-config
+        - secretRef:
+            name: dashboard-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 5000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: suricata
+spec:
+  selector:
+    app: dashboard
+  ports:
+  - port: 80
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  type: LoadBalancer  # Or ClusterIP if using Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard-ingress
+  namespace: suricata
+  annotations:
+    nginx.ingress.kubernetes.io/websocket-services: dashboard
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    cert-manager.io/cluster-issuer: letsencrypt-prod  # If using cert-manager
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: suricata.example.com  # Change to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dashboard
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - suricata.example.com
+    secretName: dashboard-tls

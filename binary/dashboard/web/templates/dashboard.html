@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Suricata Multi-Agent{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">Multi-Agent Dashboard</h2>
+
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Total Agents</h6>
+                        <h3 class="mb-0" id="total-agents">-</h3>
+                    </div>
+                    <div class="text-primary">
+                        <i class="fas fa-server fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Online</h6>
+                        <h3 class="mb-0 text-success" id="online-agents">-</h3>
+                    </div>
+                    <div class="text-success">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Events (24h)</h6>
+                        <h3 class="mb-0" id="total-events">-</h3>
+                    </div>
+                    <div class="text-warning">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Critical Alerts</h6>
+                        <h3 class="mb-0 text-danger" id="critical-alerts">-</h3>
+                    </div>
+                    <div class="text-danger">
+                        <i class="fas fa-bell fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent List -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Active Agents</h5>
+                    <a href="/agents" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> Add Agent
+                    </a>
+                </div>
+                <div id="agents-grid" class="row">
+                    <!-- Agents will be loaded here -->
+                    <div class="col-12 text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Loading agents...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Events -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="stat-card">
+                <h5 class="mb-3">Recent Events (All Agents)</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Agent</th>
+                                <th>Type</th>
+                                <th>Severity</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-events">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading events...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="col-md-4">
+            <div class="stat-card">
+                <h5 class="mb-3">Event Types (24h)</h5>
+                <canvas id="event-types-chart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let agentsData = [];
+let eventTypesChart = null;
+
+// Load dashboard data
+async function loadDashboard() {
+    try {
+        // Load summary stats
+        const stats = await apiCall('/stats/summary');
+        if (stats.success) {
+            $('#total-agents').text(stats.data.total_agents || 0);
+            $('#online-agents').text(stats.data.online_agents || 0);
+            $('#total-events').text(formatNumber(stats.data.events_24h || 0));
+            $('#critical-alerts').text(stats.data.critical_alerts || 0);
+        }
+
+        // Load agents
+        const agents = await apiCall('/agents');
+        if (agents.success) {
+            agentsData = agents.agents;
+            renderAgents(agents.agents);
+        }
+
+        // Load recent events
+        loadRecentEvents();
+
+        // Load event types chart
+        loadEventTypesChart();
+
+    } catch (error) {
+        console.error('Failed to load dashboard:', error);
+    }
+}
+
+// Render agent cards
+function renderAgents(agents) {
+    if (agents.length === 0) {
+        $('#agents-grid').html(`
+            <div class="col-12 text-center py-5">
+                <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                <p class="text-muted">No agents registered yet</p>
+                <a href="/agents" class="btn btn-primary">Add Your First Agent</a>
+            </div>
+        `);
+        return;
+    }
+
+    let html = '';
+    agents.forEach(agent => {
+        const statusClass = agent.status === 'online' ? 'success' :
+                           agent.status === 'offline' ? 'danger' : 'warning';
+        const statusIcon = agent.status === 'online' ? 'check-circle' :
+                          agent.status === 'offline' ? 'times-circle' : 'clock';
+
+        html += `
+            <div class="col-md-4 mb-3">
+                <div class="card agent-card h-100" onclick="window.location.href='/agents/${agent.id}'">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title mb-0">${agent.name}</h6>
+                            <span class="badge bg-${statusClass}">
+                                <i class="fas fa-${statusIcon}"></i> ${agent.status}
+                            </span>
+                        </div>
+                        <p class="text-muted small mb-2">
+                            <i class="fas fa-network-wired"></i> ${agent.hostname}
+                        </p>
+                        ${agent.ip_address ? `
+                        <p class="text-muted small mb-2">
+                            <i class="fas fa-globe"></i> ${agent.ip_address}
+                        </p>
+                        ` : ''}
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-clock"></i>
+                                ${agent.last_seen ? formatTimeAgo(agent.last_seen) : 'Never'}
+                            </small>
+                            ${agent.tags && agent.tags.length > 0 ? `
+                            <div>
+                                ${agent.tags.map(tag => `<span class="badge bg-secondary">${tag}</span>`).join(' ')}
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    $('#agents-grid').html(html);
+}
+
+// Load recent events
+async function loadRecentEvents() {
+    try {
+        const response = await apiCall('/query/events', 'POST', {
+            limit: 10,
+            sort: { field: 'timestamp', order: 'desc' }
+        });
+
+        if (response.success && response.events.length > 0) {
+            let html = '';
+            response.events.forEach(event => {
+                const severity = event.indexed?.severity || 3;
+                const severityClass = severity === 1 ? 'danger' :
+                                     severity === 2 ? 'warning' : 'info';
+
+                html += `
+                    <tr>
+                        <td>${formatTime(event.timestamp)}</td>
+                        <td>${event.agent_name}</td>
+                        <td><span class="badge bg-secondary">${event.event_type}</span></td>
+                        <td><span class="badge bg-${severityClass}">${severity}</span></td>
+                        <td class="text-truncate" style="max-width: 300px;">
+                            ${event.raw_event?.alert?.signature || 'N/A'}
+                        </td>
+                    </tr>
+                `;
+            });
+            $('#recent-events').html(html);
+        } else {
+            $('#recent-events').html('<tr><td colspan="5" class="text-center text-muted">No recent events</td></tr>');
+        }
+    } catch (error) {
+        console.error('Failed to load events:', error);
+    }
+}
+
+// Load event types chart
+async function loadEventTypesChart() {
+    // Placeholder data - should come from API
+    const ctx = document.getElementById('event-types-chart');
+    eventTypesChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Alert', 'HTTP', 'DNS', 'TLS', 'Flow'],
+            datasets: [{
+                data: [45, 25, 15, 10, 5],
+                backgroundColor: [
+                    '#dc3545',
+                    '#0dcaf0',
+                    '#198754',
+                    '#ffc107',
+                    '#6c757d'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// Update agent status from WebSocket
+function updateAgentStatus(agentId, status) {
+    const agent = agentsData.find(a => a.id === agentId);
+    if (agent) {
+        agent.status = status;
+        agent.last_seen = new Date().toISOString();
+        renderAgents(agentsData);
+
+        // Update counts
+        const onlineCount = agentsData.filter(a => a.status === 'online').length;
+        $('#online-agents').text(onlineCount);
+    }
+}
+
+// Handle new events
+function handleNewEvent(data) {
+    // Increment event count
+    const current = parseInt($('#total-events').text().replace(/,/g, '')) || 0;
+    $('#total-events').text(formatNumber(current + 1));
+
+    // Reload recent events
+    loadRecentEvents();
+}
+
+// Helper functions
+function formatNumber(num) {
+    return num.toLocaleString();
+}
+
+function formatTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString();
+}
+
+function formatTimeAgo(timestamp) {
+    const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+// Subscribe to WebSocket channels
+socket.on('connect', function() {
+    socket.emit('subscribe', { channel: 'events' });
+    socket.emit('subscribe', { channel: 'alerts' });
+});
+
+// Load dashboard on page load
+$(document).ready(function() {
+    loadDashboard();
+
+    // Refresh every 30 seconds
+    setInterval(loadDashboard, 30000);
+});
+</script>
+{% endblock %}

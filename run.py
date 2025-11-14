@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+"""
+Development Server Runner
+For production, use wsgi.py with gunicorn
+"""
 
 import sys
 import os
-from config import Config
 
 def check_dependencies():
     """Check if optional dependencies are installed"""
@@ -43,18 +46,24 @@ def check_dependencies():
 
     # Check other required packages
     required = {
-        'Flask': 'Flask==2.3.3',
-        'psutil': 'psutil==5.9.5',
-        'yaml': 'PyYAML==6.0.1'
+        'flask': 'Flask',
+        'flask_socketio': 'Flask-SocketIO',
+        'flask_cors': 'Flask-CORS',
+        'psutil': 'psutil',
+        'yaml': 'PyYAML',
+        'pymongo': 'pymongo',
+        'jwt': 'PyJWT',
+        'bcrypt': 'bcrypt',
+        'gevent': 'gevent'
     }
 
     for module, package in required.items():
         try:
-            __import__(module.lower() if module != 'yaml' else 'yaml')
-            print(f"✓ {module} is installed")
+            __import__(module)
+            print(f"✓ {package} is installed")
         except ImportError:
             missing.append({
-                'name': module,
+                'name': package,
                 'install': f'pip install {package}'
             })
 
@@ -91,7 +100,7 @@ def main():
     # Only show startup banner on main process (not reloader)
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         print("\n" + "=" * 60)
-        print("           Suricata Web Dashboard")
+        print("     Suricata Dashboard - Remote Monitoring")
         print("=" * 60)
         print("\nChecking dependencies...")
         print("-" * 60)
@@ -101,24 +110,27 @@ def main():
             sys.exit(1)
 
         print("\n" + "=" * 60)
-        print("Starting Flask development server...")
-        try:
-            host = getattr(Config, 'FLASK_HOST', '0.0.0.0')
-            port = int(getattr(Config, 'FLASK_PORT', 5000))
-        except Exception:
-            host = '0.0.0.0'
-            port = 5000
+        print("Starting development server with WebSocket support...")
+        host = os.getenv('FLASK_HOST', '0.0.0.0')
+        port = int(os.getenv('FLASK_PORT', 5000))
         print(f"Dashboard will be available at: http://{host}:{port}")
-        print("Press Ctrl+C to stop the server")
+        print("WebSocket endpoints:")
+        print(f"  - Agent:  ws://{host}:{port}/ws/v1/agent")
+        print(f"  - UI:     ws://{host}:{port}/ws/v1/ui")
+        print("\nPress Ctrl+C to stop the server")
         print("=" * 60 + "\n")
 
     try:
-        from app import app
-        app.run(
-            debug=Config.FLASK_DEBUG,
-            host=Config.FLASK_HOST,
-            port=Config.FLASK_PORT,
-            use_debugger=False,
+        from binary.dashboard import create_app
+
+        app, socketio = create_app()
+
+        # Run with SocketIO (supports WebSocket)
+        socketio.run(
+            app,
+            host=os.getenv('FLASK_HOST', '0.0.0.0'),
+            port=int(os.getenv('FLASK_PORT', 5000)),
+            debug=os.getenv('FLASK_DEBUG', 'False').lower() == 'true',
             use_reloader=True
         )
     except KeyboardInterrupt:
@@ -126,6 +138,8 @@ def main():
         sys.exit(0)
     except Exception as e:
         print(f"\nError starting server: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":

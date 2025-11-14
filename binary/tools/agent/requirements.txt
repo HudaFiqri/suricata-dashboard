@@ -1,0 +1,21 @@
+# Suricata Dashboard Agent Dependencies
+
+# Core
+requests>=2.31.0
+PyYAML>=6.0.0
+
+# File monitoring
+watchdog>=3.0.0
+
+# WebSocket
+websocket-client>=1.6.0
+python-socketio[client]>=5.10.0
+
+# Encryption
+cryptography>=41.0.0
+
+# Database (local buffer)
+# SQLite is built-in to Python
+
+# System monitoring
+psutil>=5.9.0
