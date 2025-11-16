@@ -144,14 +144,7 @@
         let isConnected = false;
 
         function connectWebSocket() {
-            // Get JWT token from localStorage
-            const token = localStorage.getItem('jwt_token');
-
-            if (!token) {
-                window.location.href = '/login';
-                return;
-            }
-
+            // Public access mode - no authentication required
             // Connect to UI namespace
             socket = io('/ws/v1/ui', {
                 transports: ['websocket', 'polling'],
@@ -165,25 +158,13 @@
                 isConnected = true;
                 $('#connection-status').html('<i class="fas fa-circle text-success"></i> Connected');
 
-                // Authenticate
-                socket.emit('auth', {
-                    token: token
-                });
+                // No authentication required in public mode
             });
 
             socket.on('disconnect', function() {
                 console.log('WebSocket disconnected');
                 isConnected = false;
                 $('#connection-status').html('<i class="fas fa-circle text-danger"></i> Disconnected');
-            });
-
-            socket.on('auth_response', function(data) {
-                if (!data.success) {
-                    console.error('Auth failed:', data.error);
-                    localStorage.removeItem('jwt_token');
-                    window.location.href = '/login';
-                }
-                console.log('Authenticated as:', data.user);
             });
 
             // Agent status updates
