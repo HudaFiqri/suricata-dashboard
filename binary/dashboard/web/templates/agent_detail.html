@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Management - Suricata Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Agent Management</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAgentModal">
+            <i class="fas fa-plus"></i> Add New Agent
+        </button>
+    </div>
+
+    <!-- Agent Filter -->
+    <div class="stat-card mb-4">
+        <div class="row">
+            <div class="col-md-4">
+                <input type="text" class="form-control" id="search-agents" placeholder="Search agents...">
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filter-status">
+                    <option value="">All Status</option>
+                    <option value="online">Online</option>
+                    <option value="offline">Offline</option>
+                    <option value="pending">Pending</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filter-tags">
+                    <option value="">All Tags</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-secondary w-100" onclick="loadAgents()">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agents Table -->
+    <div class="stat-card">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Name</th>
+                        <th>Hostname / IP</th>
+                        <th>Version</th>
+                        <th>Tags</th>
+                        <th>Last Seen</th>
+                        <th>Events (24h)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="agents-table">
+                    <tr>
+                        <td colspan="8" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2 text-muted">Loading agents...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Agent Modal -->
+<div class="modal fade" id="addAgentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Agent</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Installation Instructions</strong><br>
+                    Run the following command on your Suricata server to install the agent:
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Agent Name</label>
+                    <input type="text" class="form-control" id="new-agent-name" placeholder="e.g., production-server-01">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Tags (comma-separated)</label>
+                    <input type="text" class="form-control" id="new-agent-tags" placeholder="production, web-server">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Installation Command</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="install-command" readonly value="Loading...">
+                        <button class="btn btn-outline-secondary" onclick="copyInstallCommand()">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                    </div>
+                    <small class="text-muted">Run this command with sudo on your Suricata server</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Or download installer script:</label>
+                    <div>
+                        <a href="#" id="download-installer" class="btn btn-sm btn-outline-primary" download>
+                            <i class="fas fa-download"></i> Download install.sh
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="generateInstaller()">
+                    Generate Installer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Agent Detail Modal -->
+<div class="modal fade" id="agentDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="agent-detail-title">Agent Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="agent-detail-content">
+                <!-- Content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let agentsData = [];
+let allTags = new Set();
+
+// Load agents
+async function loadAgents() {
+    try {
+        const response = await apiCall('/agents');
+        if (response.success) {
+            agentsData = response.agents;
+
+            // Extract all tags
+            allTags.clear();
+            response.agents.forEach(agent => {
+                if (agent.tags) {
+                    agent.tags.forEach(tag => allTags.add(tag));
+                }
+            });
+            updateTagsFilter();
+
+            renderAgentsTable(response.agents);
+        }
+    } catch (error) {
+        console.error('Failed to load agents:', error);
+        $('#agents-table').html(`
+            <tr>
+                <td colspan="8" class="text-center text-danger">
+                    <i class="fas fa-exclamation-triangle"></i> Failed to load agents
+                </td>
+            </tr>
+        `);
+    }
+}
+
+// Render agents table
+function renderAgentsTable(agents) {
+    if (agents.length === 0) {
+        $('#agents-table').html(`
+            <tr>
+                <td colspan="8" class="text-center py-5">
+                    <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No agents registered yet</p>
+                </td>
+            </tr>
+        `);
+        return;
+    }
+
+    let html = '';
+    agents.forEach(agent => {
+        const statusClass = agent.status === 'online' ? 'success' :
+                           agent.status === 'offline' ? 'danger' : 'warning';
+        const statusIcon = agent.status === 'online' ? 'check-circle' :
+                          agent.status === 'offline' ? 'times-circle' : 'clock';
+
+        html += `
+            <tr>
+                <td>
+                    <span class="badge bg-${statusClass}">
+                        <i class="fas fa-${statusIcon}"></i> ${agent.status}
+                    </span>
+                </td>
+                <td>
+                    <strong>${agent.name}</strong>
+                </td>
+                <td>
+                    ${agent.hostname}<br>
+                    ${agent.ip_address ? `<small class="text-muted">${agent.ip_address}</small>` : ''}
+                </td>
+                <td>
+                    ${agent.version || 'N/A'}<br>
+                    <small class="text-muted">Suricata ${agent.suricata_version || 'N/A'}</small>
+                </td>
+                <td>
+                    ${agent.tags && agent.tags.length > 0 ?
+                      agent.tags.map(tag => `<span class="badge bg-secondary me-1">${tag}</span>`).join('') :
+                      '<span class="text-muted">-</span>'}
+                </td>
+                <td>
+                    ${agent.last_seen ?
+                      `<span title="${new Date(agent.last_seen).toLocaleString()}">${formatTimeAgo(agent.last_seen)}</span>` :
+                      '<span class="text-muted">Never</span>'}
+                </td>
+                <td>
+                    <span class="badge bg-info">${agent.events_24h || 0}</span>
+                </td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <a href="/agents/${agent.id}" class="btn btn-outline-primary" title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <button class="btn btn-outline-success" onclick="sendCommand('${agent.id}', 'reload_config')" title="Reload Config">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="viewAgentConfig('${agent.id}')" title="Configure">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="deleteAgent('${agent.id}')" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    $('#agents-table').html(html);
+}
+
+// Update tags filter
+function updateTagsFilter() {
+    let html = '<option value="">All Tags</option>';
+    allTags.forEach(tag => {
+        html += `<option value="${tag}">${tag}</option>`;
+    });
+    $('#filter-tags').html(html);
+}
+
+// Filter agents
+$('#search-agents, #filter-status, #filter-tags').on('change keyup', function() {
+    const search = $('#search-agents').val().toLowerCase();
+    const status = $('#filter-status').val();
+    const tag = $('#filter-tags').val();
+
+    const filtered = agentsData.filter(agent => {
+        const matchSearch = !search ||
+            agent.name.toLowerCase().includes(search) ||
+            agent.hostname.toLowerCase().includes(search);
+
+        const matchStatus = !status || agent.status === status;
+
+        const matchTag = !tag || (agent.tags && agent.tags.includes(tag));
+
+        return matchSearch && matchStatus && matchTag;
+    });
+
+    renderAgentsTable(filtered);
+});
+
+// Generate installer
+async function generateInstaller() {
+    const name = $('#new-agent-name').val();
+    const tags = $('#new-agent-tags').val();
+
+    if (!name) {
+        alert('Please enter an agent name');
+        return;
+    }
+
+    try {
+        // First, register the agent to get token
+        const response = await apiCall('/agents/register', 'POST', {
+            name: name,
+            hostname: 'pending',
+            tags: tags ? tags.split(',').map(t => t.trim()) : []
+        });
+
+        if (response.success) {
+            const token = response.token;
+            const dashboardUrl = window.location.origin;
+
+            // Build install command
+            const installCmd = `curl -sSL "${dashboardUrl}/api/v1/agent/install.sh?token=${token}&name=${encodeURIComponent(name)}&tags=${encodeURIComponent(tags)}" | sudo bash`;
+            $('#install-command').val(installCmd);
+
+            // Set download link
+            $('#download-installer').attr('href', `/api/v1/agent/install.sh?token=${token}&name=${encodeURIComponent(name)}&tags=${encodeURIComponent(tags)}`);
+
+            alert('Installer generated! Copy the command and run it on your Suricata server.');
+
+            // Reload agents list
+            loadAgents();
+        } else {
+            alert('Failed to generate installer: ' + response.error);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Copy install command
+function copyInstallCommand() {
+    const cmd = $('#install-command').val();
+    navigator.clipboard.writeText(cmd);
+
+    // Show feedback
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+    setTimeout(() => {
+        btn.innerHTML = originalHtml;
+    }, 2000);
+}
+
+// Send command to agent
+async function sendCommand(agentId, commandType) {
+    if (!confirm(`Send ${commandType} command to agent?`)) return;
+
+    try {
+        const response = await apiCall(`/commands/${agentId}`, 'POST', {
+            command_type: commandType
+        });
+
+        if (response.success) {
+            alert('Command sent successfully!');
+        } else {
+            alert('Failed to send command: ' + response.error);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// View agent config
+function viewAgentConfig(agentId) {
+    window.location.href = `/configs/${agentId}`;
+}
+
+// Delete agent
+async function deleteAgent(agentId) {
+    if (!confirm('Are you sure you want to delete this agent? This will remove all associated data.')) {
+        return;
+    }
+
+    try {
+        const response = await apiCall(`/agents/${agentId}`, 'DELETE');
+        if (response.success) {
+            alert('Agent deleted successfully');
+            loadAgents();
+        } else {
+            alert('Failed to delete agent: ' + response.error);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Update agent status from WebSocket
+function updateAgentStatus(agentId, status) {
+    const agent = agentsData.find(a => a.id === agentId);
+    if (agent) {
+        agent.status = status;
+        agent.last_seen = new Date().toISOString();
+
+        // Re-render with current filters
+        $('#search-agents').trigger('change');
+    }
+}
+
+// Helper function
+function formatTimeAgo(timestamp) {
+    const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+// Load on page ready
+$(document).ready(function() {
+    loadAgents();
+
+    // Refresh every 10 seconds
+    setInterval(loadAgents, 10000);
+});
+</script>
+{% endblock %}
