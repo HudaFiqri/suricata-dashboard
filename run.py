@@ -6,6 +6,10 @@ For production, use wsgi.py with gunicorn
 
 import sys
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 def check_dependencies():
     """Check if optional dependencies are installed"""
