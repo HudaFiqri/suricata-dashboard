@@ -36,13 +36,15 @@ def get_mongodb_uri():
     """Build MongoDB connection URI from environment"""
     host = os.getenv('MONGO_HOST', 'localhost')
     port = os.getenv('MONGO_PORT', '27017')
-    user = os.getenv('MONGO_USER', 'suricata')
-    password = os.getenv('MONGO_PASSWORD', 'password')
+    user = os.getenv('MONGO_USER', '')  # Default empty string
+    password = os.getenv('MONGO_PASSWORD', '')  # Default empty string
     auth_source = os.getenv('MONGO_AUTH_SOURCE', 'admin')
 
+    # Only use authentication if both user and password are provided
     if user and password:
         return f"mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}"
     else:
+        # No authentication (for development)
         return f"mongodb://{host}:{port}/"
 
 def init_postgresql(app=None):

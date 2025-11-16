@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Suricata Dashboard{% endblock %}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin: 3px 10px;
+        }
+        .sidebar .nav-link:hover {
+            background-color: rgba(255,255,255,0.1);
+            color: white;
+        }
+        .sidebar .nav-link.active {
+            background-color: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .agent-card {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .agent-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .status-online {
+            color: #28a745;
+        }
+        .status-offline {
+            color: #dc3545;
+        }
+        .status-pending {
+            color: #ffc107;
+        }
+        .navbar {
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .event-badge {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Top Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt"></i> Suricata Dashboard
+            </a>
+            <div class="d-flex align-items-center">
+                <span class="me-3" id="connection-status">
+                    <i class="fas fa-circle text-success"></i> Connected
+                </span>
+                <span class="me-3">
+                    <i class="fas fa-user"></i> Admin
+                </span>
+                <a href="/logout" class="btn btn-sm btn-outline-danger">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 sidebar">
+                <div class="py-4">
+                    <h6 class="px-3 mb-3 text-uppercase" style="font-size: 0.8rem; opacity: 0.7;">Navigation</h6>
+                    <nav class="nav flex-column">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home fa-fw me-2"></i> Dashboard
+                        </a>
+                        <a class="nav-link" href="/agents">
+                            <i class="fas fa-server fa-fw me-2"></i> Agents
+                        </a>
+                        <a class="nav-link" href="/events">
+                            <i class="fas fa-exclamation-triangle fa-fw me-2"></i> Events
+                        </a>
+                        <a class="nav-link" href="/alerts">
+                            <i class="fas fa-bell fa-fw me-2"></i> Alerts
+                        </a>
+                        <a class="nav-link" href="/logs">
+                            <i class="fas fa-file-alt fa-fw me-2"></i> Logs
+                        </a>
+                        <a class="nav-link" href="/statistics">
+                            <i class="fas fa-chart-bar fa-fw me-2"></i> Statistics
+                        </a>
+                        <a class="nav-link" href="/configs">
+                            <i class="fas fa-cog fa-fw me-2"></i> Configurations
+                        </a>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10 p-4">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- WebSocket Connection -->
+    <script>
+        // Global WebSocket connection
+        let socket = null;
+        let isConnected = false;
+
+        function connectWebSocket() {
+            // Get JWT token from localStorage
+            const token = localStorage.getItem('jwt_token');
+
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+
+            // Connect to UI namespace
+            socket = io('/ws/v1/ui', {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionAttempts: 10
+            });
+
+            socket.on('connect', function() {
+                console.log('WebSocket connected');
+                isConnected = true;
+                $('#connection-status').html('<i class="fas fa-circle text-success"></i> Connected');
+
+                // Authenticate
+                socket.emit('auth', {
+                    token: token
+                });
+            });
+
+            socket.on('disconnect', function() {
+                console.log('WebSocket disconnected');
+                isConnected = false;
+                $('#connection-status').html('<i class="fas fa-circle text-danger"></i> Disconnected');
+            });
+
+            socket.on('auth_response', function(data) {
+                if (!data.success) {
+                    console.error('Auth failed:', data.error);
+                    localStorage.removeItem('jwt_token');
+                    window.location.href = '/login';
+                }
+                console.log('Authenticated as:', data.user);
+            });
+
+            // Agent status updates
+            socket.on('agent_status', function(data) {
+                updateAgentStatus(data.agent_id, data.status);
+            });
+
+            // New events
+            socket.on('new_event', function(data) {
+                handleNewEvent(data);
+            });
+
+            // New logs
+            socket.on('new_log', function(data) {
+                handleNewLog(data);
+            });
+        }
+
+        // Override these in page-specific scripts
+        function updateAgentStatus(agentId, status) {
+            console.log('Agent status update:', agentId, status);
+        }
+
+        function handleNewEvent(data) {
+            console.log('New event:', data);
+        }
+
+        function handleNewLog(data) {
+            console.log('New log:', data);
+        }
+
+        // API helper
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            const token = localStorage.getItem('jwt_token');
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            };
+
+            if (data && method !== 'GET') {
+                options.body = JSON.stringify(data);
+            }
+
+            const response = await fetch(`/api/v1${endpoint}`, options);
+            return await response.json();
+        }
+
+        // Initialize on page load
+        $(document).ready(function() {
+            // Set active nav link
+            const path = window.location.pathname;
+            $(`.sidebar .nav-link[href="${path}"]`).addClass('active');
+
+            // Connect WebSocket
+            connectWebSocket();
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
