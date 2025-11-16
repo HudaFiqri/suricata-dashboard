@@ -130,6 +130,56 @@ def create_app(config=None):
         create_tables()
         logger.info("✓ Database tables verified")
 
+    # Create default admin user if authentication is enabled
+    ENABLE_AUTH = os.getenv('ENABLE_AUTH', 'False').lower() == 'true'
+    if ENABLE_AUTH:
+        with app.app_context():
+            from binary.dashboard.database import get_pg_session, get_mongo_db
+            import bcrypt
+            from datetime import datetime
+
+            # Try PostgreSQL first
+            try:
+                session = get_pg_session()
+                from binary.dashboard.models import User
+
+                existing = session.query(User).filter_by(username='admin').first()
+                if not existing:
+                    password_hash = bcrypt.hashpw('admin'.encode(), bcrypt.gensalt()).decode()
+                    admin_user = User(
+                        username='admin',
+                        email='admin@localhost',
+                        password_hash=password_hash,
+                        role='admin',
+                        is_active=True
+                    )
+                    session.add(admin_user)
+                    session.commit()
+                    logger.info("✓ Default admin user created in PostgreSQL (admin/admin)")
+                else:
+                    logger.info("✓ Admin user already exists in PostgreSQL")
+            except RuntimeError:
+                # Fallback to MongoDB
+                try:
+                    db = get_mongo_db()
+                    existing = db.users.find_one({'username': 'admin'})
+                    if not existing:
+                        password_hash = bcrypt.hashpw('admin'.encode(), bcrypt.gensalt()).decode()
+                        db.users.insert_one({
+                            'username': 'admin',
+                            'email': 'admin@localhost',
+                            'password_hash': password_hash,
+                            'role': 'admin',
+                            'is_active': True,
+                            'created_at': datetime.utcnow(),
+                            'updated_at': datetime.utcnow()
+                        })
+                        logger.info("✓ Default admin user created in MongoDB (admin/admin)")
+                    else:
+                        logger.info("✓ Admin user already exists in MongoDB")
+                except RuntimeError:
+                    logger.warning("⚠ Could not create default admin user - no database available")
+
     logger.info("=" * 60)
     logger.info("Suricata Dashboard initialized successfully")
     logger.info("=" * 60)
