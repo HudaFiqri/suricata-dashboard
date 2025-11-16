@@ -11,19 +11,87 @@ import hashlib
 from datetime import datetime, timedelta
 from binary.dashboard.api import api
 from binary.dashboard.models import User, Agent
-from binary.dashboard.database import get_pg_session
+from binary.dashboard.database import get_pg_session, get_mongo_db
 import os
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'change-this-secret-key')
 JWT_EXPIRATION_HOURS = 24
 ENABLE_AUTH = os.getenv('ENABLE_AUTH', 'False').lower() == 'true'
 
+def get_user_from_db(username):
+    """Get user from PostgreSQL or MongoDB (fallback)"""
+    # Try PostgreSQL first
+    try:
+        session = get_pg_session()
+        user = session.query(User).filter_by(username=username, is_active=True).first()
+        if user:
+            return {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'password_hash': user.password_hash,
+                'role': user.role,
+                'is_active': user.is_active
+            }, session
+    except RuntimeError:
+        pass
+
+    # Fallback to MongoDB
+    try:
+        db = get_mongo_db()
+        user = db.users.find_one({'username': username, 'is_active': True})
+        if user:
+            return {
+                'id': str(user['_id']),
+                'username': user['username'],
+                'email': user.get('email'),
+                'password_hash': user['password_hash'],
+                'role': user.get('role', 'viewer'),
+                'is_active': user.get('is_active', True)
+            }, None
+    except RuntimeError:
+        pass
+
+    return None, None
+
+def update_last_login(user_id, session=None):
+    """Update last login timestamp"""
+    if session:
+        # PostgreSQL
+        try:
+            user = session.query(User).filter_by(id=user_id).first()
+            if user:
+                user.last_login = datetime.utcnow()
+                session.commit()
+        except:
+            pass
+    else:
+        # MongoDB
+        try:
+            db = get_mongo_db()
+            from bson.objectid import ObjectId
+            db.users.update_one(
+                {'_id': ObjectId(user_id)},
+                {'$set': {'last_login': datetime.utcnow()}}
+            )
+        except:
+            pass
+
 def generate_jwt(user):
-    """Generate JWT token for user"""
+    """Generate JWT token for user (accepts dict or User object)"""
+    if isinstance(user, dict):
+        user_id = user['id']
+        username = user['username']
+        role = user.get('role', 'viewer')
+    else:
+        user_id = user.id
+        username = user.username
+        role = user.role
+
     payload = {
-        'user_id': user.id,
-        'username': user.username,
-        'role': user.role,
+        'user_id': user_id,
+        'username': username,
+        'role': role,
         'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
     }
 
@@ -108,6 +176,13 @@ def require_agent_auth(f):
 @api.route('/auth/login', methods=['POST'])
 def login():
     """User login endpoint"""
+    # If auth is disabled, reject login attempts
+    if not ENABLE_AUTH:
+        return jsonify({
+            'success': False,
+            'error': 'Authentication is disabled'
+        }), 400
+
     data = request.get_json()
 
     username = data.get('username')
@@ -119,8 +194,8 @@ def login():
             'error': 'Username and password required'
         }), 400
 
-    session = get_pg_session()
-    user = session.query(User).filter_by(username=username, is_active=True).first()
+    # Get user from database (PostgreSQL or MongoDB)
+    user, session = get_user_from_db(username)
 
     if not user:
         return jsonify({
@@ -129,15 +204,14 @@ def login():
         }), 401
 
     # Verify password
-    if not bcrypt.checkpw(password.encode(), user.password_hash.encode()):
+    if not bcrypt.checkpw(password.encode(), user['password_hash'].encode()):
         return jsonify({
             'success': False,
             'error': 'Invalid credentials'
         }), 401
 
     # Update last login
-    user.last_login = datetime.utcnow()
-    session.commit()
+    update_last_login(user['id'], session)
 
     # Generate token
     token = generate_jwt(user)
@@ -147,10 +221,10 @@ def login():
         'token': token,
         'expires_in': JWT_EXPIRATION_HOURS * 3600,
         'user': {
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'role': user.role
+            'id': user['id'],
+            'username': user['username'],
+            'email': user.get('email'),
+            'role': user['role']
         }
     })
 
