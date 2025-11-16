@@ -50,23 +50,56 @@ def create_app(config=None):
     # Enable CORS
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-    # Initialize database connections
+    # Initialize database connections with auto-detection
     logger.info("Initializing database connections...")
     from binary.dashboard.database import init_postgresql, init_mongodb
 
-    try:
-        init_postgresql(app)
-        logger.info("✓ PostgreSQL connection initialized")
-    except Exception as e:
-        logger.error(f"✗ PostgreSQL initialization failed: {e}")
-        raise
+    db_initialized = False
+    pg_available = False
+    mongo_available = False
 
-    try:
-        init_mongodb(app)
+    # Try PostgreSQL first
+    pg_engine, pg_session = init_postgresql(app, raise_on_error=False)
+    if pg_engine and pg_session:
+        logger.info("✓ PostgreSQL connection initialized")
+        pg_available = True
+        db_initialized = True
+    else:
+        logger.warning("⚠ PostgreSQL not available - some features will be limited")
+
+    # Try MongoDB
+    mongo_client, mongo_db = init_mongodb(app, raise_on_error=False)
+    if mongo_client and mongo_db:
         logger.info("✓ MongoDB connection initialized")
-    except Exception as e:
-        logger.error(f"✗ MongoDB initialization failed: {e}")
-        raise
+        mongo_available = True
+        db_initialized = True
+    else:
+        logger.warning("⚠ MongoDB not available - some features will be limited")
+
+    # Show status summary
+    if not db_initialized:
+        logger.warning("=" * 60)
+        logger.warning("⚠ WARNING: No database connections available!")
+        logger.warning("=" * 60)
+        logger.warning("Application will run with LIMITED functionality:")
+        logger.warning("  ✓ Real-time monitoring (from log files)")
+        logger.warning("  ✗ Alert history (requires PostgreSQL)")
+        logger.warning("  ✗ Traffic statistics (requires PostgreSQL)")
+        logger.warning("  ✗ Time-series events (requires MongoDB)")
+        logger.warning("")
+        logger.warning("To enable database features:")
+        logger.warning("  1. Install PostgreSQL and/or MongoDB")
+        logger.warning("  2. Update credentials in .env file")
+        logger.warning("  3. Restart the application")
+        logger.warning("=" * 60)
+    else:
+        logger.info("Database status:")
+        logger.info(f"  PostgreSQL: {'✓ Connected' if pg_available else '✗ Not available'}")
+        logger.info(f"  MongoDB:    {'✓ Connected' if mongo_available else '✗ Not available'}")
+
+    # Store database status in app config
+    app.config['DB_POSTGRESQL_AVAILABLE'] = pg_available
+    app.config['DB_MONGODB_AVAILABLE'] = mongo_available
 
     # Initialize WebSocket
     logger.info("Initializing WebSocket server...")

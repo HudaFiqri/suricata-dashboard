@@ -47,8 +47,16 @@ def get_mongodb_uri():
         # No authentication (for development)
         return f"mongodb://{host}:{port}/"
 
-def init_postgresql(app=None):
-    """Initialize PostgreSQL connection"""
+def init_postgresql(app=None, raise_on_error=False):
+    """Initialize PostgreSQL connection
+
+    Args:
+        app: Flask app instance
+        raise_on_error: If True, raise exception on connection failure. If False, log warning and continue.
+
+    Returns:
+        Tuple of (engine, session) or (None, None) if connection fails
+    """
     global pg_engine, pg_session
 
     uri = get_postgres_uri()
@@ -72,22 +80,35 @@ def init_postgresql(app=None):
         with pg_engine.connect() as conn:
             conn.execute("SELECT 1")
 
-        logger.info("PostgreSQL connection established")
+        logger.info("✓ PostgreSQL connection established")
 
         # If Flask app provided, add teardown handler
         if app:
             @app.teardown_appcontext
             def shutdown_session(exception=None):
-                pg_session.remove()
+                if pg_session:
+                    pg_session.remove()
 
         return pg_engine, pg_session
 
     except Exception as e:
-        logger.error(f"Failed to connect to PostgreSQL: {e}")
-        raise
+        logger.error(f"✗ Failed to connect to PostgreSQL: {e}")
+        pg_engine = None
+        pg_session = None
+        if raise_on_error:
+            raise
+        return None, None
 
-def init_mongodb(app=None):
-    """Initialize MongoDB connection"""
+def init_mongodb(app=None, raise_on_error=False):
+    """Initialize MongoDB connection
+
+    Args:
+        app: Flask app instance
+        raise_on_error: If True, raise exception on connection failure. If False, log warning and continue.
+
+    Returns:
+        Tuple of (client, db) or (None, None) if connection fails
+    """
     global mongo_client, mongo_db
 
     uri = get_mongodb_uri()
@@ -109,7 +130,7 @@ def init_mongodb(app=None):
         # Get database
         mongo_db = mongo_client[database_name]
 
-        logger.info(f"MongoDB connection established (database: {database_name})")
+        logger.info(f"✓ MongoDB connection established (database: {database_name})")
 
         # If Flask app provided, add teardown handler
         if app:
@@ -120,9 +141,13 @@ def init_mongodb(app=None):
 
         return mongo_client, mongo_db
 
-    except ConnectionFailure as e:
-        logger.error(f"Failed to connect to MongoDB: {e}")
-        raise
+    except (ConnectionFailure, Exception) as e:
+        logger.error(f"✗ Failed to connect to MongoDB: {e}")
+        mongo_client = None
+        mongo_db = None
+        if raise_on_error:
+            raise
+        return None, None
 
 def init_databases(app):
     """Initialize both PostgreSQL and MongoDB"""
@@ -150,13 +175,17 @@ def get_mongo_db():
 
 def create_tables():
     """Create database tables if they don't exist"""
-    from binary.dashboard.models import Base
+    try:
+        from binary.dashboard.models import Base
 
-    if pg_engine:
-        Base.metadata.create_all(pg_engine)
-        logger.info("Database tables created/verified")
-    else:
-        logger.warning("PostgreSQL engine not initialized, skipping table creation")
+        if pg_engine:
+            Base.metadata.create_all(pg_engine)
+            logger.info("✓ Database tables created/verified")
+        else:
+            logger.warning("⚠ PostgreSQL engine not initialized, skipping table creation")
+    except Exception as e:
+        logger.error(f"✗ Error creating tables: {e}")
+        # Don't raise - let app continue without tables
 
 def health_check():
     """Check health of all database connections"""
