@@ -59,13 +59,14 @@ def agent_config(agent_id):
     """Agent configuration editor"""
     return render_template('config_editor.html', agent_id=agent_id)
 
-@web.route('/login')
-def login():
-    """Login page"""
-    return render_template('login.html')
+# Login disabled - public access mode
+# @web.route('/login')
+# def login():
+#     """Login page"""
+#     return render_template('login.html')
 
 @web.route('/logout')
 def logout():
     """Logout"""
     session.clear()
-    return redirect(url_for('web.login'))
+    return redirect(url_for('web.index'))
