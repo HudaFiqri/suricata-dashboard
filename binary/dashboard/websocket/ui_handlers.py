@@ -22,96 +22,53 @@ active_ui_clients = {}  # {session_id: {user_id, username, connected_at}}
 
 @socketio.on('connect', namespace='/ws/v1/ui')
 def handle_ui_connect():
-    """Web UI client connects"""
+    """Web UI client connects - PUBLIC ACCESS MODE"""
     session_id = request.sid
-    logger.info(f"UI client connecting: {session_id}")
+    logger.info(f"UI client connecting (public mode): {session_id}")
+
+    # Auto-register as public user
+    active_ui_clients[session_id] = {
+        'user_id': 'public',
+        'username': 'public',
+        'role': 'admin',  # Grant admin role in public mode
+        'connected_at': datetime.utcnow()
+    }
 
     emit('connected', {
         'session_id': session_id,
-        'timestamp': datetime.utcnow().isoformat()
+        'timestamp': datetime.utcnow().isoformat(),
+        'public_mode': True
     })
 
 @socketio.on('auth', namespace='/ws/v1/ui')
 def handle_ui_auth(data):
-    """Authenticate UI client with JWT token"""
+    """Auth handler - disabled in public access mode"""
     session_id = request.sid
-    token = data.get('token')
 
-    if not token:
-        emit('auth_response', {
-            'success': False,
-            'error': 'No token provided'
-        })
-        disconnect()
-        return
-
-    try:
-        # Decode JWT
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-
-        user_id = payload.get('user_id')
-        username = payload.get('username')
-
-        # Verify user exists
-        db = get_pg_session()
-        user = db.query(User).filter_by(id=user_id, is_active=True).first()
-
-        if not user:
-            emit('auth_response', {
-                'success': False,
-                'error': 'User not found'
-            })
-            disconnect()
-            return
-
-        # Store in active clients
-        active_ui_clients[session_id] = {
-            'user_id': user_id,
-            'username': username,
-            'role': user.role,
-            'connected_at': datetime.utcnow()
+    # Always return success in public mode
+    emit('auth_response', {
+        'success': True,
+        'public_mode': True,
+        'user': {
+            'username': 'public',
+            'role': 'admin'
         }
-
-        logger.info(f"UI client authenticated: {username}")
-
-        emit('auth_response', {
-            'success': True,
-            'user': {
-                'username': username,
-                'role': user.role
-            }
-        })
-
-    except jwt.ExpiredSignatureError:
-        emit('auth_response', {
-            'success': False,
-            'error': 'Token expired'
-        })
-        disconnect()
-
-    except jwt.InvalidTokenError:
-        emit('auth_response', {
-            'success': False,
-            'error': 'Invalid token'
-        })
-        disconnect()
-
-    except Exception as e:
-        logger.error(f"UI auth failed: {e}")
-        emit('auth_response', {
-            'success': False,
-            'error': 'Authentication failed'
-        })
-        disconnect()
+    })
 
 @socketio.on('subscribe', namespace='/ws/v1/ui')
 def handle_subscribe(data):
-    """Subscribe to specific data streams"""
+    """Subscribe to specific data streams - PUBLIC ACCESS MODE"""
     session_id = request.sid
 
+    # Public mode - no auth check needed
+    # Auto-register if not exists
     if session_id not in active_ui_clients:
-        emit('error', {'message': 'Not authenticated'})
-        return
+        active_ui_clients[session_id] = {
+            'user_id': 'public',
+            'username': 'public',
+            'role': 'admin',
+            'connected_at': datetime.utcnow()
+        }
 
     channel = data.get('channel')
 
@@ -153,19 +110,21 @@ def handle_unsubscribe(data):
 
 @socketio.on('send_command', namespace='/ws/v1/ui')
 def handle_send_command(data):
-    """UI sends command to agent"""
+    """UI sends command to agent - PUBLIC ACCESS MODE"""
     session_id = request.sid
 
+    # Public mode - auto-register if needed
     if session_id not in active_ui_clients:
-        emit('error', {'message': 'Not authenticated'})
-        return
+        active_ui_clients[session_id] = {
+            'user_id': 'public',
+            'username': 'public',
+            'role': 'admin',
+            'connected_at': datetime.utcnow()
+        }
 
     user_info = active_ui_clients[session_id]
 
-    # Check permissions
-    if user_info['role'] not in ['admin', 'operator']:
-        emit('error', {'message': 'Insufficient permissions'})
-        return
+    # Public mode - no permission check (everyone is admin)
 
     agent_id = data.get('agent_id')
     command_type = data.get('command_type')
@@ -216,12 +175,10 @@ def handle_send_command(data):
 
 @socketio.on('get_active_agents', namespace='/ws/v1/ui')
 def handle_get_active_agents():
-    """Get list of currently connected agents"""
+    """Get list of currently connected agents - PUBLIC ACCESS MODE"""
     session_id = request.sid
 
-    if session_id not in active_ui_clients:
-        emit('error', {'message': 'Not authenticated'})
-        return
+    # Public mode - no auth check needed
 
     from binary.dashboard.websocket.agent_handlers import active_agents
 
