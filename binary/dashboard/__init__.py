@@ -14,6 +14,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+# Reduce werkzeug logging noise
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 def create_app(config=None):

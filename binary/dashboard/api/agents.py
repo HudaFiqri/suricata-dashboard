@@ -84,7 +84,15 @@ def register_agent():
 @require_auth
 def list_agents():
     """List all agents with optional filtering"""
-    session = get_pg_session()
+    try:
+        session = get_pg_session()
+    except RuntimeError:
+        # PostgreSQL not available
+        return jsonify({
+            'success': False,
+            'error': 'Database not available',
+            'agents': []
+        }), 503
 
     # Query parameters
     status = request.args.get('status')

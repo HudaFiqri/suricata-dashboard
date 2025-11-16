@@ -4,12 +4,16 @@ Handles PostgreSQL (SQLAlchemy) and MongoDB (PyMongo) connections
 """
 
 import os
+import warnings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 import logging
+
+# Suppress pymongo threading warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pymongo")
 
 logger = logging.getLogger(__name__)
 
@@ -164,12 +168,14 @@ def init_databases(app):
 def get_pg_session():
     """Get PostgreSQL session"""
     if pg_session is None:
+        logger.warning("PostgreSQL not available")
         raise RuntimeError("PostgreSQL not initialized. Call init_postgresql() first.")
     return pg_session
 
 def get_mongo_db():
     """Get MongoDB database"""
     if mongo_db is None:
+        logger.warning("MongoDB not available")
         raise RuntimeError("MongoDB not initialized. Call init_mongodb() first.")
     return mongo_db
 

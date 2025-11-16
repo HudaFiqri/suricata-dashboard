@@ -6,10 +6,18 @@ For production, use wsgi.py with gunicorn
 
 import sys
 import os
+import warnings
+import threading
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Suppress threading exceptions from pymongo
+threading.excepthook = lambda args: None
+
+# Suppress warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def check_dependencies():
     """Check if optional dependencies are installed"""
