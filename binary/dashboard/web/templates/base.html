@@ -123,6 +123,11 @@
                         <a class="nav-link" href="/configs">
                             <i class="fas fa-cog fa-fw me-2"></i> Configurations
                         </a>
+                        {% if enable_auth %}
+                        <a class="nav-link" href="/users" id="users-menu">
+                            <i class="fas fa-users fa-fw me-2"></i> Users
+                        </a>
+                        {% endif %}
                     </nav>
                 </div>
             </div>
@@ -234,6 +239,11 @@
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             if (user.username) {
                 $('#username-display').text(user.username);
+
+                // Hide Users menu if not admin
+                if (user.role !== 'admin') {
+                    $('#users-menu').hide();
+                }
             } else {
                 // Not logged in, redirect to login
                 if (window.location.pathname !== '/login') {

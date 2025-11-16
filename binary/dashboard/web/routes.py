@@ -62,6 +62,11 @@ def agent_config(agent_id):
     """Agent configuration editor"""
     return render_template('config_editor.html', agent_id=agent_id)
 
+@web.route('/users')
+def users():
+    """User management page"""
+    return render_template('users.html')
+
 @web.route('/login')
 def login():
     """Login page"""

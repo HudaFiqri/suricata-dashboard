@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - Suricata Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .user-card {
+        transition: all 0.3s;
+    }
+    .user-card:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .role-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-users"></i> User Management</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+        <i class="fas fa-plus"></i> Add User
+    </button>
+</div>
+
+<!-- Users Table -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="users-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Last Login</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-tbody">
+                    <tr>
+                        <td colspan="7" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="add-user-form">
+                    <div class="mb-3">
+                        <label class="form-label">Username *</label>
+                        <input type="text" class="form-control" id="new-username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="new-email">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password *</label>
+                        <input type="password" class="form-control" id="new-password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Confirm Password *</label>
+                        <input type="password" class="form-control" id="new-password-confirm" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role *</label>
+                        <select class="form-select" id="new-role" required>
+                            <option value="admin">Admin</option>
+                            <option value="viewer" selected>Viewer</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createUser()">Create User</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-user-form">
+                    <input type="hidden" id="edit-user-id">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" id="edit-username" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="edit-email">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <select class="form-select" id="edit-role">
+                            <option value="admin">Admin</option>
+                            <option value="viewer">Viewer</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">New Password (leave empty to keep current)</label>
+                        <input type="password" class="form-control" id="edit-password">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="edit-is-active">
+                            <label class="form-check-label" for="edit-is-active">
+                                Active
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateUser()">Update User</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let users = [];
+
+async function loadUsers() {
+    try {
+        const response = await apiCall('/users');
+        if (response.success) {
+            users = response.users;
+            renderUsers();
+        } else {
+            showAlert('danger', response.error || 'Failed to load users');
+        }
+    } catch (error) {
+        showAlert('danger', 'Error loading users: ' + error.message);
+    }
+}
+
+function renderUsers() {
+    const tbody = $('#users-tbody');
+    tbody.empty();
+
+    if (users.length === 0) {
+        tbody.html('<tr><td colspan="7" class="text-center text-muted">No users found</td></tr>');
+        return;
+    }
+
+    users.forEach(user => {
+        const row = `
+            <tr>
+                <td><strong>${escapeHtml(user.username)}</strong></td>
+                <td>${escapeHtml(user.email || '-')}</td>
+                <td>
+                    <span class="badge role-badge ${user.role === 'admin' ? 'bg-danger' : 'bg-info'}">
+                        ${user.role.toUpperCase()}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge ${user.is_active ? 'bg-success' : 'bg-secondary'}">
+                        ${user.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
+                <td>${new Date(user.created_at).toLocaleString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="editUser('${user.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    ${user.username !== 'admin' ? `
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUser('${user.id}', '${escapeHtml(user.username)}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    ` : ''}
+                </td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+}
+
+async function createUser() {
+    const username = $('#new-username').val();
+    const email = $('#new-email').val();
+    const password = $('#new-password').val();
+    const passwordConfirm = $('#new-password-confirm').val();
+    const role = $('#new-role').val();
+
+    if (!username || !password) {
+        showAlert('danger', 'Username and password are required');
+        return;
+    }
+
+    if (password !== passwordConfirm) {
+        showAlert('danger', 'Passwords do not match');
+        return;
+    }
+
+    try {
+        const response = await apiCall('/users', 'POST', {
+            username,
+            email,
+            password,
+            role
+        });
+
+        if (response.success) {
+            showAlert('success', 'User created successfully');
+            $('#addUserModal').modal('hide');
+            $('#add-user-form')[0].reset();
+            loadUsers();
+        } else {
+            showAlert('danger', response.error || 'Failed to create user');
+        }
+    } catch (error) {
+        showAlert('danger', 'Error creating user: ' + error.message);
+    }
+}
+
+function editUser(userId) {
+    const user = users.find(u => u.id == userId);
+    if (!user) return;
+
+    $('#edit-user-id').val(user.id);
+    $('#edit-username').val(user.username);
+    $('#edit-email').val(user.email || '');
+    $('#edit-role').val(user.role);
+    $('#edit-is-active').prop('checked', user.is_active);
+    $('#edit-password').val('');
+
+    $('#editUserModal').modal('show');
+}
+
+async function updateUser() {
+    const userId = $('#edit-user-id').val();
+    const email = $('#edit-email').val();
+    const role = $('#edit-role').val();
+    const password = $('#edit-password').val();
+    const isActive = $('#edit-is-active').is(':checked');
+
+    const data = {
+        email,
+        role,
+        is_active: isActive
+    };
+
+    if (password) {
+        data.password = password;
+    }
+
+    try {
+        const response = await apiCall(`/users/${userId}`, 'PUT', data);
+
+        if (response.success) {
+            showAlert('success', 'User updated successfully');
+            $('#editUserModal').modal('hide');
+            loadUsers();
+        } else {
+            showAlert('danger', response.error || 'Failed to update user');
+        }
+    } catch (error) {
+        showAlert('danger', 'Error updating user: ' + error.message);
+    }
+}
+
+async function deleteUser(userId, username) {
+    if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await apiCall(`/users/${userId}`, 'DELETE');
+
+        if (response.success) {
+            showAlert('success', 'User deleted successfully');
+            loadUsers();
+        } else {
+            showAlert('danger', response.error || 'Failed to delete user');
+        }
+    } catch (error) {
+        showAlert('danger', 'Error deleting user: ' + error.message);
+    }
+}
+
+function showAlert(type, message) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+
+    // Remove old alerts
+    $('.alert').remove();
+
+    // Add new alert at top of content
+    $('h2').after(alertHtml);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        $('.alert').fadeOut('slow', function() {
+            $(this).remove();
+        });
+    }, 5000);
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+$(document).ready(function() {
+    loadUsers();
+});
+</script>
+{% endblock %}

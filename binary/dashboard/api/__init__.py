@@ -19,6 +19,7 @@ from . import stats
 from . import query
 from . import installer
 from . import health
+from . import users
 
 __all__ = [
     'api',
@@ -31,5 +32,6 @@ __all__ = [
     'stats',
     'query',
     'installer',
-    'health'
+    'health',
+    'users'
 ]
