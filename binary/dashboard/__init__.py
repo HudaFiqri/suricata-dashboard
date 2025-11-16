@@ -60,7 +60,7 @@ def create_app(config=None):
 
     # Try PostgreSQL first
     pg_engine, pg_session = init_postgresql(app, raise_on_error=False)
-    if pg_engine and pg_session:
+    if pg_engine is not None and pg_session is not None:
         logger.info("✓ PostgreSQL connection initialized")
         pg_available = True
         db_initialized = True
@@ -69,7 +69,7 @@ def create_app(config=None):
 
     # Try MongoDB
     mongo_client, mongo_db = init_mongodb(app, raise_on_error=False)
-    if mongo_client and mongo_db:
+    if mongo_client is not None and mongo_db is not None:
         logger.info("✓ MongoDB connection initialized")
         mongo_available = True
         db_initialized = True
