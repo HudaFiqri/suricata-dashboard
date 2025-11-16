@@ -136,12 +136,9 @@ def init_mongodb(app=None, raise_on_error=False):
 
         logger.info(f"✓ MongoDB connection established (database: {database_name})")
 
-        # If Flask app provided, add teardown handler
-        if app:
-            @app.teardown_appcontext
-            def shutdown_mongodb(exception=None):
-                if mongo_client:
-                    mongo_client.close()
+        # Don't close MongoDB connection on teardown
+        # MongoDB client manages its own connection pool and should stay alive
+        # Closing it on every request causes "Cannot use MongoClient after close" errors
 
         return mongo_client, mongo_db
 
