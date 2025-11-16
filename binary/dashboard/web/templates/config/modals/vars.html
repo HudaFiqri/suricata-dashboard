@@ -1,0 +1,55 @@
+<!-- Variables Modal -->
+
+<div class="modal fade" id="varsModal" tabindex="-1">
+
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+
+        <div class="modal-content">
+
+            <div class="modal-header bg-success text-white">
+
+                <h5 class="modal-title"><i class="fas fa-dollar-sign"></i> Variables Configuration</h5>
+
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+
+            </div>
+
+            <div class="modal-body">
+
+                <div class="alert alert-info">
+
+                    <i class="fas fa-info-circle"></i> Manage Suricata address and port variables. Use JSON mode for structured values such as groups or lists.
+
+                </div>
+
+                <div class="alert alert-danger d-none" id="vars-error"></div>
+
+                <div class="alert alert-success d-none" id="vars-success"></div>
+
+
+
+                <div id="vars-container">
+
+                    <p class="text-muted text-center"><i class="fas fa-spinner fa-spin"></i> Loading variables...</p>
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+
+                <button type="button" class="btn btn-success" id="save-vars-btn">
+
+                    <i class="fas fa-save"></i> Save Configuration
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>

@@ -1,0 +1,29 @@
+<!-- IPS/Preventive Modal -->
+<div class="modal fade" id="ipsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-shield-alt"></i> IPS / Preventive Configuration</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> IPS mode actively blocks traffic. Ensure proper testing before enabling in production.
+                </div>
+                <div class="alert alert-danger d-none" id="ips-error"></div>
+                <div class="alert alert-success d-none" id="ips-success"></div>
+
+                <div id="ips-container">
+                    <p class="text-muted text-center"><i class="fas fa-spinner fa-spin"></i> Loading IPS configuration...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="save-ips-btn">
+                    <i class="fas fa-save"></i> Save Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
