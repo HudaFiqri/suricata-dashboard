@@ -21,8 +21,14 @@ class DatabaseManager:
 
     SUPPORTED_DB_TYPES = ('mysql', 'postgresql')
 
-    def __init__(self, db_type: str = 'postgresql', db_config: Optional[Dict[str, str]] = None):
-        """Initialize database manager."""
+    def __init__(self, db_type: str = 'postgresql', db_config: Optional[Dict[str, str]] = None, auto_detect: bool = False):
+        """Initialize database manager.
+
+        Args:
+            db_type: Database type ('mysql' or 'postgresql')
+            db_config: Database configuration dictionary
+            auto_detect: If True, try to detect available database automatically
+        """
         normalized_type = (db_type or '').strip().lower()
         if normalized_type not in self.SUPPORTED_DB_TYPES:
             raise ValueError(f"Unsupported database type: {db_type}")
@@ -33,14 +39,20 @@ class DatabaseManager:
         self.db_type = normalized_type
         self.original_db_type = self.db_type
         self.db_config = db_config
+        self.auto_detect = auto_detect
 
         self.engine = None
         self.db_url = ''
+        self.connection_failed = False
+        self.connection_error = None
 
         self._initialize_database()
 
-        self.Session = scoped_session(sessionmaker(bind=self.engine))
-        self._create_tables()
+        if not self.connection_failed:
+            self.Session = scoped_session(sessionmaker(bind=self.engine))
+            self._create_tables()
+        else:
+            self.Session = None
 
     ENGINE_FACTORIES = {
         'mysql': create_mysql_engine,
@@ -55,10 +67,20 @@ class DatabaseManager:
 
         try:
             self.db_url, self.engine = factory(self.db_config)
-            if not _is_reloader_process():
-                print(f"[DATABASE] Connected to {self.db_type.upper()}")
+            # Test connection
+            if self._test_connection():
+                if not _is_reloader_process():
+                    print(f"[DATABASE] ✓ Connected to {self.db_type.upper()} at {self.db_config.get('host')}:{self.db_config.get('port')}")
+                self.connection_failed = False
+            else:
+                raise RuntimeError("Connection test failed")
         except Exception as exc:
-            raise RuntimeError(f"[DATABASE] Failed to connect to {self.db_type.upper()}: {exc}") from exc
+            self.connection_failed = True
+            self.connection_error = str(exc)
+            if not _is_reloader_process():
+                print(f"[DATABASE] ✗ Failed to connect to {self.db_type.upper()}: {exc}")
+            if not self.auto_detect:
+                raise RuntimeError(f"[DATABASE] Failed to connect to {self.db_type.upper()}: {exc}") from exc
 
     def _create_tables(self):
         """Create all tables"""
@@ -69,6 +91,8 @@ class DatabaseManager:
 
     def get_session(self):
         """Get a new database session"""
+        if self.connection_failed or self.Session is None:
+            raise RuntimeError(f"Database connection not available: {self.connection_error}")
         return self.Session()
 
     def close(self):
@@ -91,6 +115,8 @@ class DatabaseManager:
     def _test_connection(self) -> bool:
         """Test if database connection is alive"""
         try:
+            if not self.engine:
+                return False
             with self.engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             return True
