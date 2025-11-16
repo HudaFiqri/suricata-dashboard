@@ -40,29 +40,14 @@ def validate_jwt(token):
         return None
 
 def require_auth(f):
-    """Decorator to require authentication"""
+    """Decorator to require authentication - DISABLED FOR PUBLIC ACCESS MODE"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-
-        if not auth_header:
-            return jsonify({'success': False, 'error': 'No authorization header'}), 401
-
-        try:
-            # Bearer token format
-            token = auth_header.split(' ')[1] if ' ' in auth_header else auth_header
-            payload = validate_jwt(token)
-
-            if not payload:
-                return jsonify({'success': False, 'error': 'Invalid token'}), 401
-
-            # Attach user info to request
-            request.user_id = payload['user_id']
-            request.username = payload['username']
-            request.user_role = payload['role']
-
-        except Exception as e:
-            return jsonify({'success': False, 'error': 'Authentication failed'}), 401
+        # PUBLIC ACCESS MODE - No authentication required
+        # Attach default public user info to request
+        request.user_id = 'public'
+        request.username = 'public'
+        request.user_role = 'admin'
 
         return f(*args, **kwargs)
 
