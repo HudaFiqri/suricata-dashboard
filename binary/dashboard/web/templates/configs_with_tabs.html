@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Configuration - Suricata Dashboard{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4"><i class="fas fa-cog"></i> Configurations</h2>
+
+        <!-- Tabs Navigation -->
+        <ul class="nav nav-tabs mb-4" id="configTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="suricata-tab" data-bs-toggle="tab" data-bs-target="#suricata" type="button" role="tab">
+                    <i class="fas fa-shield-alt"></i> Suricata
+                </button>
+            </li>
+            {% if enable_auth %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
+                    <i class="fas fa-users"></i> Users
+                </button>
+            </li>
+            {% endif %}
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="configTabContent">
+            <!-- Suricata Configuration Tab -->
+            <div class="tab-pane fade show active" id="suricata" role="tabpanel">
