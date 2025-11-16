@@ -825,15 +825,20 @@ let users = [];
 
 async function loadUsers() {
     try {
+        console.log('Loading users...');
         const response = await apiCall('/users');
+        console.log('Users API response:', response);
+
         if (response.success) {
             users = response.users;
             renderUsers();
         } else {
             console.error('Failed to load users:', response.error);
+            $('#users-tbody').html(`<tr><td colspan="7" class="text-center text-danger">Error: ${response.error || 'Failed to load users'}</td></tr>`);
         }
     } catch (error) {
-        console.error('Error loading users:', error.message);
+        console.error('Error loading users:', error);
+        $('#users-tbody').html(`<tr><td colspan="7" class="text-center text-danger">Error: ${error.message}</td></tr>`);
     }
 }
 
