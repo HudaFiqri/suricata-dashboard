@@ -236,7 +236,8 @@
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             if (user.username) {
                 $('#username-display').text(user.username);
-
+            } else {
+                // Not logged in, redirect to login (unless already on login page)
                 if (window.location.pathname !== '/login') {
                     window.location.href = '/login';
                     return;
