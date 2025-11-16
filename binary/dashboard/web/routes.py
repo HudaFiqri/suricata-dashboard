@@ -6,13 +6,16 @@ Dashboard pages for multi-agent management
 from flask import render_template, redirect, url_for, session, request
 from binary.dashboard.web import web
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+ENABLE_AUTH = os.getenv('ENABLE_AUTH', 'False').lower() == 'true'
 
 @web.route('/')
 def index():
     """Dashboard home - agent overview"""
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', enable_auth=ENABLE_AUTH)
 
 @web.route('/agents')
 def agents():
@@ -59,11 +62,13 @@ def agent_config(agent_id):
     """Agent configuration editor"""
     return render_template('config_editor.html', agent_id=agent_id)
 
-# Login disabled - public access mode
-# @web.route('/login')
-# def login():
-#     """Login page"""
-#     return render_template('login.html')
+@web.route('/login')
+def login():
+    """Login page"""
+    if not ENABLE_AUTH:
+        # Auth disabled, redirect to dashboard
+        return redirect(url_for('web.index'))
+    return render_template('login.html')
 
 @web.route('/logout')
 def logout():

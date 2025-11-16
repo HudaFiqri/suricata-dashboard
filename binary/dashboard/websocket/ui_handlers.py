@@ -16,59 +16,116 @@ import logging
 logger = logging.getLogger(__name__)
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'change-this-secret-key')
+ENABLE_AUTH = os.getenv('ENABLE_AUTH', 'False').lower() == 'true'
 
 # Track active UI connections
 active_ui_clients = {}  # {session_id: {user_id, username, connected_at}}
 
 @socketio.on('connect', namespace='/ws/v1/ui')
 def handle_ui_connect():
-    """Web UI client connects - PUBLIC ACCESS MODE"""
-    session_id = request.sid
-    logger.info(f"UI client connecting (public mode): {session_id}")
-
-    # Auto-register as public user
-    active_ui_clients[session_id] = {
-        'user_id': 'public',
-        'username': 'public',
-        'role': 'admin',  # Grant admin role in public mode
-        'connected_at': datetime.utcnow()
-    }
-
-    emit('connected', {
-        'session_id': session_id,
-        'timestamp': datetime.utcnow().isoformat(),
-        'public_mode': True
-    })
-
-@socketio.on('auth', namespace='/ws/v1/ui')
-def handle_ui_auth(data):
-    """Auth handler - disabled in public access mode"""
+    """Web UI client connects"""
     session_id = request.sid
 
-    # Always return success in public mode
-    emit('auth_response', {
-        'success': True,
-        'public_mode': True,
-        'user': {
-            'username': 'public',
-            'role': 'admin'
-        }
-    })
-
-@socketio.on('subscribe', namespace='/ws/v1/ui')
-def handle_subscribe(data):
-    """Subscribe to specific data streams - PUBLIC ACCESS MODE"""
-    session_id = request.sid
-
-    # Public mode - no auth check needed
-    # Auto-register if not exists
-    if session_id not in active_ui_clients:
+    if not ENABLE_AUTH:
+        # PUBLIC ACCESS MODE
+        logger.info(f"UI client connecting (public mode): {session_id}")
         active_ui_clients[session_id] = {
             'user_id': 'public',
             'username': 'public',
             'role': 'admin',
             'connected_at': datetime.utcnow()
         }
+
+        emit('connected', {
+            'session_id': session_id,
+            'timestamp': datetime.utcnow().isoformat(),
+            'auth_required': False
+        })
+    else:
+        # AUTH ENABLED - Wait for auth message
+        logger.info(f"UI client connecting (auth required): {session_id}")
+        emit('connected', {
+            'session_id': session_id,
+            'timestamp': datetime.utcnow().isoformat(),
+            'auth_required': True
+        })
+
+@socketio.on('auth', namespace='/ws/v1/ui')
+def handle_ui_auth(data):
+    """WebSocket authentication handler"""
+    session_id = request.sid
+
+    if not ENABLE_AUTH:
+        # Public mode - auto success
+        emit('auth_response', {
+            'success': True,
+            'user': {
+                'username': 'public',
+                'role': 'admin'
+            }
+        })
+        return
+
+    # Auth enabled - validate JWT token
+    token = data.get('token')
+    if not token:
+        emit('auth_response', {
+            'success': False,
+            'error': 'Token required'
+        })
+        return
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+
+        # Register authenticated client
+        active_ui_clients[session_id] = {
+            'user_id': payload['user_id'],
+            'username': payload['username'],
+            'role': payload.get('role', 'viewer'),
+            'connected_at': datetime.utcnow()
+        }
+
+        emit('auth_response', {
+            'success': True,
+            'user': {
+                'username': payload['username'],
+                'role': payload.get('role', 'viewer')
+            }
+        })
+
+        logger.info(f"UI client authenticated: {payload['username']}")
+
+    except jwt.ExpiredSignatureError:
+        emit('auth_response', {
+            'success': False,
+            'error': 'Token expired'
+        })
+    except jwt.InvalidTokenError:
+        emit('auth_response', {
+            'success': False,
+            'error': 'Invalid token'
+        })
+
+@socketio.on('subscribe', namespace='/ws/v1/ui')
+def handle_subscribe(data):
+    """Subscribe to specific data streams"""
+    session_id = request.sid
+
+    # Check if client is registered
+    if session_id not in active_ui_clients:
+        if not ENABLE_AUTH:
+            # Public mode - auto-register
+            active_ui_clients[session_id] = {
+                'user_id': 'public',
+                'username': 'public',
+                'role': 'admin',
+                'connected_at': datetime.utcnow()
+            }
+        else:
+            # Auth mode - client must authenticate first
+            emit('error', {'message': 'Authentication required'})
+            return
 
     channel = data.get('channel')
 
@@ -110,21 +167,30 @@ def handle_unsubscribe(data):
 
 @socketio.on('send_command', namespace='/ws/v1/ui')
 def handle_send_command(data):
-    """UI sends command to agent - PUBLIC ACCESS MODE"""
+    """UI sends command to agent"""
     session_id = request.sid
 
-    # Public mode - auto-register if needed
+    # Check if client is registered
     if session_id not in active_ui_clients:
-        active_ui_clients[session_id] = {
-            'user_id': 'public',
-            'username': 'public',
-            'role': 'admin',
-            'connected_at': datetime.utcnow()
-        }
+        if not ENABLE_AUTH:
+            # Public mode - auto-register
+            active_ui_clients[session_id] = {
+                'user_id': 'public',
+                'username': 'public',
+                'role': 'admin',
+                'connected_at': datetime.utcnow()
+            }
+        else:
+            # Auth mode - must be authenticated
+            emit('error', {'message': 'Authentication required'})
+            return
 
     user_info = active_ui_clients[session_id]
 
-    # Public mode - no permission check (everyone is admin)
+    # Check permissions (only admins can send commands in auth mode)
+    if ENABLE_AUTH and user_info.get('role') != 'admin':
+        emit('error', {'message': 'Insufficient permissions'})
+        return
 
     agent_id = data.get('agent_id')
     command_type = data.get('command_type')
@@ -175,10 +241,13 @@ def handle_send_command(data):
 
 @socketio.on('get_active_agents', namespace='/ws/v1/ui')
 def handle_get_active_agents():
-    """Get list of currently connected agents - PUBLIC ACCESS MODE"""
+    """Get list of currently connected agents"""
     session_id = request.sid
 
-    # Public mode - no auth check needed
+    # Check if authenticated (in auth mode)
+    if ENABLE_AUTH and session_id not in active_ui_clients:
+        emit('error', {'message': 'Authentication required'})
+        return
 
     from binary.dashboard.websocket.agent_handlers import active_agents
 

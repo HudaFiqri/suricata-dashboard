@@ -16,6 +16,7 @@ import os
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'change-this-secret-key')
 JWT_EXPIRATION_HOURS = 24
+ENABLE_AUTH = os.getenv('ENABLE_AUTH', 'False').lower() == 'true'
 
 def generate_jwt(user):
     """Generate JWT token for user"""
@@ -40,14 +41,34 @@ def validate_jwt(token):
         return None
 
 def require_auth(f):
-    """Decorator to require authentication - DISABLED FOR PUBLIC ACCESS MODE"""
+    """Decorator to require authentication"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # PUBLIC ACCESS MODE - No authentication required
-        # Attach default public user info to request
-        request.user_id = 'public'
-        request.username = 'public'
-        request.user_role = 'admin'
+        if not ENABLE_AUTH:
+            # PUBLIC ACCESS MODE - No authentication required
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+            return f(*args, **kwargs)
+
+        # AUTH ENABLED - Check for JWT token
+        token = request.headers.get('Authorization')
+
+        if not token:
+            return jsonify({'success': False, 'error': 'No authorization token'}), 401
+
+        # Remove 'Bearer ' prefix if present
+        if token.startswith('Bearer '):
+            token = token[7:]
+
+        payload = validate_jwt(token)
+        if not payload:
+            return jsonify({'success': False, 'error': 'Invalid or expired token'}), 401
+
+        # Attach user info to request
+        request.user_id = payload['user_id']
+        request.username = payload['username']
+        request.user_role = payload.get('role', 'viewer')
 
         return f(*args, **kwargs)
 
