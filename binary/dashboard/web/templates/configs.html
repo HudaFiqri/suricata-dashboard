@@ -481,18 +481,29 @@
 
 {% endblock %}
 {% block extra_js %}
-<!-- Configuration Module Scripts -->
-<script src="{{ url_for('static', filename='js/config/utils.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/app-layer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/outputs.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/stream.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/vars.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/host.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/ips.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/interfaces.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/packet-capture.js') }}"></script>
-
 <script>
+// ==================== Utility Functions ====================
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.toString().replace(/[&<>"']/g, m => map[m]);
+}
+
+function toBoolean(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+        return value.toLowerCase() === 'true' || value === '1';
+    }
+    return !!value;
+}
+
+// ==================== Configuration Settings ====================
 const integrationDefaults = {
     discord: {
         enabled: false,
