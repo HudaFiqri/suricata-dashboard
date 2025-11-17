@@ -33,9 +33,13 @@ def register_agent():
     # Generate token (same for both PostgreSQL and MongoDB)
     import secrets
     import hashlib
+    from cryptography.fernet import Fernet
+
     plain_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(plain_token.encode()).hexdigest()
-    encryption_key = secrets.token_urlsafe(32)
+
+    # Generate proper Fernet key (32 bytes base64-encoded)
+    encryption_key = Fernet.generate_key().decode('utf-8')
 
     # Try PostgreSQL first
     try:
@@ -618,9 +622,9 @@ def rotate_encryption_key(agent_id):
     Returns new key that needs to be updated in agent config
     """
 
-    # Generate new encryption key
-    import secrets
-    new_encryption_key = secrets.token_urlsafe(32)
+    # Generate new encryption key (proper Fernet format)
+    from cryptography.fernet import Fernet
+    new_encryption_key = Fernet.generate_key().decode('utf-8')
 
     # Try PostgreSQL first
     try:

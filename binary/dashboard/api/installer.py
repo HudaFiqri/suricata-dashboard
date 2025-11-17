@@ -104,8 +104,8 @@ def get_installer():
 
     # If still no encryption key, auto-generate one
     if not encryption_key:
-        import secrets
-        encryption_key = secrets.token_urlsafe(32)
+        from cryptography.fernet import Fernet
+        encryption_key = Fernet.generate_key().decode('utf-8')
         logger.info(f"Auto-generated encryption key for installer download")
 
     dashboard_url = request.host_url.rstrip('/')
