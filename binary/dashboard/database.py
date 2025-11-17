@@ -29,7 +29,7 @@ mongo_db = None
 def get_postgres_uri():
     """Build PostgreSQL connection URI from environment"""
     host = os.getenv('POSTGRES_HOST', 'localhost')
-    port = os.getenv('POSTGRES_PORT', '5432')
+    port = int(os.getenv('POSTGRES_PORT', '5432') or '5432')
     database = os.getenv('POSTGRES_DB', 'suricata_dashboard')
     user = os.getenv('POSTGRES_USER', 'suricata')
     password = os.getenv('POSTGRES_PASSWORD', 'password')
@@ -39,7 +39,7 @@ def get_postgres_uri():
 def get_mongodb_uri():
     """Build MongoDB connection URI from environment"""
     host = os.getenv('MONGO_HOST', 'localhost')
-    port = os.getenv('MONGO_PORT', '27017')
+    port = int(os.getenv('MONGO_PORT', '27017') or '27017')
     user = os.getenv('MONGO_USER', '')  # Default empty string
     password = os.getenv('MONGO_PASSWORD', '')  # Default empty string
     auth_source = os.getenv('MONGO_AUTH_SOURCE', 'admin')

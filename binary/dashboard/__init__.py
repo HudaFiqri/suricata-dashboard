@@ -17,6 +17,11 @@ logging.basicConfig(
 # Reduce werkzeug logging noise
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
+# Suppress initialization logs on reloader process (to avoid duplicate logs)
+if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+    logging.getLogger('binary.dashboard').setLevel(logging.ERROR)
+    logging.getLogger('binary.dashboard.database').setLevel(logging.ERROR)
+
 logger = logging.getLogger(__name__)
 
 def create_app(config=None):
