@@ -160,38 +160,46 @@ def require_agent_auth(f):
             # Hash token to find agent
             token_hash = hashlib.sha256(plain_token.encode()).hexdigest()
 
+            agent = None
+
+            # Try PostgreSQL first
             try:
-                # Try PostgreSQL first
                 session = get_pg_session()
                 agent = session.query(Agent).filter_by(token_hash=token_hash).first()
-
-                if not agent:
-                    # Try MongoDB fallback
-                    try:
-                        db = get_mongo_db()
-                        agent_doc = db.agents.find_one({'token_hash': token_hash})
-                        if agent_doc:
-                            # Convert MongoDB doc to agent-like object
-                            class AgentObj:
-                                def __init__(self, doc):
-                                    self.id = str(doc['_id'])
-                                    self.name = doc.get('name')
-                                    self.encryption_key = doc.get('encryption_key')
-                            agent = AgentObj(agent_doc)
-                    except:
-                        pass
-
-                if not agent:
-                    return jsonify({'success': False, 'error': 'Agent not found'}), 401
-
-                # Attach agent info to request
-                request.agent_id = agent.id
-                request.agent = agent
-
-                return f(*args, **kwargs)
-
+            except RuntimeError:
+                # PostgreSQL not available, try MongoDB
+                pass
             except Exception as e:
-                return jsonify({'success': False, 'error': f'Agent authentication failed: {str(e)}'}), 401
+                # Other error, log but continue to MongoDB
+                pass
+
+            # Try MongoDB fallback if PostgreSQL failed or agent not found
+            if not agent:
+                try:
+                    db = get_mongo_db()
+                    agent_doc = db.agents.find_one({'token_hash': token_hash})
+                    if agent_doc:
+                        # Convert MongoDB doc to agent-like object
+                        class AgentObj:
+                            def __init__(self, doc):
+                                self.id = str(doc['_id'])
+                                self.name = doc.get('name')
+                                self.encryption_key = doc.get('encryption_key')
+                        agent = AgentObj(agent_doc)
+                except RuntimeError:
+                    # MongoDB not available either
+                    pass
+                except Exception:
+                    pass
+
+            if not agent:
+                return jsonify({'success': False, 'error': 'Agent not found'}), 401
+
+            # Attach agent info to request
+            request.agent_id = agent.id
+            request.agent = agent
+
+            return f(*args, **kwargs)
 
         # Old format: X-Agent-Token + X-Agent-ID
         if not encrypted_token or not agent_id:
