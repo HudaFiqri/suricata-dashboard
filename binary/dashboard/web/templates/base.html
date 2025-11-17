@@ -68,6 +68,10 @@
             font-size: 0.8rem;
             padding: 0.25rem 0.5rem;
         }
+        /* Hide admin-only buttons for viewer role */
+        body.viewer-mode .admin-only {
+            display: none !important;
+        }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -245,6 +249,14 @@
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             if (user.username) {
                 $('#username-display').text(user.username);
+
+                // Hide admin-only elements for viewer role
+                if (user.role === 'viewer') {
+                    // Hide Configurations menu
+                    $('.sidebar .nav-link[href="/configs"]').hide();
+                    // Hide admin buttons (will be applied by other pages)
+                    $('body').addClass('viewer-mode');
+                }
             } else {
                 // Not logged in, redirect to login (unless already on login page)
                 if (window.location.pathname !== '/login') {
