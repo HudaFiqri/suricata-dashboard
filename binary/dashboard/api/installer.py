@@ -93,15 +93,29 @@ AGENT_FILE_EOF
 # Agent files not found in dashboard
 # Creating placeholder agent script
 cat > /opt/suricata-agent/agent.py << 'AGENT_FILE_EOF'
-#!/usr/bin/env python3
+#!/opt/suricata-agent/venv/bin/python
 """
 Suricata Dashboard Agent - Placeholder
 Agent files are not yet implemented in the dashboard.
-This is a placeholder script.
+This is a placeholder script that will be replaced when agent code is available.
 """
 import sys
-print("Agent files not yet implemented. Please check dashboard documentation.")
-sys.exit(1)
+import time
+
+print("=" * 60)
+print("Suricata Dashboard Agent - Placeholder")
+print("=" * 60)
+print()
+print("Agent files are not yet implemented in the dashboard.")
+print("This placeholder keeps the service running while you develop the agent.")
+print()
+print("The agent will idle until proper agent code is deployed.")
+print("=" * 60)
+
+# Keep service running (prevents systemd restart loop)
+while True:
+    time.sleep(60)
+    print("Agent placeholder still running... (waiting for real agent code)")
 AGENT_FILE_EOF
 
 '''
