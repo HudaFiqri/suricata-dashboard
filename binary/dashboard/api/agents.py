@@ -129,15 +129,6 @@ def register_agent():
 @require_auth
 def list_agents():
     """List all agents with optional filtering"""
-    try:
-        session = get_pg_session()
-    except RuntimeError:
-        # PostgreSQL not available
-        return jsonify({
-            'success': False,
-            'error': 'Database not available',
-            'agents': []
-        }), 503
 
     # Query parameters
     status = request.args.get('status')
@@ -145,29 +136,86 @@ def list_agents():
     limit = int(request.args.get('limit', 50))
     offset = int(request.args.get('offset', 0))
 
-    # Build query
-    query = session.query(Agent)
+    # Try PostgreSQL first
+    try:
+        session = get_pg_session()
 
-    if status:
-        query = query.filter_by(status=status)
+        # Build query
+        query = session.query(Agent)
 
-    if tags:
-        # Filter by tags (JSONB contains)
-        tag_list = tags.split(',')
-        for tag in tag_list:
-            query = query.filter(Agent.tags.contains([tag]))
+        if status:
+            query = query.filter_by(status=status)
 
-    # Count total
-    total = query.count()
+        if tags:
+            # Filter by tags (JSONB contains)
+            tag_list = tags.split(',')
+            for tag in tag_list:
+                query = query.filter(Agent.tags.contains([tag]))
 
-    # Apply pagination
-    agents = query.order_by(Agent.created_at.desc()).limit(limit).offset(offset).all()
+        # Count total
+        total = query.count()
 
-    return jsonify({
-        'success': True,
-        'total': total,
-        'agents': [agent.to_dict() for agent in agents]
-    })
+        # Apply pagination
+        agents = query.order_by(Agent.created_at.desc()).limit(limit).offset(offset).all()
+
+        return jsonify({
+            'success': True,
+            'total': total,
+            'agents': [agent.to_dict() for agent in agents]
+        })
+
+    except RuntimeError:
+        # Fallback to MongoDB
+        try:
+            from binary.dashboard.database import get_mongo_db
+            db = get_mongo_db()
+
+            # Build MongoDB query
+            mongo_query = {}
+            if status:
+                mongo_query['status'] = status
+            if tags:
+                tag_list = tags.split(',')
+                mongo_query['tags'] = {'$all': tag_list}
+
+            # Count total
+            total = db.agents.count_documents(mongo_query)
+
+            # Query with pagination
+            cursor = db.agents.find(mongo_query).sort('created_at', -1).skip(offset).limit(limit)
+            agents_list = []
+
+            for agent_doc in cursor:
+                # Convert MongoDB document to dict
+                agent_dict = {
+                    'id': str(agent_doc.get('_id')),
+                    'name': agent_doc.get('name'),
+                    'hostname': agent_doc.get('hostname'),
+                    'ip_address': agent_doc.get('ip_address'),
+                    'tags': agent_doc.get('tags', []),
+                    'version': agent_doc.get('version'),
+                    'suricata_version': agent_doc.get('suricata_version'),
+                    'system_info': agent_doc.get('system_info', {}),
+                    'status': agent_doc.get('status', 'offline'),
+                    'last_seen': agent_doc.get('last_seen'),
+                    'created_at': agent_doc.get('created_at'),
+                    'updated_at': agent_doc.get('updated_at')
+                }
+                agents_list.append(agent_dict)
+
+            return jsonify({
+                'success': True,
+                'total': total,
+                'agents': agents_list
+            })
+
+        except RuntimeError:
+            # Both databases unavailable
+            return jsonify({
+                'success': False,
+                'error': 'Database not available',
+                'agents': []
+            }), 503
 
 @api.route('/agents/<int:agent_id>', methods=['GET'])
 @require_auth
