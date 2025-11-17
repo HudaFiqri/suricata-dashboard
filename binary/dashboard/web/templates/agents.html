@@ -324,21 +324,93 @@ function copyInstallCommand(event) {
     const cmd = $('#install-command').val();
 
     if (!cmd || cmd === 'Loading...') {
-        alert('Please generate an installer first');
+        showNotification('Please generate an installer first', 'warning');
         return;
     }
 
-    navigator.clipboard.writeText(cmd).then(() => {
-        // Show feedback
-        const btn = event.target.closest('button');
-        const originalHtml = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-        setTimeout(() => {
-            btn.innerHTML = originalHtml;
-        }, 2000);
-    }).catch(err => {
-        alert('Failed to copy: ' + err.message);
-    });
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+
+    // Try modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cmd).then(() => {
+            // Success feedback
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-success');
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+
+            showNotification('Installation command copied to clipboard!', 'success');
+
+            setTimeout(() => {
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-secondary');
+                btn.innerHTML = originalHtml;
+            }, 2000);
+        }).catch(err => {
+            // Fallback if modern API fails
+            fallbackCopy(cmd, btn, originalHtml);
+        });
+    } else {
+        // Fallback for older browsers
+        fallbackCopy(cmd, btn, originalHtml);
+    }
+}
+
+// Fallback copy method using execCommand
+function fallbackCopy(text, btn, originalHtml) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-success');
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+
+            showNotification('Installation command copied to clipboard!', 'success');
+
+            setTimeout(() => {
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-secondary');
+                btn.innerHTML = originalHtml;
+            }, 2000);
+        } else {
+            showNotification('Failed to copy. Please copy manually.', 'danger');
+        }
+    } catch (err) {
+        showNotification('Copy not supported. Please copy manually.', 'danger');
+    } finally {
+        document.body.removeChild(textArea);
+    }
+}
+
+// Show notification toast
+function showNotification(message, type = 'info') {
+    // Remove existing notifications
+    $('.notification-toast').remove();
+
+    const toast = $(`
+        <div class="notification-toast alert alert-${type} alert-dismissible fade show"
+             style="position: fixed; top: 80px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            <strong>${type === 'success' ? '<i class="fas fa-check-circle"></i>' : type === 'warning' ? '<i class="fas fa-exclamation-triangle"></i>' : '<i class="fas fa-info-circle"></i>'}</strong> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `);
+
+    $('body').append(toast);
+
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        toast.fadeOut(300, function() {
+            $(this).remove();
+        });
+    }, 3000);
 }
 
 // Send command to agent
