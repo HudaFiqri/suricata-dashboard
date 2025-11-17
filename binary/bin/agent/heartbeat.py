@@ -16,17 +16,14 @@ logger = logging.getLogger(__name__)
 class HeartbeatManager:
     """Manages agent heartbeat and health monitoring"""
 
-    def __init__(self, client, agent_name: str, interval: int = 30):
+    def __init__(self, client, agent_name: str, agent_id: str, interval: int = 30):
         """Initialize heartbeat manager"""
         self.client = client
         self.agent_name = agent_name
+        self.agent_id = agent_id
         self.interval = interval
         self.running = False
         self.thread = None
-
-        # Get agent ID from environment or config
-        # This would normally be set during installation
-        self.agent_id = os.getenv('SURICATA_AGENT_ID', 'unknown')
 
     def start(self):
         """Start heartbeat thread"""

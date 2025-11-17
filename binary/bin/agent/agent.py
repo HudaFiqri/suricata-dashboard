@@ -149,11 +149,33 @@ class SuricataAgent:
 
         logger.info("Successfully connected to dashboard")
 
+        # Fetch agent ID from dashboard
+        logger.info("Fetching agent ID from dashboard...")
+        try:
+            import requests
+            response = requests.get(
+                f"{self.config.dashboard_url}/api/v1/agents/self",
+                headers={'Authorization': f'Bearer {self.config.token}'},
+                verify=self.config.verify_ssl,
+                timeout=10
+            )
+            if response.status_code == 200:
+                agent_data = response.json()
+                agent_id = agent_data.get('agent_id')
+                logger.info(f"Agent ID: {agent_id}")
+            else:
+                logger.error(f"Failed to fetch agent ID: HTTP {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to fetch agent ID: {e}")
+            return False
+
         # Start heartbeat manager
         logger.info("Starting heartbeat manager...")
         self.heartbeat_manager = HeartbeatManager(
             client=self.client,
             agent_name=self.config.agent_name,
+            agent_id=agent_id,
             interval=self.config.heartbeat_interval
         )
         self.heartbeat_manager.start()
