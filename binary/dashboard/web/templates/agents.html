@@ -170,6 +170,74 @@
         </div>
     </div>
 </div>
+
+<!-- Rotate Encryption Key Modal -->
+<div class="modal fade" id="rotateKeyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-key"></i> Rotate Encryption Key
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Important:</strong> After rotation, you must update the encryption key in the agent's config file and restart the agent service.
+                </div>
+
+                <p>
+                    Agent: <strong id="rotate-agent-name"></strong>
+                </p>
+
+                <div id="rotate-result" style="display: none;">
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Encryption key rotated successfully!
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">New Encryption Key:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control font-monospace" id="new-encryption-key" readonly>
+                            <button class="btn btn-outline-secondary" onclick="copyNewKey()">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">Update Agent Configuration:</h6>
+                            <ol>
+                                <li>SSH to the agent server</li>
+                                <li>Edit the config: <code>sudo nano /etc/suricata-agent/config.yaml</code></li>
+                                <li>Update the <code>encryption_key</code> field with the new key above</li>
+                                <li>Restart the agent: <code>sudo systemctl restart suricata-agent</code></li>
+                                <li>Verify: <code>sudo systemctl status suricata-agent</code></li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="rotate-loading" style="display: none;">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-info" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Rotating encryption key...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-info" id="confirm-rotate-btn" onclick="confirmRotateKey()">
+                    <i class="fas fa-key"></i> Rotate Key
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -269,6 +337,9 @@ function renderAgentsTable(agents) {
                         </button>
                         <button class="btn btn-outline-warning" onclick="viewAgentConfig('${agent.id}')" title="Configure">
                             <i class="fas fa-cog"></i>
+                        </button>
+                        <button class="btn btn-outline-info" onclick="rotateEncryptionKey('${agent.id}', '${agent.name}')" title="Rotate Encryption Key">
+                            <i class="fas fa-key"></i>
                         </button>
                         <button class="btn btn-outline-danger" onclick="deleteAgent('${agent.id}', '${agent.name}')" title="Delete">
                             <i class="fas fa-trash"></i>
@@ -575,6 +646,108 @@ $(document).on('hidden.bs.modal', '#deleteAgentModal', function() {
     deleteAgentName = null;
     $('#delete-agent-name-input').val('').removeClass('is-valid is-invalid');
     $('#confirm-delete-btn').prop('disabled', true).html('<i class="fas fa-trash"></i> Delete Agent');
+});
+
+// Rotate encryption key - show modal
+let rotateAgentId = null;
+let rotateAgentName = null;
+
+function rotateEncryptionKey(agentId, agentName) {
+    rotateAgentId = agentId;
+    rotateAgentName = agentName;
+
+    // Update modal content
+    $('#rotate-agent-name').text(agentName);
+    $('#rotate-result').hide();
+    $('#rotate-loading').hide();
+    $('#confirm-rotate-btn').show();
+    $('#new-encryption-key').val('');
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('rotateKeyModal'));
+    modal.show();
+}
+
+// Confirm rotate key button click
+async function confirmRotateKey() {
+    const btn = $('#confirm-rotate-btn');
+
+    // Show loading state
+    $('#rotate-loading').show();
+    btn.hide();
+
+    try {
+        const response = await apiCall(`/agents/${rotateAgentId}/rotate-key`, 'POST');
+
+        $('#rotate-loading').hide();
+
+        if (response.success) {
+            // Show new encryption key
+            $('#new-encryption-key').val(response.encryption_key);
+            $('#rotate-result').show();
+
+            showNotification('Encryption key rotated successfully', 'success');
+
+            // Reload agents list
+            loadAgents();
+        } else {
+            showNotification('Failed to rotate key: ' + response.error, 'danger');
+            btn.show();
+        }
+    } catch (error) {
+        $('#rotate-loading').hide();
+        showNotification('Error: ' + error.message, 'danger');
+        btn.show();
+    }
+}
+
+// Copy new encryption key
+function copyNewKey() {
+    const input = document.getElementById('new-encryption-key');
+    const key = input.value;
+
+    if (!key) {
+        showNotification('No encryption key to copy', 'warning');
+        return;
+    }
+
+    // Method 1: Select input and copy
+    try {
+        input.select();
+        input.setSelectionRange(0, 99999);
+
+        const successful = document.execCommand('copy');
+
+        if (successful) {
+            showNotification('Encryption key copied to clipboard!', 'success');
+            window.getSelection().removeAllRanges();
+            return;
+        }
+    } catch (err) {
+        console.error('execCommand failed:', err);
+    }
+
+    // Method 2: Try modern clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(key).then(() => {
+            showNotification('Encryption key copied to clipboard!', 'success');
+        }).catch(err => {
+            console.error('Clipboard API failed:', err);
+            showNotification('Failed to copy. Please copy manually.', 'danger');
+        });
+    } else {
+        showNotification('Copy not supported. Please select and copy manually (Ctrl+C).', 'warning');
+    }
+}
+
+// Reset rotate key modal when closed
+$(document).on('hidden.bs.modal', '#rotateKeyModal', function() {
+    rotateAgentId = null;
+    rotateAgentName = null;
+    $('#new-encryption-key').val('');
+    $('#rotate-result').hide();
+    $('#rotate-loading').hide();
+    $('#confirm-rotate-btn').show().html('<i class="fas fa-key"></i> Rotate Key');
 });
 
 // Update agent status from WebSocket

@@ -605,3 +605,112 @@ def agent_heartbeat(agent_id):
                 'success': False,
                 'error': 'Database not available'
             }), 503
+
+
+
+@api.route('/agents/<agent_id>/rotate-key', methods=['POST'])
+@require_auth
+def rotate_encryption_key(agent_id):
+    """
+    Rotate agent encryption key
+    Generates new encryption key for the agent
+
+    Returns new key that needs to be updated in agent config
+    """
+
+    # Generate new encryption key
+    import secrets
+    new_encryption_key = secrets.token_urlsafe(32)
+
+    # Try PostgreSQL first
+    try:
+        session = get_pg_session()
+
+        # Convert to int for PostgreSQL
+        try:
+            pg_agent_id = int(agent_id)
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Invalid agent ID'}), 400
+
+        agent = session.query(Agent).filter_by(id=pg_agent_id).first()
+
+        if not agent:
+            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+        agent_name = agent.name
+        old_key = agent.encryption_key[:8] + '...'  # Show first 8 chars for audit
+
+        # Update encryption key
+        agent.encryption_key = new_encryption_key
+        agent.updated_at = datetime.utcnow()
+        session.commit()
+
+        # Audit log
+        audit = AuditLog(
+            user_id=request.user_id,
+            username=request.username,
+            agent_id=pg_agent_id,
+            action='encryption_key_rotated',
+            resource_type='agent',
+            resource_id=pg_agent_id,
+            details={'agent_name': agent_name, 'old_key_prefix': old_key},
+            ip_address=request.remote_addr
+        )
+        session.add(audit)
+        session.commit()
+
+        logger.info(f"Encryption key rotated for agent {agent_name} (ID: {pg_agent_id}) by {request.username}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Encryption key rotated successfully',
+            'encryption_key': new_encryption_key,
+            'agent_name': agent_name
+        })
+
+    except RuntimeError:
+        # Fallback to MongoDB
+        try:
+            from binary.dashboard.database import get_mongo_db
+            from bson import ObjectId
+            db = get_mongo_db()
+
+            # Convert to ObjectId
+            try:
+                mongo_agent_id = ObjectId(agent_id)
+            except Exception:
+                return jsonify({'success': False, 'error': 'Invalid agent ID format'}), 400
+
+            # Find agent
+            agent = db.agents.find_one({'_id': mongo_agent_id})
+            if not agent:
+                return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+            agent_name = agent.get('name', 'Unknown')
+
+            # Update encryption key
+            result = db.agents.update_one(
+                {'_id': mongo_agent_id},
+                {'$set': {
+                    'encryption_key': new_encryption_key,
+                    'updated_at': datetime.utcnow()
+                }}
+            )
+
+            if result.matched_count == 0:
+                return jsonify({'success': False, 'error': 'Failed to update agent'}), 500
+
+            logger.info(f"Encryption key rotated for agent {agent_name} (ID: {agent_id})")
+
+            return jsonify({
+                'success': True,
+                'message': 'Encryption key rotated successfully',
+                'encryption_key': new_encryption_key,
+                'agent_name': agent_name
+            })
+
+        except RuntimeError:
+            return jsonify({
+                'success': False,
+                'error': 'Database not available'
+            }), 503
