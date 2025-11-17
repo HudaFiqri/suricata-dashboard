@@ -311,7 +311,7 @@ echo ""
     return Response(
         script,
         mimetype='text/x-shellscript',
-        headers={{
+        headers={
             'Content-Disposition': f'attachment; filename=install-suricata-agent-{name.replace(" ", "-")}.sh'
-        }}
+        }
     )
