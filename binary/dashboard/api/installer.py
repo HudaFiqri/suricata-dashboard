@@ -21,6 +21,12 @@ def get_agent_files():
 
     files = {}
 
+    # Check if agent directory exists
+    if not os.path.exists(agent_dir):
+        logger.warning(f"Agent directory not found: {agent_dir}")
+        # Return empty dict - installer will create placeholder
+        return files
+
     # Get all Python files recursively
     for filepath in glob.glob(os.path.join(agent_dir, '**', '*.py'), recursive=True):
         # Get relative path from agent directory
@@ -71,15 +77,31 @@ def get_installer():
     agent_files = get_agent_files()
 
     # Build embedded files section
-    embedded_files = ""
-    for filepath, content in agent_files.items():
-        # Encode file content as base64
-        encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-
-        embedded_files += f'''
+    if agent_files:
+        embedded_files = ""
+        for filepath, content in agent_files.items():
+            embedded_files += f'''
 # File: {filepath}
 cat > /opt/suricata-agent/{filepath} << 'AGENT_FILE_EOF'
 {content}
+AGENT_FILE_EOF
+
+'''
+    else:
+        # No agent files found - create placeholder
+        embedded_files = '''
+# Agent files not found in dashboard
+# Creating placeholder agent script
+cat > /opt/suricata-agent/agent.py << 'AGENT_FILE_EOF'
+#!/usr/bin/env python3
+"""
+Suricata Dashboard Agent - Placeholder
+Agent files are not yet implemented in the dashboard.
+This is a placeholder script.
+"""
+import sys
+print("Agent files not yet implemented. Please check dashboard documentation.")
+sys.exit(1)
 AGENT_FILE_EOF
 
 '''
