@@ -30,48 +30,93 @@ def register_agent():
                 'error': f'Missing required field: {field}'
             }), 400
 
-    session = get_pg_session()
-
-    # Check if agent already exists
-    existing = session.query(Agent).filter_by(name=data['name']).first()
-    if existing:
-        return jsonify({
-            'success': False,
-            'error': f'Agent with name {data["name"]} already exists'
-        }), 409
-
-    # Create new agent
-    agent = Agent(
-        name=data['name'],
-        hostname=data['hostname'],
-        ip_address=data.get('ip_address'),
-        tags=data.get('tags', []),
-        version=data.get('agent_version'),
-        suricata_version=data.get('suricata_version'),
-        system_info=data.get('system_info', {}),
-        status='online',  # Assume online on registration
-        last_seen=datetime.utcnow()
-    )
-
-    # Generate token (simplified - in production, use proper token generation)
+    # Generate token (same for both PostgreSQL and MongoDB)
     import secrets
-    plain_token = secrets.token_urlsafe(32)
-
-    # Hash token for storage
     import hashlib
+    plain_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(plain_token.encode()).hexdigest()
-    agent.token_hash = token_hash
-    agent.encryption_key = secrets.token_urlsafe(32)
+    encryption_key = secrets.token_urlsafe(32)
 
-    session.add(agent)
-    session.commit()
+    # Try PostgreSQL first
+    try:
+        session = get_pg_session()
 
-    logger.info(f"Agent registered: {agent.name} (ID: {agent.id})")
+        # Check if agent already exists
+        existing = session.query(Agent).filter_by(name=data['name']).first()
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': f'Agent with name {data["name"]} already exists'
+            }), 409
 
-    # Return response with config
+        # Create new agent
+        agent = Agent(
+            name=data['name'],
+            hostname=data['hostname'],
+            ip_address=data.get('ip_address'),
+            tags=data.get('tags', []),
+            version=data.get('agent_version'),
+            suricata_version=data.get('suricata_version'),
+            system_info=data.get('system_info', {}),
+            status='online',
+            last_seen=datetime.utcnow(),
+            token_hash=token_hash,
+            encryption_key=encryption_key
+        )
+
+        session.add(agent)
+        session.commit()
+
+        agent_id = agent.id
+        logger.info(f"Agent registered in PostgreSQL: {agent.name} (ID: {agent_id})")
+
+    except RuntimeError:
+        # Fallback to MongoDB
+        try:
+            from binary.dashboard.database import get_mongo_db
+            db = get_mongo_db()
+
+            # Check if agent already exists
+            existing = db.agents.find_one({'name': data['name']})
+            if existing:
+                return jsonify({
+                    'success': False,
+                    'error': f'Agent with name {data["name"]} already exists'
+                }), 409
+
+            # Create new agent document
+            agent_doc = {
+                'name': data['name'],
+                'hostname': data['hostname'],
+                'ip_address': data.get('ip_address'),
+                'tags': data.get('tags', []),
+                'version': data.get('agent_version'),
+                'suricata_version': data.get('suricata_version'),
+                'system_info': data.get('system_info', {}),
+                'status': 'online',
+                'last_seen': datetime.utcnow(),
+                'token_hash': token_hash,
+                'encryption_key': encryption_key,
+                'created_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow()
+            }
+
+            result = db.agents.insert_one(agent_doc)
+            agent_id = str(result.inserted_id)
+
+            logger.info(f"Agent registered in MongoDB: {data['name']} (ID: {agent_id})")
+
+        except RuntimeError:
+            return jsonify({
+                'success': False,
+                'error': 'Database not available'
+            }), 503
+
+    # Return response with config and token
     return jsonify({
         'success': True,
-        'agent_id': agent.id,
+        'agent_id': agent_id,
+        'token': plain_token,  # Return plain token for installer
         'message': 'Agent registered successfully',
         'config': {
             'heartbeat_interval': 30,
