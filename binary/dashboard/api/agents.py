@@ -217,74 +217,191 @@ def list_agents():
                 'agents': []
             }), 503
 
-@api.route('/agents/<int:agent_id>', methods=['GET'])
+@api.route('/agents/<agent_id>', methods=['GET'])
 @require_auth
 def get_agent(agent_id):
-    """Get single agent details"""
-    session = get_pg_session()
-    agent = session.query(Agent).filter_by(id=agent_id).first()
+    """Get single agent details (supports both int and string IDs)"""
 
-    if not agent:
-        return jsonify({'success': False, 'error': 'Agent not found'}), 404
+    # Try PostgreSQL first
+    try:
+        session = get_pg_session()
 
-    return jsonify({
-        'success': True,
-        'agent': agent.to_dict()
-    })
+        # Convert to int for PostgreSQL
+        try:
+            pg_agent_id = int(agent_id)
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Invalid agent ID'}), 400
 
-@api.route('/agents/<int:agent_id>', methods=['PUT'])
+        agent = session.query(Agent).filter_by(id=pg_agent_id).first()
+
+        if not agent:
+            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+        return jsonify({
+            'success': True,
+            'agent': agent.to_dict()
+        })
+
+    except RuntimeError:
+        # Fallback to MongoDB
+        try:
+            from binary.dashboard.database import get_mongo_db
+            from bson import ObjectId
+            db = get_mongo_db()
+
+            # Convert to ObjectId
+            try:
+                mongo_agent_id = ObjectId(agent_id)
+            except Exception:
+                return jsonify({'success': False, 'error': 'Invalid agent ID format'}), 400
+
+            agent = db.agents.find_one({'_id': mongo_agent_id})
+
+            if not agent:
+                return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+            # Convert to dict
+            agent_dict = {
+                'id': str(agent.get('_id')),
+                'name': agent.get('name'),
+                'hostname': agent.get('hostname'),
+                'ip_address': agent.get('ip_address'),
+                'tags': agent.get('tags', []),
+                'version': agent.get('version'),
+                'suricata_version': agent.get('suricata_version'),
+                'system_info': agent.get('system_info', {}),
+                'status': agent.get('status', 'offline'),
+                'last_seen': agent.get('last_seen'),
+                'created_at': agent.get('created_at'),
+                'updated_at': agent.get('updated_at')
+            }
+
+            return jsonify({
+                'success': True,
+                'agent': agent_dict
+            })
+
+        except RuntimeError:
+            return jsonify({
+                'success': False,
+                'error': 'Database not available'
+            }), 503
+
+@api.route('/agents/<agent_id>', methods=['PUT'])
 @require_auth
 def update_agent(agent_id):
-    """Update agent metadata"""
-    session = get_pg_session()
-    agent = session.query(Agent).filter_by(id=agent_id).first()
-
-    if not agent:
-        return jsonify({'success': False, 'error': 'Agent not found'}), 404
-
+    """Update agent metadata (supports both int and string IDs)"""
     data = request.get_json()
 
-    # Update allowed fields
-    if 'tags' in data:
-        agent.tags = data['tags']
+    # Try PostgreSQL first
+    try:
+        session = get_pg_session()
 
-    if 'name' in data:
-        # Check name uniqueness
-        existing = session.query(Agent).filter(
-            Agent.name == data['name'],
-            Agent.id != agent_id
-        ).first()
+        # Convert to int for PostgreSQL
+        try:
+            pg_agent_id = int(agent_id)
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Invalid agent ID'}), 400
 
-        if existing:
-            return jsonify({'success': False, 'error': 'Name already exists'}), 409
+        agent = session.query(Agent).filter_by(id=pg_agent_id).first()
 
-        agent.name = data['name']
+        if not agent:
+            return jsonify({'success': False, 'error': 'Agent not found'}), 404
 
-    session.commit()
+        # Update allowed fields
+        if 'tags' in data:
+            agent.tags = data['tags']
 
-    # Audit log
-    audit = AuditLog(
-        user_id=request.user_id,
-        username=request.username,
-        agent_id=agent_id,
-        action='agent_updated',
-        resource_type='agent',
-        resource_id=agent_id,
-        details=data,
-        ip_address=request.remote_addr
-    )
-    session.add(audit)
-    session.commit()
+        if 'name' in data:
+            # Check name uniqueness
+            existing = session.query(Agent).filter(
+                Agent.name == data['name'],
+                Agent.id != pg_agent_id
+            ).first()
 
-    return jsonify({
-        'success': True,
-        'message': 'Agent updated successfully'
-    })
+            if existing:
+                return jsonify({'success': False, 'error': 'Name already exists'}), 409
 
-@api.route('/agents/<int:agent_id>', methods=['DELETE'])
+            agent.name = data['name']
+
+        session.commit()
+
+        # Audit log
+        audit = AuditLog(
+            user_id=request.user_id,
+            username=request.username,
+            agent_id=pg_agent_id,
+            action='agent_updated',
+            resource_type='agent',
+            resource_id=pg_agent_id,
+            details=data,
+            ip_address=request.remote_addr
+        )
+        session.add(audit)
+        session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Agent updated successfully'
+        })
+
+    except RuntimeError:
+        # Fallback to MongoDB
+        try:
+            from binary.dashboard.database import get_mongo_db
+            from bson import ObjectId
+            from datetime import datetime
+            db = get_mongo_db()
+
+            # Convert to ObjectId
+            try:
+                mongo_agent_id = ObjectId(agent_id)
+            except Exception:
+                return jsonify({'success': False, 'error': 'Invalid agent ID format'}), 400
+
+            # Find agent
+            agent = db.agents.find_one({'_id': mongo_agent_id})
+            if not agent:
+                return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+            # Build update document
+            update_doc = {'updated_at': datetime.utcnow()}
+
+            if 'tags' in data:
+                update_doc['tags'] = data['tags']
+
+            if 'name' in data:
+                # Check name uniqueness
+                existing = db.agents.find_one({
+                    'name': data['name'],
+                    '_id': {'$ne': mongo_agent_id}
+                })
+                if existing:
+                    return jsonify({'success': False, 'error': 'Name already exists'}), 409
+
+                update_doc['name'] = data['name']
+
+            # Update agent
+            db.agents.update_one(
+                {'_id': mongo_agent_id},
+                {'$set': update_doc}
+            )
+
+            return jsonify({
+                'success': True,
+                'message': 'Agent updated successfully'
+            })
+
+        except RuntimeError:
+            return jsonify({
+                'success': False,
+                'error': 'Database not available'
+            }), 503
+
+@api.route('/agents/<agent_id>', methods=['DELETE'])
 @require_auth
 def delete_agent(agent_id):
-    """Delete agent"""
+    """Delete agent (supports both int and string IDs for PostgreSQL/MongoDB)"""
     confirm = request.args.get('confirm')
     if confirm != 'true':
         return jsonify({
@@ -292,37 +409,85 @@ def delete_agent(agent_id):
             'error': 'Confirmation required (add ?confirm=true)'
         }), 400
 
-    session = get_pg_session()
-    agent = session.query(Agent).filter_by(id=agent_id).first()
+    # Try PostgreSQL first
+    try:
+        session = get_pg_session()
 
-    if not agent:
-        return jsonify({'success': False, 'error': 'Agent not found'}), 404
+        # Convert agent_id to int for PostgreSQL
+        try:
+            pg_agent_id = int(agent_id)
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Invalid agent ID for PostgreSQL'}), 400
 
-    agent_name = agent.name
+        agent = session.query(Agent).filter_by(id=pg_agent_id).first()
 
-    # Audit log before deletion
-    audit = AuditLog(
-        user_id=request.user_id,
-        username=request.username,
-        agent_id=agent_id,
-        action='agent_deleted',
-        resource_type='agent',
-        resource_id=agent_id,
-        details={'name': agent_name},
-        ip_address=request.remote_addr
-    )
-    session.add(audit)
+        if not agent:
+            return jsonify({'success': False, 'error': 'Agent not found'}), 404
 
-    # Delete agent (cascade will delete related configs, commands, etc.)
-    session.delete(agent)
-    session.commit()
+        agent_name = agent.name
 
-    logger.info(f"Agent deleted: {agent_name} (ID: {agent_id}) by {request.username}")
+        # Audit log before deletion
+        audit = AuditLog(
+            user_id=request.user_id,
+            username=request.username,
+            agent_id=pg_agent_id,
+            action='agent_deleted',
+            resource_type='agent',
+            resource_id=pg_agent_id,
+            details={'name': agent_name},
+            ip_address=request.remote_addr
+        )
+        session.add(audit)
 
-    return jsonify({
-        'success': True,
-        'message': 'Agent deleted successfully'
-    })
+        # Delete agent (cascade will delete related configs, commands, etc.)
+        session.delete(agent)
+        session.commit()
+
+        logger.info(f"Agent deleted from PostgreSQL: {agent_name} (ID: {pg_agent_id})")
+
+        return jsonify({
+            'success': True,
+            'message': 'Agent deleted successfully'
+        })
+
+    except RuntimeError:
+        # Fallback to MongoDB
+        try:
+            from binary.dashboard.database import get_mongo_db
+            from bson import ObjectId
+            db = get_mongo_db()
+
+            # Convert string ID to ObjectId
+            try:
+                mongo_agent_id = ObjectId(agent_id)
+            except Exception:
+                return jsonify({'success': False, 'error': 'Invalid agent ID format'}), 400
+
+            # Find agent
+            agent = db.agents.find_one({'_id': mongo_agent_id})
+            if not agent:
+                return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+            agent_name = agent.get('name', 'Unknown')
+
+            # Delete agent
+            result = db.agents.delete_one({'_id': mongo_agent_id})
+
+            if result.deleted_count == 0:
+                return jsonify({'success': False, 'error': 'Failed to delete agent'}), 500
+
+            logger.info(f"Agent deleted from MongoDB: {agent_name} (ID: {agent_id})")
+
+            return jsonify({
+                'success': True,
+                'message': 'Agent deleted successfully'
+            })
+
+        except RuntimeError:
+            return jsonify({
+                'success': False,
+                'error': 'Database not available'
+            }), 503
 
 @api.route('/agents/<int:agent_id>/heartbeat', methods=['POST'])
 @require_agent_auth
