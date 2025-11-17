@@ -36,15 +36,29 @@ def decrypt_agent_payload(agent, encrypted_data: str) -> dict:
         if not encryption_key:
             raise ValueError("Agent has no encryption key configured")
 
-        # Initialize crypto helper (handles double base64 encoding from agent)
-        from binary.bin.agent.crypto import AgentCrypto
-        crypto = AgentCrypto(encryption_key)
+        logger.debug(f"Decrypting with key: {encryption_key[:10]}... (length: {len(encryption_key)})")
 
-        # Decrypt using the same method as agent encryption
-        return crypto.decrypt_json(encrypted_data)
+        # Initialize cipher
+        if isinstance(encryption_key, str):
+            key_bytes = encryption_key.encode('utf-8')
+        else:
+            key_bytes = encryption_key
+        cipher = Fernet(key_bytes)
+
+        # Decode from base64 (agent does base64 encode after Fernet encrypt)
+        encrypted_bytes = base64.b64decode(encrypted_data)
+
+        # Decrypt
+        decrypted = cipher.decrypt(encrypted_bytes)
+
+        # Parse JSON
+        return json.loads(decrypted.decode('utf-8'))
 
     except Exception as e:
         logger.error(f"Decryption failed: {e}")
+        logger.error(f"Agent type: {type(agent)}, Encryption key present: {bool(encryption_key)}")
+        if isinstance(agent, dict):
+            logger.error(f"Agent dict keys: {agent.keys()}")
         raise
 
 
