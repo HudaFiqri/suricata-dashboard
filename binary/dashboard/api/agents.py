@@ -617,11 +617,21 @@ def agent_heartbeat(agent_id):
         # Update health metrics (store decrypted health data)
         agent_obj.health_metrics = health_data
 
+        # Update hostname and IP from health data
+        if 'hostname' in health_data:
+            agent_obj.hostname = health_data['hostname']
+        if 'ip_address' in health_data:
+            agent_obj.ip_address = health_data['ip_address']
+        if 'agent_version' in health_data:
+            agent_obj.version = health_data['agent_version']
+
         # Update Suricata info
         if 'suricata' in health_data:
             suricata = health_data['suricata']
             if 'pid' in suricata:
                 agent_obj.suricata_pid = suricata['pid']
+            if 'version' in suricata:
+                agent_obj.suricata_version = suricata['version']
 
         session.commit()
 
@@ -646,15 +656,30 @@ def agent_heartbeat(agent_id):
             except Exception:
                 return jsonify({'success': False, 'error': 'Invalid agent ID'}), 400
 
+            # Prepare update data
+            update_data = {
+                'status': 'online',
+                'last_seen': datetime.utcnow(),
+                'health_metrics': health_data,
+                'updated_at': datetime.utcnow()
+            }
+
+            # Update hostname, IP, and version from health data
+            if 'hostname' in health_data:
+                update_data['hostname'] = health_data['hostname']
+            if 'ip_address' in health_data:
+                update_data['ip_address'] = health_data['ip_address']
+            if 'agent_version' in health_data:
+                update_data['version'] = health_data['agent_version']
+
+            # Update Suricata version
+            if 'suricata' in health_data and 'version' in health_data['suricata']:
+                update_data['suricata_version'] = health_data['suricata']['version']
+
             # Update agent
             result = db.agents.update_one(
                 {'_id': mongo_agent_id},
-                {'$set': {
-                    'status': 'online',
-                    'last_seen': datetime.utcnow(),
-                    'health_metrics': health_data,
-                    'updated_at': datetime.utcnow()
-                }}
+                {'$set': update_data}
             )
 
             if result.matched_count == 0:

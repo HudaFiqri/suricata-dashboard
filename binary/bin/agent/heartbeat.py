@@ -89,10 +89,19 @@ class HeartbeatManager:
             # Check if Suricata is running
             suricata_running = self._check_suricata_running()
             suricata_pid = self._get_suricata_pid() if suricata_running else None
+            suricata_version = self._get_suricata_version() if suricata_running else None
+
+            # Get agent version
+            try:
+                import agent
+                agent_version = agent.__version__
+            except (ImportError, AttributeError):
+                agent_version = '1.0.0'
 
             health_data = {
                 'hostname': socket.gethostname(),
                 'ip_address': self._get_local_ip(),
+                'agent_version': agent_version,
                 'cpu_percent': cpu_percent,
                 'memory_percent': memory_percent,
                 'disk_percent': disk_percent,
@@ -101,7 +110,8 @@ class HeartbeatManager:
                 'agent_memory_mb': process_memory,
                 'suricata': {
                     'running': suricata_running,
-                    'pid': suricata_pid
+                    'pid': suricata_pid,
+                    'version': suricata_version
                 }
             }
 
@@ -127,6 +137,26 @@ class HeartbeatManager:
             for proc in psutil.process_iter(['name', 'pid']):
                 if proc.info['name'] == 'suricata':
                     return proc.info['pid']
+            return None
+        except Exception:
+            return None
+
+    def _get_suricata_version(self) -> str:
+        """Get Suricata version"""
+        try:
+            import subprocess
+            result = subprocess.run(['suricata', '--version'],
+                                  capture_output=True,
+                                  text=True,
+                                  timeout=5)
+            if result.returncode == 0:
+                # Parse version from output like "This is Suricata version 7.0.0"
+                output = result.stdout.strip()
+                if 'version' in output.lower():
+                    parts = output.split()
+                    for i, part in enumerate(parts):
+                        if part.lower() == 'version' and i + 1 < len(parts):
+                            return parts[i + 1]
             return None
         except Exception:
             return None

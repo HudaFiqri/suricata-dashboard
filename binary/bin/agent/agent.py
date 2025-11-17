@@ -12,6 +12,9 @@ import logging
 import time
 from pathlib import Path
 
+# Agent version
+__version__ = '1.0.0'
+
 # Add agent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
