@@ -67,17 +67,46 @@ def get_installer():
             mimetype='text/plain'
         )
 
-    encryption_key = request.args.get('encryption_key')
-    if not encryption_key:
-        return Response(
-            "Error: Missing required parameter 'encryption_key'",
-            status=400,
-            mimetype='text/plain'
-        )
-
     name = request.args.get('name', '$(hostname)')
     tags = request.args.get('tags', '')
     agent_id = request.args.get('agent_id', '')
+
+    # Get or generate encryption key
+    encryption_key = request.args.get('encryption_key')
+
+    # If agent_id provided, try to fetch encryption key from database
+    if agent_id and not encryption_key:
+        try:
+            from binary.dashboard.database import get_pg_session, get_mongo_db
+            from binary.dashboard.models import Agent
+            from bson import ObjectId
+
+            # Try PostgreSQL first
+            try:
+                session = get_pg_session()
+                pg_agent_id = int(agent_id)
+                agent = session.query(Agent).filter_by(id=pg_agent_id).first()
+                if agent and agent.encryption_key:
+                    encryption_key = agent.encryption_key
+                    logger.info(f"Fetched encryption key from PostgreSQL for agent {agent_id}")
+            except (RuntimeError, ValueError):
+                # Try MongoDB
+                try:
+                    db = get_mongo_db()
+                    agent = db.agents.find_one({'_id': ObjectId(agent_id)})
+                    if agent and agent.get('encryption_key'):
+                        encryption_key = agent['encryption_key']
+                        logger.info(f"Fetched encryption key from MongoDB for agent {agent_id}")
+                except:
+                    pass
+        except Exception as e:
+            logger.warning(f"Failed to fetch encryption key from database: {e}")
+
+    # If still no encryption key, auto-generate one
+    if not encryption_key:
+        import secrets
+        encryption_key = secrets.token_urlsafe(32)
+        logger.info(f"Auto-generated encryption key for installer download")
 
     dashboard_url = request.host_url.rstrip('/')
 
