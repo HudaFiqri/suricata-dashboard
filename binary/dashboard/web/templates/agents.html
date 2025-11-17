@@ -321,7 +321,10 @@ async function generateInstaller() {
 
 // Copy install command
 function copyInstallCommand(event) {
-    const cmd = $('#install-command').val();
+    const input = document.getElementById('install-command');
+    const cmd = input.value;
+
+    console.log('Copy button clicked, cmd:', cmd); // Debug
 
     if (!cmd || cmd === 'Loading...') {
         showNotification('Please generate an installer first', 'warning');
@@ -331,10 +334,40 @@ function copyInstallCommand(event) {
     const btn = event.target.closest('button');
     const originalHtml = btn.innerHTML;
 
-    // Try modern clipboard API first
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(cmd).then(() => {
+    // Method 1: Select input and copy (most reliable)
+    try {
+        input.select();
+        input.setSelectionRange(0, 99999); // For mobile devices
+
+        const successful = document.execCommand('copy');
+        console.log('execCommand copy result:', successful); // Debug
+
+        if (successful) {
             // Success feedback
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-success');
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+
+            showNotification('Installation command copied to clipboard!', 'success');
+
+            // Deselect
+            window.getSelection().removeAllRanges();
+
+            setTimeout(() => {
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-secondary');
+                btn.innerHTML = originalHtml;
+            }, 2000);
+            return;
+        }
+    } catch (err) {
+        console.error('execCommand failed:', err); // Debug
+    }
+
+    // Method 2: Try modern clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        console.log('Trying navigator.clipboard'); // Debug
+        navigator.clipboard.writeText(cmd).then(() => {
             btn.classList.remove('btn-outline-secondary');
             btn.classList.add('btn-success');
             btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
@@ -347,12 +380,12 @@ function copyInstallCommand(event) {
                 btn.innerHTML = originalHtml;
             }, 2000);
         }).catch(err => {
-            // Fallback if modern API fails
-            fallbackCopy(cmd, btn, originalHtml);
+            console.error('Clipboard API failed:', err); // Debug
+            showNotification('Failed to copy. Please copy manually.', 'danger');
         });
     } else {
-        // Fallback for older browsers
-        fallbackCopy(cmd, btn, originalHtml);
+        console.log('No clipboard support'); // Debug
+        showNotification('Copy not supported. Please select and copy manually (Ctrl+C).', 'warning');
     }
 }
 
