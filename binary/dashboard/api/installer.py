@@ -184,11 +184,18 @@ mkdir -p /var/log/suricata-agent
 
 echo -e "${{GREEN}}✓${{NC}} Directories created"
 
+# Create Python virtual environment
+echo ""
+echo "Creating Python virtual environment..."
+python3 -m venv /opt/suricata-agent/venv
+
+echo -e "${{GREEN}}✓${{NC}} Virtual environment created"
+
 # Install Python dependencies
 echo ""
 echo "Installing Python packages..."
-pip3 install --quiet --upgrade pip
-pip3 install --quiet requests PyYAML watchdog websocket-client python-socketio cryptography psutil
+/opt/suricata-agent/venv/bin/pip install --quiet --upgrade pip
+/opt/suricata-agent/venv/bin/pip install --quiet requests PyYAML watchdog websocket-client python-socketio cryptography psutil
 
 echo -e "${{GREEN}}✓${{NC}} Python packages installed"
 
@@ -250,7 +257,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/opt/suricata-agent
-ExecStart=/usr/bin/python3 /opt/suricata-agent/agent.py --config /etc/suricata-agent/config.yaml
+ExecStart=/opt/suricata-agent/venv/bin/python /opt/suricata-agent/agent.py --config /etc/suricata-agent/config.yaml
 Restart=always
 RestartSec=10
 StandardOutput=journal
