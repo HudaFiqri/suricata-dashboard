@@ -331,7 +331,14 @@ echo "Starting agent service..."
 
 systemctl daemon-reload
 systemctl enable suricata-agent
-systemctl start suricata-agent
+
+# Check if service was already running (reinstall/update scenario)
+if systemctl is-active --quiet suricata-agent; then
+    echo "Agent service already running, restarting to apply changes..."
+    systemctl restart suricata-agent
+else
+    systemctl start suricata-agent
+fi
 
 sleep 2
 

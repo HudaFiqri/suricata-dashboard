@@ -19,6 +19,7 @@ from config import Config
 from heartbeat import HeartbeatManager
 from watcher import EventWatcher
 from api_client import DashboardClient
+from crypto import AgentCrypto
 
 # Version
 __version__ = "1.0.0"
@@ -51,6 +52,72 @@ class SuricataAgent:
         logger.info(f"Received signal {signum}, shutting down...")
         self.stop()
 
+    def _validate_and_fix_encryption_key(self):
+        """
+        Validate encryption key and auto-fix if invalid
+        Returns True if key is valid or was fixed, False otherwise
+        """
+        encryption_key = self.config.encryption_key
+
+        # Check if encryption key exists and is valid
+        if encryption_key and AgentCrypto.is_valid_fernet_key(encryption_key):
+            logger.info("Encryption key validated successfully")
+            return True
+
+        if not encryption_key:
+            logger.warning("Encryption key is missing from config!")
+        else:
+            logger.warning("Invalid encryption key format detected!")
+
+        logger.info("Attempting to fetch valid encryption key from dashboard...")
+
+        try:
+            # Try to fetch the correct encryption key from dashboard
+            import requests
+            import yaml
+
+            # Make API call to get agent info (which includes encryption_key)
+            response = requests.get(
+                f"{self.config.dashboard_url}/api/v1/agents/self",
+                headers={'Authorization': f'Bearer {self.config.token}'},
+                verify=self.config.verify_ssl,
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                agent_data = response.json()
+                new_encryption_key = agent_data.get('encryption_key')
+
+                if new_encryption_key and AgentCrypto.is_valid_fernet_key(new_encryption_key):
+                    logger.info("Valid encryption key fetched from dashboard")
+
+                    # Update config in memory
+                    self.config.encryption_key = new_encryption_key
+
+                    # Update config file
+                    logger.info(f"Updating config file: {self.config.config_path}")
+                    with open(self.config.config_path, 'r') as f:
+                        config_data = yaml.safe_load(f)
+
+                    config_data['agent']['encryption_key'] = new_encryption_key
+
+                    with open(self.config.config_path, 'w') as f:
+                        yaml.dump(config_data, f, default_flow_style=False, indent=2)
+
+                    logger.info("Encryption key auto-fixed successfully!")
+                    return True
+                else:
+                    logger.error("Fetched encryption key is also invalid")
+                    return False
+            else:
+                logger.error(f"Failed to fetch encryption key from dashboard: HTTP {response.status_code}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Failed to auto-fix encryption key: {e}")
+            logger.error("Please contact your dashboard administrator to get the correct encryption key")
+            return False
+
     def start(self):
         """Start the agent"""
         logger.info("=" * 60)
@@ -60,6 +127,11 @@ class SuricataAgent:
         logger.info(f"Dashboard URL: {self.config.dashboard_url}")
         logger.info(f"Eve Log: {self.config.eve_log_path}")
         logger.info("=" * 60)
+
+        # Validate and auto-fix encryption key if needed
+        if not self._validate_and_fix_encryption_key():
+            logger.error("Cannot start agent with invalid encryption key. Exiting.")
+            return False
 
         # Initialize dashboard client
         logger.info("Initializing dashboard client...")

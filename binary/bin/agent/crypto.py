@@ -31,7 +31,28 @@ class AgentCrypto:
             logger.debug("Encryption initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize encryption: {e}")
-            raise
+            raise ValueError(f"Invalid encryption key format. Please check your config file or run agent with --fix-key to auto-repair.")
+
+    @staticmethod
+    def is_valid_fernet_key(key: str) -> bool:
+        """
+        Check if a key is valid Fernet format
+
+        Args:
+            key: The encryption key to validate
+
+        Returns:
+            bool: True if valid, False otherwise
+        """
+        try:
+            if isinstance(key, str):
+                key_bytes = key.encode('utf-8')
+            else:
+                key_bytes = key
+            Fernet(key_bytes)
+            return True
+        except Exception:
+            return False
 
     def encrypt_json(self, data: dict) -> str:
         """

@@ -222,6 +222,69 @@ def list_agents():
                 'agents': []
             }), 503
 
+@api.route('/agents/self', methods=['GET'])
+def get_self_agent():
+    """
+    Get agent's own info using token authentication
+    Used by agent to fetch its encryption key during auto-fix
+    """
+    # Get token from Authorization header
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return jsonify({
+            'success': False,
+            'error': 'Missing or invalid Authorization header'
+        }), 401
+
+    token = auth_header.replace('Bearer ', '')
+
+    # Hash the token to match against database
+    import hashlib
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    # Try PostgreSQL first
+    try:
+        session = get_pg_session()
+        agent = session.query(Agent).filter_by(token_hash=token_hash).first()
+
+        if not agent:
+            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+        return jsonify({
+            'success': True,
+            'agent_id': agent.id,
+            'name': agent.name,
+            'encryption_key': agent.encryption_key,
+            'tags': agent.tags,
+            'status': agent.status
+        })
+
+    except RuntimeError:
+        # Fallback to MongoDB
+        try:
+            from binary.dashboard.database import get_mongo_db
+            db = get_mongo_db()
+
+            agent = db.agents.find_one({'token_hash': token_hash})
+
+            if not agent:
+                return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+            return jsonify({
+                'success': True,
+                'agent_id': str(agent.get('_id')),
+                'name': agent.get('name'),
+                'encryption_key': agent.get('encryption_key'),
+                'tags': agent.get('tags', []),
+                'status': agent.get('status')
+            })
+
+        except RuntimeError:
+            return jsonify({
+                'success': False,
+                'error': 'Database not available'
+            }), 503
+
 @api.route('/agents/<agent_id>', methods=['GET'])
 @require_auth
 def get_agent(agent_id):

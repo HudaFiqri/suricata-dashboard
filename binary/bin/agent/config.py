@@ -38,8 +38,8 @@ class Config:
         if not self.token:
             raise ValueError("Agent token not configured")
 
-        if not self.encryption_key:
-            raise ValueError("Encryption key not configured")
+        # Note: encryption_key validation is done at agent startup
+        # to allow auto-fix mechanism to work
 
         # Dashboard settings
         dashboard_config = config.get('dashboard', {})
