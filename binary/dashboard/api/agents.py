@@ -58,8 +58,8 @@ def register_agent():
             version=data.get('agent_version'),
             suricata_version=data.get('suricata_version'),
             system_info=data.get('system_info', {}),
-            status='online',
-            last_seen=datetime.utcnow(),
+            status='pending',  # Will change to 'online' when agent sends first heartbeat
+            last_seen=None,
             token_hash=token_hash,
             encryption_key=encryption_key
         )
@@ -93,8 +93,8 @@ def register_agent():
                 'version': data.get('agent_version'),
                 'suricata_version': data.get('suricata_version'),
                 'system_info': data.get('system_info', {}),
-                'status': 'online',
-                'last_seen': datetime.utcnow(),
+                'status': 'pending',  # Will change to 'online' when agent sends first heartbeat
+                'last_seen': None,
                 'token_hash': token_hash,
                 'encryption_key': encryption_key,
                 'created_at': datetime.utcnow(),
