@@ -87,9 +87,9 @@
                     <i class="fas fa-user"></i> <span id="username-display">{% if enable_auth %}User{% else %}Public{% endif %}</span>
                 </span>
                 {% if enable_auth %}
-                <a href="/logout" class="btn btn-sm btn-outline-danger">
+                <button onclick="doLogout()" class="btn btn-sm btn-outline-danger">
                     <i class="fas fa-sign-out-alt"></i> Logout
-                </a>
+                </button>
                 {% endif %}
             </div>
         </div>
@@ -223,6 +223,15 @@
 
             const response = await fetch(`/api/v1${endpoint}`, options);
             return await response.json();
+        }
+
+        // Logout function
+        function doLogout() {
+            // Clear localStorage
+            localStorage.removeItem('jwt_token');
+            localStorage.removeItem('user');
+            // Redirect to login page
+            window.location.href = '/login';
         }
 
         // Initialize on page load
