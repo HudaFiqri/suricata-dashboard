@@ -63,6 +63,11 @@ def init_postgresql(app=None, raise_on_error=False):
     """
     global pg_engine, pg_session
 
+    # Skip if PostgreSQL host is not configured
+    if not os.getenv('POSTGRES_HOST'):
+        logger.warning("PostgreSQL not configured (POSTGRES_HOST not set)")
+        return None, None
+
     uri = get_postgres_uri()
 
     try:
