@@ -32,10 +32,14 @@ class Config:
         agent_config = config.get('agent', {})
         self.agent_name = agent_config.get('name', os.uname().nodename)
         self.token = agent_config.get('token')
+        self.encryption_key = agent_config.get('encryption_key')
         self.tags = agent_config.get('tags', [])
 
         if not self.token:
             raise ValueError("Agent token not configured")
+
+        if not self.encryption_key:
+            raise ValueError("Encryption key not configured")
 
         # Dashboard settings
         dashboard_config = config.get('dashboard', {})

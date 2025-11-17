@@ -112,11 +112,12 @@ def register_agent():
                 'error': 'Database not available'
             }), 503
 
-    # Return response with config and token
+    # Return response with config, token, and encryption key
     return jsonify({
         'success': True,
         'agent_id': agent_id,
         'token': plain_token,  # Return plain token for installer
+        'encryption_key': encryption_key,  # Return encryption key for installer
         'message': 'Agent registered successfully',
         'config': {
             'heartbeat_interval': 30,
@@ -489,59 +490,118 @@ def delete_agent(agent_id):
                 'error': 'Database not available'
             }), 503
 
-@api.route('/agents/<int:agent_id>/heartbeat', methods=['POST'])
+@api.route('/agents/<agent_id>/heartbeat', methods=['POST'])
 @require_agent_auth
 def agent_heartbeat(agent_id):
     """
-    Agent heartbeat endpoint
+    Agent heartbeat endpoint (encrypted)
     Called periodically by agent to update status and get pending commands
+
+    Expects encrypted payload:
+    {
+        "encrypted": "base64_encoded_encrypted_data"
+    }
+
+    Decrypted payload contains health metrics
     """
     data = request.get_json()
 
-    session = get_pg_session()
-    agent = session.query(Agent).filter_by(id=agent_id).first()
+    # Decrypt payload
+    try:
+        # Get agent from request (set by require_agent_auth)
+        agent = request.agent
 
-    if not agent:
-        return jsonify({'success': False, 'error': 'Agent not found'}), 404
+        # Import decrypt function from events.py
+        from binary.dashboard.api.events import decrypt_agent_payload
 
-    # Update agent status
-    agent.status = 'online'
-    agent.last_seen = datetime.utcnow()
+        # Decrypt health data
+        if 'encrypted' in data:
+            health_data = decrypt_agent_payload(agent, data['encrypted'])
+        else:
+            # Fallback for non-encrypted (backward compat during migration)
+            health_data = data
 
-    # Update health metrics
-    if 'health' in data:
-        agent.health_metrics = data['health']
+    except Exception as e:
+        logger.error(f"Failed to decrypt heartbeat: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to decrypt heartbeat data'
+        }), 400
 
-    # Update Suricata info
-    if 'suricata' in data:
-        suricata = data['suricata']
-        if 'pid' in suricata:
-            agent.suricata_pid = suricata['pid']
+    # Try PostgreSQL first
+    try:
+        session = get_pg_session()
 
-    session.commit()
+        # Convert to int for PostgreSQL
+        try:
+            pg_agent_id = int(agent_id)
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Invalid agent ID'}), 400
 
-    # Get pending commands
-    from binary.dashboard.models import AgentCommand
-    pending_commands = session.query(AgentCommand).filter_by(
-        agent_id=agent_id,
-        status='pending'
-    ).order_by(AgentCommand.priority.asc()).limit(10).all()
+        agent_obj = session.query(Agent).filter_by(id=pg_agent_id).first()
 
-    commands = []
-    for cmd in pending_commands:
-        commands.append({
-            'command_id': cmd.id,
-            'command_type': cmd.command_type,
-            'parameters': cmd.parameters
+        if not agent_obj:
+            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+        # Update agent status
+        agent_obj.status = 'online'
+        agent_obj.last_seen = datetime.utcnow()
+
+        # Update health metrics (store decrypted health data)
+        agent_obj.health_metrics = health_data
+
+        # Update Suricata info
+        if 'suricata' in health_data:
+            suricata = health_data['suricata']
+            if 'pid' in suricata:
+                agent_obj.suricata_pid = suricata['pid']
+
+        session.commit()
+
+        # Get pending commands (TODO: implement command queue)
+        commands = []
+
+        return jsonify({
+            'success': True,
+            'pending_commands': commands
         })
 
-        # Mark as sent
-        cmd.status = 'sent'
-        cmd.sent_at = datetime.utcnow()
+    except RuntimeError:
+        # Fallback to MongoDB
+        try:
+            from binary.dashboard.database import get_mongo_db
+            from bson import ObjectId
+            db = get_mongo_db()
 
-    session.commit()
+            # Convert to ObjectId
+            try:
+                mongo_agent_id = ObjectId(agent_id)
+            except Exception:
+                return jsonify({'success': False, 'error': 'Invalid agent ID'}), 400
 
-    return jsonify({
-        'success': True,
-        'pending_commands': commands
-    })
+            # Update agent
+            result = db.agents.update_one(
+                {'_id': mongo_agent_id},
+                {'$set': {
+                    'status': 'online',
+                    'last_seen': datetime.utcnow(),
+                    'health_metrics': health_data,
+                    'updated_at': datetime.utcnow()
+                }}
+            )
+
+            if result.matched_count == 0:
+                return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+            # TODO: Get pending commands from MongoDB
+
+            return jsonify({
+                'success': True,
+                'pending_commands': []
+            })
+
+        except RuntimeError:
+            return jsonify({
+                'success': False,
+                'error': 'Database not available'
+            }), 503

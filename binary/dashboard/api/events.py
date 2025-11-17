@@ -10,9 +10,136 @@ from binary.dashboard.api.auth import require_agent_auth
 from binary.dashboard.database import get_mongo_db
 from binary.dashboard.models import Agent
 from binary.dashboard.database import get_pg_session
+from cryptography.fernet import Fernet
+import base64
+import json
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def decrypt_agent_payload(agent, encrypted_data: str) -> dict:
+    """
+    Decrypt payload from agent using agent's encryption key
+
+    Args:
+        agent: Agent object (from database)
+        encrypted_data: Base64-encoded encrypted string
+
+    Returns:
+        Decrypted dictionary
+    """
+    try:
+        # Get encryption key from agent
+        encryption_key = agent.get('encryption_key') if isinstance(agent, dict) else agent.encryption_key
+
+        if not encryption_key:
+            raise ValueError("Agent has no encryption key configured")
+
+        # Initialize cipher
+        cipher = Fernet(encryption_key.encode('utf-8'))
+
+        # Decode from base64
+        encrypted_bytes = base64.b64decode(encrypted_data)
+
+        # Decrypt
+        decrypted = cipher.decrypt(encrypted_bytes)
+
+        # Parse JSON
+        return json.loads(decrypted.decode('utf-8'))
+
+    except Exception as e:
+        logger.error(f"Decryption failed: {e}")
+        raise
+
+
+@api.route('/events', methods=['POST'])
+@require_agent_auth
+def ingest_encrypted_events():
+    """
+    Ingest encrypted events from agent
+
+    Expects encrypted payload:
+    {
+        "encrypted": "base64_encoded_encrypted_data"
+    }
+
+    Decrypted payload contains:
+    {
+        "events": [...]
+    }
+    """
+    data = request.get_json()
+
+    if not data or 'encrypted' not in data:
+        return jsonify({
+            'success': False,
+            'error': 'Missing encrypted payload'
+        }), 400
+
+    try:
+        # Get agent from request (set by require_agent_auth)
+        agent_id = request.agent_id
+        agent = request.agent
+
+        # Decrypt payload
+        decrypted = decrypt_agent_payload(agent, data['encrypted'])
+
+        # Extract events
+        events = decrypted.get('events', [])
+
+        if not events:
+            return jsonify({
+                'success': True,
+                'inserted': 0,
+                'message': 'No events to process'
+            })
+
+        # Store events in MongoDB
+        db = get_mongo_db()
+
+        # Prepare events for insertion
+        processed_events = []
+        for event in events:
+            # Parse timestamp
+            timestamp_str = event.get('timestamp')
+            if timestamp_str:
+                try:
+                    timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                except:
+                    timestamp = datetime.utcnow()
+            else:
+                timestamp = datetime.utcnow()
+
+            # Build document
+            doc = {
+                'agent_id': agent_id,
+                'event_type': event.get('event_type'),
+                'timestamp': timestamp,
+                'raw_event': event,
+                'received_at': datetime.utcnow(),
+                'expire_at': datetime.utcnow() + timedelta(days=90)  # TTL index
+            }
+            processed_events.append(doc)
+
+        # Insert events
+        result = db.events.insert_many(processed_events)
+        inserted_count = len(result.inserted_ids)
+
+        logger.info(f"Ingested {inserted_count} encrypted events from agent {agent_id}")
+
+        return jsonify({
+            'success': True,
+            'inserted': inserted_count
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Failed to ingest encrypted events: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 
 @api.route('/events/batch', methods=['POST'])
 @require_agent_auth

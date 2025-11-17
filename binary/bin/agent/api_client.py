@@ -6,6 +6,7 @@ import requests
 import logging
 import json
 from typing import Dict, List, Optional
+from crypto import AgentCrypto
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 class DashboardClient:
     """Client for communicating with dashboard API"""
 
-    def __init__(self, dashboard_url: str, token: str, verify_ssl: bool = True):
+    def __init__(self, dashboard_url: str, token: str, encryption_key: str, verify_ssl: bool = True):
         """Initialize client"""
         self.dashboard_url = dashboard_url.rstrip('/')
         self.token = token
@@ -24,6 +25,10 @@ class DashboardClient:
             'Content-Type': 'application/json',
             'User-Agent': 'Suricata-Agent/1.0'
         })
+
+        # Initialize encryption
+        self.crypto = AgentCrypto(encryption_key)
+        logger.debug("API client initialized with encryption")
 
     def test_connection(self) -> bool:
         """Test connection to dashboard"""
@@ -39,11 +44,14 @@ class DashboardClient:
             return False
 
     def send_heartbeat(self, agent_id: str, health_data: Dict) -> bool:
-        """Send heartbeat to dashboard"""
+        """Send encrypted heartbeat to dashboard"""
         try:
+            # Encrypt health data
+            encrypted_data = self.crypto.encrypt_json(health_data)
+
             response = self.session.post(
                 f"{self.dashboard_url}/api/v1/agents/{agent_id}/heartbeat",
-                json=health_data,
+                json={'encrypted': encrypted_data},
                 verify=self.verify_ssl,
                 timeout=10
             )
@@ -60,11 +68,14 @@ class DashboardClient:
             return False
 
     def send_events(self, events: List[Dict]) -> bool:
-        """Send events batch to dashboard"""
+        """Send encrypted events batch to dashboard"""
         try:
+            # Encrypt events payload
+            encrypted_data = self.crypto.encrypt_json({'events': events})
+
             response = self.session.post(
                 f"{self.dashboard_url}/api/v1/events",
-                json={'events': events},
+                json={'encrypted': encrypted_data},
                 verify=self.verify_ssl,
                 timeout=30
             )

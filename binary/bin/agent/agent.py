@@ -66,6 +66,7 @@ class SuricataAgent:
         self.client = DashboardClient(
             dashboard_url=self.config.dashboard_url,
             token=self.config.token,
+            encryption_key=self.config.encryption_key,
             verify_ssl=self.config.verify_ssl
         )
 

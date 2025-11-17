@@ -67,6 +67,14 @@ def get_installer():
             mimetype='text/plain'
         )
 
+    encryption_key = request.args.get('encryption_key')
+    if not encryption_key:
+        return Response(
+            "Error: Missing required parameter 'encryption_key'",
+            status=400,
+            mimetype='text/plain'
+        )
+
     name = request.args.get('name', '$(hostname)')
     tags = request.args.get('tags', '')
     agent_id = request.args.get('agent_id', '')
@@ -232,6 +240,7 @@ cat > /etc/suricata-agent/config.yaml << 'CONFIG_EOF'
 agent:
   name: "{name}"
   token: "{token}"
+  encryption_key: "{encryption_key}"
   tags: [{tags}]
 
 dashboard:

@@ -332,14 +332,15 @@ async function generateInstaller() {
 
         if (response.success) {
             const token = response.token;
+            const encryptionKey = response.encryption_key;
             const dashboardUrl = window.location.origin;
 
             // Build install command
-            const installCmd = `curl -sSL "${dashboardUrl}/api/v1/agent/install.sh?token=${token}&name=${encodeURIComponent(name)}&tags=${encodeURIComponent(tags)}" | sudo bash`;
+            const installCmd = `curl -sSL "${dashboardUrl}/api/v1/agent/install.sh?token=${token}&encryption_key=${encodeURIComponent(encryptionKey)}&name=${encodeURIComponent(name)}&tags=${encodeURIComponent(tags)}" | sudo bash`;
             $('#install-command').val(installCmd);
 
             // Set download link
-            $('#download-installer').attr('href', `/api/v1/agent/install.sh?token=${token}&name=${encodeURIComponent(name)}&tags=${encodeURIComponent(tags)}`);
+            $('#download-installer').attr('href', `/api/v1/agent/install.sh?token=${token}&encryption_key=${encodeURIComponent(encryptionKey)}&name=${encodeURIComponent(name)}&tags=${encodeURIComponent(tags)}`);
 
             alert('Installer generated! Copy the command and run it on your Suricata server.');
 
