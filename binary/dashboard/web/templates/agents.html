@@ -96,7 +96,7 @@
                     <label class="form-label">Installation Command</label>
                     <div class="input-group">
                         <input type="text" class="form-control" id="install-command" readonly value="Loading...">
-                        <button class="btn btn-outline-secondary" onclick="copyInstallCommand()">
+                        <button class="btn btn-outline-secondary" onclick="copyInstallCommand(event)">
                             <i class="fas fa-copy"></i> Copy
                         </button>
                     </div>
@@ -320,17 +320,25 @@ async function generateInstaller() {
 }
 
 // Copy install command
-function copyInstallCommand() {
+function copyInstallCommand(event) {
     const cmd = $('#install-command').val();
-    navigator.clipboard.writeText(cmd);
 
-    // Show feedback
-    const btn = event.target.closest('button');
-    const originalHtml = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-    setTimeout(() => {
-        btn.innerHTML = originalHtml;
-    }, 2000);
+    if (!cmd || cmd === 'Loading...') {
+        alert('Please generate an installer first');
+        return;
+    }
+
+    navigator.clipboard.writeText(cmd).then(() => {
+        // Show feedback
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+        }, 2000);
+    }).catch(err => {
+        alert('Failed to copy: ' + err.message);
+    });
 }
 
 // Send command to agent
