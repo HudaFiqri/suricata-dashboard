@@ -480,7 +480,7 @@
 {% endif %}
 
 {% endblock %}
-{% block scripts %}
+{% block extra_js %}
 <!-- Configuration Module Scripts -->
 <script src="{{ url_for('static', filename='js/config/utils.js') }}"></script>
 <script src="{{ url_for('static', filename='js/config/app-layer.js') }}"></script>
@@ -989,9 +989,20 @@ async function deleteUser(userId, username) {
 
 // Load users when Users tab is clicked
 $('#users-tab').on('shown.bs.tab', function() {
+    console.log('Users tab shown event triggered');
     if (users.length === 0) {
         loadUsers();
     }
+});
+
+// Also try to load immediately if tab is already visible
+$(document).ready(function() {
+    setTimeout(function() {
+        if ($('#users').hasClass('show') && $('#users').hasClass('active')) {
+            console.log('Users tab is active, loading users...');
+            loadUsers();
+        }
+    }, 500);
 });
 {% endif %}
 </script>
