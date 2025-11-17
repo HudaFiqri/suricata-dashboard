@@ -146,9 +146,54 @@ def require_agent_auth(f):
     """Decorator to require agent authentication"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Support both old format (X-Agent-Token + X-Agent-ID) and new format (Bearer token)
         encrypted_token = request.headers.get('X-Agent-Token')
         agent_id = request.headers.get('X-Agent-ID')
 
+        # New format: Authorization Bearer token
+        auth_header = request.headers.get('Authorization')
+
+        if not encrypted_token and auth_header and auth_header.startswith('Bearer '):
+            # Extract token from Authorization header
+            plain_token = auth_header.replace('Bearer ', '')
+
+            # Hash token to find agent
+            token_hash = hashlib.sha256(plain_token.encode()).hexdigest()
+
+            try:
+                # Try PostgreSQL first
+                session = get_pg_session()
+                agent = session.query(Agent).filter_by(token_hash=token_hash).first()
+
+                if not agent:
+                    # Try MongoDB fallback
+                    try:
+                        db = get_mongo_db()
+                        agent_doc = db.agents.find_one({'token_hash': token_hash})
+                        if agent_doc:
+                            # Convert MongoDB doc to agent-like object
+                            class AgentObj:
+                                def __init__(self, doc):
+                                    self.id = str(doc['_id'])
+                                    self.name = doc.get('name')
+                                    self.encryption_key = doc.get('encryption_key')
+                            agent = AgentObj(agent_doc)
+                    except:
+                        pass
+
+                if not agent:
+                    return jsonify({'success': False, 'error': 'Agent not found'}), 401
+
+                # Attach agent info to request
+                request.agent_id = agent.id
+                request.agent = agent
+
+                return f(*args, **kwargs)
+
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'Agent authentication failed: {str(e)}'}), 401
+
+        # Old format: X-Agent-Token + X-Agent-ID
         if not encrypted_token or not agent_id:
             return jsonify({'success': False, 'error': 'Missing agent credentials'}), 401
 
