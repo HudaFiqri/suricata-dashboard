@@ -85,42 +85,6 @@
         </div>
     </div>
 
-    <!-- Recent Events -->
-    <div class="row">
-        <div class="col-md-8">
-            <div class="stat-card">
-                <h5 class="mb-3">Recent Events (All Agents)</h5>
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Agent</th>
-                                <th>Type</th>
-                                <th>Severity</th>
-                                <th>Message</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recent-events">
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">
-                                    <i class="fas fa-spinner fa-spin"></i> Loading events...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Quick Stats -->
-        <div class="col-md-4">
-            <div class="stat-card">
-                <h5 class="mb-3">Event Types (24h)</h5>
-                <canvas id="event-types-chart"></canvas>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}
 
@@ -184,12 +148,10 @@ function renderAgents(agents) {
         const health = agent.health_metrics || {};
         const cpuPercent = health.cpu_percent || 0;
         const memoryPercent = health.memory_percent || 0;
-        const diskPercent = health.disk_percent || 0;
 
         // Determine progress bar colors based on thresholds
         const cpuColor = cpuPercent > 80 ? 'danger' : cpuPercent > 60 ? 'warning' : 'success';
         const memColor = memoryPercent > 85 ? 'danger' : memoryPercent > 70 ? 'warning' : 'success';
-        const diskColor = diskPercent > 90 ? 'danger' : diskPercent > 80 ? 'warning' : 'success';
 
         // Suricata info
         const suricataInfo = health.suricata || {};
@@ -231,7 +193,7 @@ function renderAgents(agents) {
                             </div>
                         </div>
 
-                        <div class="mb-2">
+                        <div class="mb-3">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <small class="text-muted"><i class="fas fa-memory"></i> Memory</small>
                                 <small class="fw-bold">${memoryPercent.toFixed(1)}%</small>
@@ -239,18 +201,6 @@ function renderAgents(agents) {
                             <div class="progress" style="height: 6px;">
                                 <div class="progress-bar bg-${memColor}" role="progressbar"
                                      style="width: ${memoryPercent}%" aria-valuenow="${memoryPercent}"
-                                     aria-valuemin="0" aria-valuemax="100"></div>
-                            </div>
-                        </div>
-
-                        <div class="mb-2">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <small class="text-muted"><i class="fas fa-hdd"></i> Disk</small>
-                                <small class="fw-bold">${diskPercent.toFixed(1)}%</small>
-                            </div>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar bg-${diskColor}" role="progressbar"
-                                     style="width: ${diskPercent}%" aria-valuenow="${diskPercent}"
                                      aria-valuemin="0" aria-valuemax="100"></div>
                             </div>
                         </div>
