@@ -56,60 +56,96 @@ def get_agent_stats(agent_id):
 @require_auth
 def get_dashboard_summary():
     """Get dashboard summary across all agents"""
-    session = get_pg_session()
-    mongo_db = get_mongo_db()
+
+    # Try PostgreSQL first, fallback to MongoDB
+    session = None
+    mongo_db = None
+
+    try:
+        session = get_pg_session()
+    except RuntimeError:
+        pass
+
+    try:
+        mongo_db = get_mongo_db()
+    except RuntimeError:
+        pass
 
     # Agent summary
-    total_agents = session.query(Agent).count()
-    online_agents = session.query(Agent).filter_by(status='online').count()
+    if session:
+        total_agents = session.query(Agent).count()
+        online_agents = session.query(Agent).filter_by(status='online').count()
+    elif mongo_db:
+        total_agents = mongo_db.agents.count_documents({})
+        online_agents = mongo_db.agents.count_documents({'status': 'online'})
+    else:
+        total_agents = 0
+        online_agents = 0
+
     offline_agents = total_agents - online_agents
 
     # Event summary (last 24h from MongoDB)
     last_24h = datetime.utcnow() - timedelta(hours=24)
 
-    try:
-        # Total events
-        total_events_24h = mongo_db.events.count_documents({
-            'timestamp': {'$gte': last_24h}
-        })
+    if mongo_db:
+        try:
+            # Total events
+            total_events_24h = mongo_db.events.count_documents({
+                'timestamp': {'$gte': last_24h}
+            })
 
-        # Alerts
-        total_alerts_24h = mongo_db.events.count_documents({
-            'event_type': 'alert',
-            'timestamp': {'$gte': last_24h}
-        })
+            # Alerts
+            total_alerts_24h = mongo_db.events.count_documents({
+                'event_type': 'alert',
+                'timestamp': {'$gte': last_24h}
+            })
 
-        # Top signatures
-        top_signatures = list(mongo_db.events.aggregate([
-            {'$match': {'event_type': 'alert', 'timestamp': {'$gte': last_24h}}},
-            {'$group': {
-                '_id': '$indexed.signature_id',
-                'signature': {'$first': '$indexed.signature'},
-                'count': {'$sum': 1}
-            }},
-            {'$sort': {'count': -1}},
-            {'$limit': 10}
-        ]))
+            # Top signatures
+            top_signatures = list(mongo_db.events.aggregate([
+                {'$match': {'event_type': 'alert', 'timestamp': {'$gte': last_24h}}},
+                {'$group': {
+                    '_id': '$indexed.signature_id',
+                    'signature': {'$first': '$indexed.signature'},
+                    'count': {'$sum': 1}
+                }},
+                {'$sort': {'count': -1}},
+                {'$limit': 10}
+            ]))
 
-    except Exception as e:
-        logger.error(f"MongoDB query failed: {e}")
+        except Exception as e:
+            logger.error(f"MongoDB query failed: {e}")
+            total_events_24h = 0
+            total_alerts_24h = 0
+            top_signatures = []
+    else:
         total_events_24h = 0
         total_alerts_24h = 0
         top_signatures = []
 
     # Calculate average CPU (from cached health metrics)
-    agents_with_metrics = session.query(Agent).filter(
-        Agent.status == 'online',
-        Agent.health_metrics != None
-    ).all()
-
     total_cpu = 0
     agent_count = 0
 
-    for agent in agents_with_metrics:
-        if agent.health_metrics and 'cpu_percent' in agent.health_metrics:
-            total_cpu += agent.health_metrics['cpu_percent']
-            agent_count += 1
+    if session:
+        agents_with_metrics = session.query(Agent).filter(
+            Agent.status == 'online',
+            Agent.health_metrics != None
+        ).all()
+
+        for agent in agents_with_metrics:
+            if agent.health_metrics and 'cpu_percent' in agent.health_metrics:
+                total_cpu += agent.health_metrics['cpu_percent']
+                agent_count += 1
+    elif mongo_db:
+        agents_with_metrics = mongo_db.agents.find({
+            'status': 'online',
+            'health_metrics': {'$ne': None}
+        })
+
+        for agent in agents_with_metrics:
+            if agent.get('health_metrics') and 'cpu_percent' in agent['health_metrics']:
+                total_cpu += agent['health_metrics']['cpu_percent']
+                agent_count += 1
 
     avg_cpu = round(total_cpu / agent_count, 2) if agent_count > 0 else 0
 
