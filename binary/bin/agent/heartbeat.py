@@ -145,18 +145,19 @@ class HeartbeatManager:
         """Get Suricata version"""
         try:
             import subprocess
-            result = subprocess.run(['suricata', '--version'],
+            import re
+            # Try -V flag (more common)
+            result = subprocess.run(['suricata', '-V'],
                                   capture_output=True,
                                   text=True,
                                   timeout=5)
             if result.returncode == 0:
-                # Parse version from output like "This is Suricata version 7.0.0"
+                # Parse version from output like "This is Suricata version 8.0.2 RELEASE"
                 output = result.stdout.strip()
-                if 'version' in output.lower():
-                    parts = output.split()
-                    for i, part in enumerate(parts):
-                        if part.lower() == 'version' and i + 1 < len(parts):
-                            return parts[i + 1]
+                # Extract version number using regex (e.g., 8.0.2)
+                match = re.search(r'version\s+(\d+\.\d+\.\d+)', output, re.IGNORECASE)
+                if match:
+                    return match.group(1)
             return None
         except Exception:
             return None
