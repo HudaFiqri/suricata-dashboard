@@ -136,10 +136,10 @@ async function loadDashboard() {
         // Load summary stats
         const stats = await apiCall('/stats/summary');
         if (stats.success) {
-            $('#total-agents').text(stats.data.total_agents || 0);
-            $('#online-agents').text(stats.data.online_agents || 0);
-            $('#total-events').text(formatNumber(stats.data.events_24h || 0));
-            $('#critical-alerts').text(stats.data.critical_alerts || 0);
+            $('#total-agents').text(stats.summary.total_agents || 0);
+            $('#online-agents').text(stats.summary.online_agents || 0);
+            $('#total-events').text(formatNumber(stats.summary.total_events_24h || 0));
+            $('#critical-alerts').text(stats.summary.total_alerts_24h || 0);
         }
 
         // Load agents
