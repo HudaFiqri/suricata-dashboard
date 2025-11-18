@@ -72,10 +72,10 @@ def get_dashboard_summary():
         pass
 
     # Agent summary
-    if session:
+    if session is not None:
         total_agents = session.query(Agent).count()
         online_agents = session.query(Agent).filter_by(status='online').count()
-    elif mongo_db:
+    elif mongo_db is not None:
         total_agents = mongo_db.agents.count_documents({})
         online_agents = mongo_db.agents.count_documents({'status': 'online'})
     else:
@@ -87,7 +87,7 @@ def get_dashboard_summary():
     # Event summary (last 24h from MongoDB)
     last_24h = datetime.utcnow() - timedelta(hours=24)
 
-    if mongo_db:
+    if mongo_db is not None:
         try:
             # Total events
             total_events_24h = mongo_db.events.count_documents({
@@ -126,7 +126,7 @@ def get_dashboard_summary():
     total_cpu = 0
     agent_count = 0
 
-    if session:
+    if session is not None:
         agents_with_metrics = session.query(Agent).filter(
             Agent.status == 'online',
             Agent.health_metrics != None
@@ -136,7 +136,7 @@ def get_dashboard_summary():
             if agent.health_metrics and 'cpu_percent' in agent.health_metrics:
                 total_cpu += agent.health_metrics['cpu_percent']
                 agent_count += 1
-    elif mongo_db:
+    elif mongo_db is not None:
         agents_with_metrics = mongo_db.agents.find({
             'status': 'online',
             'health_metrics': {'$ne': None}
