@@ -125,7 +125,8 @@ class HeartbeatManager:
         """Check if Suricata process is running"""
         try:
             for proc in psutil.process_iter(['name']):
-                if proc.info['name'] == 'suricata':
+                # Case-insensitive partial match (handles 'suricata', 'Suricata-Main', etc.)
+                if proc.info['name'] and 'suricata' in proc.info['name'].lower():
                     return True
             return False
         except Exception:
@@ -135,7 +136,8 @@ class HeartbeatManager:
         """Get Suricata process ID"""
         try:
             for proc in psutil.process_iter(['name', 'pid']):
-                if proc.info['name'] == 'suricata':
+                # Case-insensitive partial match (handles 'suricata', 'Suricata-Main', etc.)
+                if proc.info['name'] and 'suricata' in proc.info['name'].lower():
                     return proc.info['pid']
             return None
         except Exception:
