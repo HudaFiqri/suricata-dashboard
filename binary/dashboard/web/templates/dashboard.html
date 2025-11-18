@@ -328,11 +328,11 @@ function formatTimeAgo(timestamp) {
     return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-// Subscribe to WebSocket channels
-socket.on('connect', function() {
-    socket.emit('subscribe', { channel: 'events' });
-    socket.emit('subscribe', { channel: 'alerts' });
-});
+// Subscribe to WebSocket channels (TODO: initialize socket first)
+// socket.on('connect', function() {
+//     socket.emit('subscribe', { channel: 'events' });
+//     socket.emit('subscribe', { channel: 'alerts' });
+// });
 
 // Load dashboard on page load
 $(document).ready(function() {
