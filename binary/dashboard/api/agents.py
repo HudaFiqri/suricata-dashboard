@@ -200,9 +200,12 @@ def list_agents():
                     'tags': agent_doc.get('tags', []),
                     'version': agent_doc.get('version'),
                     'suricata_version': agent_doc.get('suricata_version'),
+                    'suricata_pid': agent_doc.get('suricata_pid'),
+                    'health_metrics': agent_doc.get('health_metrics', {}),
                     'system_info': agent_doc.get('system_info', {}),
                     'status': agent_doc.get('status', 'offline'),
                     'last_seen': agent_doc.get('last_seen'),
+                    'last_event_at': agent_doc.get('last_event_at'),
                     'created_at': agent_doc.get('created_at'),
                     'updated_at': agent_doc.get('updated_at')
                 }
