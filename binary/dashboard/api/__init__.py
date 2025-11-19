@@ -21,6 +21,7 @@ from . import installer
 from . import health
 from . import users
 from . import sessions
+from . import permissions_api
 
 __all__ = [
     'api',
@@ -35,5 +36,6 @@ __all__ = [
     'installer',
     'health',
     'users',
-    'sessions'
+    'sessions',
+    'permissions_api'
 ]

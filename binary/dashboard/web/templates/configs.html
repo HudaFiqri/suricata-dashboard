@@ -30,6 +30,11 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="roles-tab" data-bs-toggle="tab" data-bs-target="#roles-panel" type="button" role="tab">
+                    <i class="fas fa-user-shield"></i> Roles & Permissions
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions-panel" type="button" role="tab">
                     <i class="fas fa-desktop"></i> Sessions
                 </button>
@@ -70,6 +75,242 @@
                                                 <span class="visually-hidden">Loading...</span>
                                             </div>
                                         </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Roles & Permissions Panel -->
+            <div class="tab-pane fade" id="roles-panel" role="tabpanel">
+                <div class="mb-4">
+                    <p class="text-muted mb-3">Role-Based Access Control (RBAC) defines what actions users can perform based on their assigned role.</p>
+                </div>
+
+                <!-- Roles Overview -->
+                <div class="row">
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <span class="badge bg-primary">Admin</span>
+                                </h5>
+                                <p class="card-text text-muted mb-2">Full access to all features</p>
+                                <hr>
+                                <small class="text-muted">
+                                    <i class="fas fa-check text-success"></i> Manage agents & configs<br>
+                                    <i class="fas fa-check text-success"></i> View & export events<br>
+                                    <i class="fas fa-check text-success"></i> Manage users<br>
+                                    <i class="fas fa-check text-success"></i> Manage sessions<br>
+                                    <i class="fas fa-check text-success"></i> View stats & logs
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <span class="badge bg-info">Operator</span>
+                                </h5>
+                                <p class="card-text text-muted mb-2">Manage infrastructure</p>
+                                <hr>
+                                <small class="text-muted">
+                                    <i class="fas fa-check text-success"></i> Manage agents & configs<br>
+                                    <i class="fas fa-check text-success"></i> View & export events<br>
+                                    <i class="fas fa-times text-danger"></i> Manage users<br>
+                                    <i class="fas fa-times text-danger"></i> Manage sessions<br>
+                                    <i class="fas fa-check text-success"></i> View stats & logs
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <span class="badge bg-success">Analyst</span>
+                                </h5>
+                                <p class="card-text text-muted mb-2">Read & analyze data</p>
+                                <hr>
+                                <small class="text-muted">
+                                    <i class="fas fa-eye text-info"></i> View agents<br>
+                                    <i class="fas fa-check text-success"></i> View & export events<br>
+                                    <i class="fas fa-times text-danger"></i> Manage users<br>
+                                    <i class="fas fa-times text-danger"></i> Manage sessions<br>
+                                    <i class="fas fa-check text-success"></i> View stats & logs
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <span class="badge bg-secondary">Viewer</span>
+                                </h5>
+                                <p class="card-text text-muted mb-2">Read-only access</p>
+                                <hr>
+                                <small class="text-muted">
+                                    <i class="fas fa-eye text-info"></i> View agents<br>
+                                    <i class="fas fa-eye text-info"></i> View events<br>
+                                    <i class="fas fa-times text-danger"></i> Manage users<br>
+                                    <i class="fas fa-times text-danger"></i> Manage sessions<br>
+                                    <i class="fas fa-check text-success"></i> View stats & logs
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permission Details -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Permission Matrix</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Permission</th>
+                                        <th>Admin</th>
+                                        <th>Operator</th>
+                                        <th>Analyst</th>
+                                        <th>Viewer</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Agents</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">View agents</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">Manage agents</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Events</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">View events</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">Export events</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Configuration</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">View configurations</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">Edit configurations</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>User Management</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">View users</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">Manage users</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Sessions</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">View sessions</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">Manage sessions</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                        <td><i class="fas fa-times text-danger"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Monitoring</strong></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">View statistics</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-4">View logs</td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
+                                        <td><i class="fas fa-check text-success"></i></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -151,8 +392,10 @@
                     <div class="mb-3">
                         <label for="role" class="form-label">Role</label>
                         <select class="form-select" id="role" required>
-                            <option value="viewer">Viewer</option>
-                            <option value="admin">Admin</option>
+                            <option value="viewer">Viewer - Read-only access</option>
+                            <option value="analyst">Analyst - Read + Export</option>
+                            <option value="operator">Operator - Manage agents & configs</option>
+                            <option value="admin">Admin - Full access</option>
                         </select>
                     </div>
                 </form>
@@ -187,8 +430,10 @@
                     <div class="mb-3">
                         <label for="editRole" class="form-label">Role</label>
                         <select class="form-select" id="editRole" required>
-                            <option value="viewer">Viewer</option>
-                            <option value="admin">Admin</option>
+                            <option value="viewer">Viewer - Read-only access</option>
+                            <option value="analyst">Analyst - Read + Export</option>
+                            <option value="operator">Operator - Manage agents & configs</option>
+                            <option value="admin">Admin - Full access</option>
                         </select>
                     </div>
                     <div class="form-check form-switch mb-3">
@@ -233,9 +478,16 @@ function renderUsers(users) {
             '<span class="badge bg-success">Active</span>' :
             '<span class="badge bg-danger">Inactive</span>';
 
-        const roleBadge = user.role === 'admin' ?
-            '<span class="badge bg-primary">Admin</span>' :
-            '<span class="badge bg-secondary">Viewer</span>';
+        let roleBadge = '';
+        if (user.role === 'admin') {
+            roleBadge = '<span class="badge bg-primary">Admin</span>';
+        } else if (user.role === 'operator') {
+            roleBadge = '<span class="badge bg-info">Operator</span>';
+        } else if (user.role === 'analyst') {
+            roleBadge = '<span class="badge bg-success">Analyst</span>';
+        } else {
+            roleBadge = '<span class="badge bg-secondary">Viewer</span>';
+        }
 
         html += `
             <tr>

@@ -7,6 +7,7 @@ from flask import request, jsonify
 from datetime import datetime
 from binary.dashboard.api import api
 from binary.dashboard.api.auth import require_auth
+from binary.dashboard.api.decorators import require_permission
 from binary.dashboard.database import get_pg_session, get_mongo_db
 import bcrypt
 import logging
@@ -53,15 +54,9 @@ def get_all_users():
 
 @api.route('/users', methods=['GET'])
 @require_auth
+@require_permission('users.view')
 def list_users():
     """List all users"""
-    # Check if user is admin
-    if request.user_role != 'admin':
-        return jsonify({
-            'success': False,
-            'error': 'Admin access required'
-        }), 403
-
     users, db_type = get_all_users()
 
     if users is None:
@@ -78,15 +73,9 @@ def list_users():
 
 @api.route('/users', methods=['POST'])
 @require_auth
+@require_permission('users.manage')
 def create_user():
     """Create new user"""
-    # Check if user is admin
-    if request.user_role != 'admin':
-        return jsonify({
-            'success': False,
-            'error': 'Admin access required'
-        }), 403
-
     data = request.get_json()
 
     username = data.get('username')
@@ -183,15 +172,9 @@ def create_user():
 
 @api.route('/users/<user_id>', methods=['PUT'])
 @require_auth
+@require_permission('users.manage')
 def update_user(user_id):
     """Update user"""
-    # Check if user is admin
-    if request.user_role != 'admin':
-        return jsonify({
-            'success': False,
-            'error': 'Admin access required'
-        }), 403
-
     data = request.get_json()
 
     # Try PostgreSQL first
@@ -275,15 +258,9 @@ def update_user(user_id):
 
 @api.route('/users/<user_id>', methods=['DELETE'])
 @require_auth
+@require_permission('users.manage')
 def delete_user(user_id):
     """Delete user"""
-    # Check if user is admin
-    if request.user_role != 'admin':
-        return jsonify({
-            'success': False,
-            'error': 'Admin access required'
-        }), 403
-
     # Try PostgreSQL first
     try:
         session = get_pg_session()

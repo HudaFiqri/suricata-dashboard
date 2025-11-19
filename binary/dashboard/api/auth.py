@@ -3,7 +3,7 @@ Authentication API
 JWT token generation and validation
 """
 
-from flask import request, jsonify
+from flask import request, jsonify, g
 from functools import wraps
 import jwt
 import bcrypt
@@ -83,15 +83,18 @@ def generate_jwt(user):
         user_id = user['id']
         username = user['username']
         role = user.get('role', 'viewer')
+        custom_permissions = user.get('permissions', {})
     else:
         user_id = user.id
         username = user.username
         role = user.role
+        custom_permissions = user.permissions if hasattr(user, 'permissions') else {}
 
     payload = {
         'user_id': user_id,
         'username': username,
         'role': role,
+        'custom_permissions': custom_permissions,
         'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
     }
 
@@ -117,6 +120,13 @@ def require_auth(f):
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
+            # Set g.user for permission checks
+            g.user = {
+                'id': 'public',
+                'username': 'public',
+                'role': 'admin',
+                'custom_permissions': None
+            }
             return f(*args, **kwargs)
 
         # AUTH ENABLED - Check for JWT token
@@ -133,10 +143,18 @@ def require_auth(f):
         if not payload:
             return jsonify({'success': False, 'error': 'Invalid or expired token'}), 401
 
-        # Attach user info to request
+        # Attach user info to request (legacy)
         request.user_id = payload['user_id']
         request.username = payload['username']
         request.user_role = payload.get('role', 'viewer')
+
+        # Set g.user for permission checks (new)
+        g.user = {
+            'id': payload['user_id'],
+            'username': payload['username'],
+            'role': payload.get('role', 'viewer'),
+            'custom_permissions': payload.get('custom_permissions', None)
+        }
 
         return f(*args, **kwargs)
 
