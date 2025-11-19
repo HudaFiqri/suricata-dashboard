@@ -24,8 +24,8 @@
         <!-- Tabs Navigation -->
         <ul class="nav nav-tabs mb-4" id="configTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="suricata-tab" data-bs-toggle="tab" data-bs-target="#suricata" type="button" role="tab">
-                    <i class="fas fa-shield-alt"></i> Suricata
+                <button class="nav-link active" id="agent-config-tab" data-bs-toggle="tab" data-bs-target="#agent-config" type="button" role="tab">
+                    <i class="fas fa-server"></i> Agent Configure
                 </button>
             </li>
             {% if enable_auth %}
@@ -39,145 +39,88 @@
 
         <!-- Tab Content -->
         <div class="tab-content" id="configTabContent">
-            <!-- Suricata Configuration Tab -->
-            <div class="tab-pane fade show active" id="suricata" role="tabpanel">
+            <!-- Agent Configure Tab -->
+            <div class="tab-pane fade show active" id="agent-config" role="tabpanel">
                 <div class="card mb-4">
-                    <div class="card-header">
-                        <h5><i class="fas fa-shield-alt"></i> Suricata Configuration</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-server"></i> Agent Configuration</h5>
+                        <button class="btn btn-sm btn-primary" id="deploy-config-btn">
+                            <i class="fas fa-paper-plane"></i> Deploy to Agent
+                        </button>
                     </div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    Configure Suricata settings through an intuitive interface. Click on any section below to modify its configuration.
-                </div>
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="run-self-check">
-                        <i class="fas fa-stethoscope"></i> Self-check
-                    </button>
-                    <div class="alert d-none py-1 px-2 mb-0" id="self-check-result"></div>
-                </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            Configure agent settings for monitoring and data collection. Changes will be deployed to selected agents.
+                        </div>
 
-                <!-- Suricata Config Cards -->
-                <h6 class="text-uppercase fw-bold text-muted mb-3"><i class="fas fa-cog"></i> Suricata Configuration</h6>
-                <div class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <div class="card h-100 border-secondary hover-shadow config-card" data-search="packet-capture" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-network-wired fa-3x text-secondary mb-3"></i>
-                                <h5 class="card-title">Packet Capture</h5>
-                                <p class="card-text text-muted small">Configure packet capture methods: AF-Packet, AF-XDP, DPDK, PCAP</p>
-                            </div>
+                        <!-- Agent Selection -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Select Agent</label>
+                            <select class="form-select" id="agent-selector">
+                                <option value="">Loading agents...</option>
+                            </select>
                         </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-primary hover-shadow config-card" data-search="app-layer" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-layer-group fa-3x text-primary mb-3"></i>
-                                <h5 class="card-title">App Layer</h5>
-                                <p class="card-text text-muted small">Enable/disable application layer protocols</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-success hover-shadow config-card" data-search="outputs" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-file-export fa-3x text-success mb-3"></i>
-                                <h5 class="card-title">Outputs</h5>
-                                <p class="card-text text-muted small">Configure logging outputs and event formats</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-warning hover-shadow config-card" data-search="logging" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-clipboard-list fa-3x text-warning mb-3"></i>
-                                <h5 class="card-title">Logging</h5>
-                                <p class="card-text text-muted small">Configure log levels and destinations</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-success hover-shadow config-card" data-search="vars" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-dollar-sign fa-3x text-success mb-3"></i>
-                                <h5 class="card-title">Variables</h5>
-                                <p class="card-text text-muted small">Manage address and port variables</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-info hover-shadow config-card" data-search="detection" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-shield-alt fa-3x text-info mb-3"></i>
-                                <h5 class="card-title">IDS / Detection</h5>
-                                <p class="card-text text-muted small">Configure detection engine and profiling</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-primary hover-shadow config-card" data-search="stream" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-stream fa-3x text-primary mb-3"></i>
-                                <h5 class="card-title">Stream</h5>
-                                <p class="card-text text-muted small">Configure stream engine and reassembly</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-dark hover-shadow config-card" data-search="host" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-server fa-3x text-dark mb-3"></i>
-                                <h5 class="card-title">Host</h5>
-                                <p class="card-text text-muted small">Configure host table and tracking settings</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-danger hover-shadow config-card" data-search="ips" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-shield-alt fa-3x text-danger mb-3"></i>
-                                <h5 class="card-title">IPS / Preventive</h5>
-                                <p class="card-text text-muted small">Configure inline mode and prevention actions</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-info hover-shadow config-card" data-search="interface" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fas fa-ethernet fa-3x text-info mb-3"></i>
-                                <h5 class="card-title">Interface</h5>
-                                <p class="card-text text-muted small">Configure network interfaces and monitoring</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Integration Cards -->
-                <h6 class="text-uppercase fw-bold text-muted mb-3 mt-4"><i class="fas fa-plug"></i> Integrations</h6>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <div class="card h-100 border-primary hover-shadow integration-card" data-integration="discord" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fab fa-discord fa-3x text-primary mb-3"></i>
-                                <h5 class="card-title">Discord</h5>
-                                <p class="card-text text-muted small">Configure Discord webhook notifications</p>
+                        <!-- Config Sections -->
+                        <h6 class="text-uppercase fw-bold text-muted mb-3"><i class="fas fa-cog"></i> Configuration Options</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="card h-100 border-primary hover-shadow" style="cursor: pointer;">
+                                    <div class="card-body">
+                                        <h6 class="card-title"><i class="fas fa-clock"></i> Heartbeat Interval</h6>
+                                        <p class="text-muted small mb-2">How often agent sends health updates to dashboard</p>
+                                        <input type="number" class="form-control form-control-sm" id="heartbeat-interval" value="30" min="10" max="300">
+                                        <small class="text-muted">Seconds (10-300)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card h-100 border-success hover-shadow" style="cursor: pointer;">
+                                    <div class="card-body">
+                                        <h6 class="card-title"><i class="fas fa-file-alt"></i> Eve Log Path</h6>
+                                        <p class="text-muted small mb-2">Path to Suricata EVE JSON log file</p>
+                                        <input type="text" class="form-control form-control-sm" id="eve-log-path" value="/var/log/suricata/eve.json">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card h-100 border-warning hover-shadow" style="cursor: pointer;">
+                                    <div class="card-body">
+                                        <h6 class="card-title"><i class="fas fa-database"></i> Batch Size</h6>
+                                        <p class="text-muted small mb-2">Number of events to send in each batch</p>
+                                        <input type="number" class="form-control form-control-sm" id="batch-size" value="100" min="10" max="1000">
+                                        <small class="text-muted">Events (10-1000)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card h-100 border-info hover-shadow" style="cursor: pointer;">
+                                    <div class="card-body">
+                                        <h6 class="card-title"><i class="fas fa-shield-alt"></i> SSL Verification</h6>
+                                        <p class="text-muted small mb-2">Verify dashboard SSL certificate</p>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="verify-ssl" checked>
+                                            <label class="form-check-label" for="verify-ssl">Enable SSL Verification</label>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card h-100 border-info hover-shadow integration-card" data-integration="telegram" style="cursor: pointer;">
-                            <div class="card-body text-center">
-                                <i class="fab fa-telegram fa-3x text-info mb-3"></i>
-                                <h5 class="card-title">Telegram</h5>
-                                <p class="card-text text-muted small">Configure Telegram bot notifications</p>
+
+                        <!-- Current Config Display -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-file-code"></i> Current Configuration (YAML)</h6>
+                            </div>
+                            <div class="card-body">
+                                <pre class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow-y: auto;"><code id="config-yaml">Select an agent to view configuration...</code></pre>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-            </div>
-            <!-- End Suricata Tab -->
+            <!-- End Agent Configure Tab -->
 
             <!-- Users Management Tab -->
             {% if enable_auth %}
