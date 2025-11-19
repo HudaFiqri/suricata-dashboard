@@ -301,7 +301,7 @@
 {% include 'config/modals/vars.html' %}
 
 {% endblock %}
-{% block scripts %}
+{% block extra_js %}
 <!-- Configuration Module Scripts -->
 <script src="{{ url_for('static', filename='js/config/utils.js') }}"></script>
 <script src="{{ url_for('static', filename='js/config/remote-fetch.js') }}"></script>
@@ -590,42 +590,45 @@ $('#discord-test-btn').click(function() {
     testSendMessage('discord');
 });
 
-// Card click handlers
-$('.config-card').click(function() {
-    const searchTerm = $(this).data('search');
+// Initialize when document is ready
+$(document).ready(function() {
+    // Card click handlers
+    $('.config-card').click(function() {
+        const searchTerm = $(this).data('search');
 
-    if (searchTerm === 'packet-capture') {
-        openPacketCaptureModal();
-    } else if (searchTerm === 'af-packet') {
-        // Backward compatibility - redirect to packet capture
-        openPacketCaptureModal('af-packet');
-    } else if (searchTerm === 'app-layer') {
-        openAppLayerModal();
-    } else if (searchTerm === 'outputs') {
-        openOutputsModal();
-    } else if (searchTerm === 'logging') {
-        openLoggingModal();
-    } else if (searchTerm === 'vars') {
-        openVarsModal();
-    } else if (searchTerm === 'detection') {
-        openDetectionModal();
-    } else if (searchTerm === 'stream') {
-        openStreamModal();
-    } else if (searchTerm === 'host') {
-        openHostModal();
-    } else if (searchTerm === 'ips') {
-        openIpsModal();
-    } else if (searchTerm === 'interface') {
-        openInterfaceModal();
-    }
+        if (searchTerm === 'packet-capture') {
+            openPacketCaptureModal();
+        } else if (searchTerm === 'af-packet') {
+            // Backward compatibility - redirect to packet capture
+            openPacketCaptureModal('af-packet');
+        } else if (searchTerm === 'app-layer') {
+            openAppLayerModal();
+        } else if (searchTerm === 'outputs') {
+            openOutputsModal();
+        } else if (searchTerm === 'logging') {
+            openLoggingModal();
+        } else if (searchTerm === 'vars') {
+            openVarsModal();
+        } else if (searchTerm === 'detection') {
+            openDetectionModal();
+        } else if (searchTerm === 'stream') {
+            openStreamModal();
+        } else if (searchTerm === 'host') {
+            openHostModal();
+        } else if (searchTerm === 'ips') {
+            openIpsModal();
+        } else if (searchTerm === 'interface') {
+            openInterfaceModal();
+        }
+    });
+
+    $('.integration-card').click(function() {
+        const integration = $(this).data('integration');
+        openIntegrationModal(integration);
+    });
+
+    loadIntegrationSettings();
 });
-
-$('.integration-card').click(function() {
-    const integration = $(this).data('integration');
-    openIntegrationModal(integration);
-});
-
-loadIntegrationSettings();
 // Bind self-check button if present
 $('#run-self-check').on('click', function() { try { runConfigSelfCheck(); } catch (e) { console.error('Self-check failed to start', e); } });
 
