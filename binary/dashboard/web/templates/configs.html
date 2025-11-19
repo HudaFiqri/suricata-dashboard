@@ -429,10 +429,7 @@
                     <div class="mb-3">
                         <label for="role" class="form-label">Role</label>
                         <select class="form-select" id="role" required>
-                            <option value="viewer">Viewer - Read-only access</option>
-                            <option value="analyst">Analyst - Read + Export</option>
-                            <option value="operator">Operator - Manage agents & configs</option>
-                            <option value="admin">Admin - Full access</option>
+                            <option value="">Loading roles...</option>
                         </select>
                     </div>
                 </form>
@@ -475,10 +472,7 @@
                             <div class="mb-3">
                                 <label for="editRole" class="form-label">Role</label>
                                 <select class="form-select" id="editRole" required>
-                                    <option value="viewer">Viewer - Read-only access</option>
-                                    <option value="analyst">Analyst - Read + Export</option>
-                                    <option value="operator">Operator - Manage agents & configs</option>
-                                    <option value="admin">Admin - Full access</option>
+                                    <option value="">Loading roles...</option>
                                 </select>
                             </div>
                         </div>
@@ -1072,6 +1066,44 @@ async function loadRoles() {
     }
 }
 
+// Load roles into dropdowns for Add/Edit User modals
+async function loadRolesDropdown() {
+    try {
+        const response = await apiCall('/roles');
+        if (response.success && response.roles) {
+            const roles = response.roles;
+
+            // Populate Add User modal dropdown
+            const addRoleSelect = $('#role');
+            addRoleSelect.empty();
+
+            // Populate Edit User modal dropdown
+            const editRoleSelect = $('#editRole');
+            editRoleSelect.empty();
+
+            roles.forEach(role => {
+                const displayText = role.display_name || role.name;
+                const description = role.description || '';
+                const optionText = description ? `${displayText} - ${description}` : displayText;
+
+                addRoleSelect.append(`<option value="${role.name}">${optionText}</option>`);
+                editRoleSelect.append(`<option value="${role.name}">${optionText}</option>`);
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load roles for dropdown:', error);
+        // Fallback to default roles if API fails
+        const defaultOptions = `
+            <option value="viewer">Viewer - Read-only access</option>
+            <option value="analyst">Analyst - Read + Export</option>
+            <option value="operator">Operator - Manage agents & configs</option>
+            <option value="admin">Admin - Full access</option>
+        `;
+        $('#role').html(defaultOptions);
+        $('#editRole').html(defaultOptions);
+    }
+}
+
 function renderRoles(roles) {
     const tbody = $('#roles-tbody');
     if (roles.length === 0) {
@@ -1259,6 +1291,7 @@ async function deleteRole(roleId, roleName) {
 // Load on page ready
 $(document).ready(function() {
     loadUsers();
+    loadRolesDropdown(); // Load roles for dropdowns on page load
 
     // Load sessions when tab is clicked
     $('#sessions-tab').on('click', function() {
@@ -1268,6 +1301,16 @@ $(document).ready(function() {
     // Load roles when roles tab is clicked
     $('#roles-tab').on('click', function() {
         loadRoles();
+    });
+
+    // Reload roles dropdown when Add User modal is shown
+    $('#addUserModal').on('show.bs.modal', function() {
+        loadRolesDropdown();
+    });
+
+    // Reload roles dropdown when Edit User modal is shown
+    $('#editUserModal').on('show.bs.modal', function() {
+        loadRolesDropdown();
     });
 });
 </script>
