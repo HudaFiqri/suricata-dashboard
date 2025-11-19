@@ -19,42 +19,101 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <h2 class="mb-4"><i class="fas fa-users"></i> User Management</h2>
+        <h2 class="mb-4"><i class="fas fa-cog"></i> Configuration</h2>
 
         {% if enable_auth %}
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <p class="text-muted mb-0">Manage dashboard users and their permissions</p>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                <i class="fas fa-plus"></i> Add User
-            </button>
-        </div>
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-panel" type="button" role="tab">
+                    <i class="fas fa-users"></i> Users
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions-panel" type="button" role="tab">
+                    <i class="fas fa-desktop"></i> Sessions
+                </button>
+            </li>
+        </ul>
 
-        <!-- Users Table -->
-        <div class="card">
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover" id="users-table">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Email</th>
-                                <th>Role</th>
-                                <th>Status</th>
-                                <th>Last Login</th>
-                                <th>Created</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-tbody">
-                            <tr>
-                                <td colspan="7" class="text-center">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Users Panel -->
+            <div class="tab-pane fade show active" id="users-panel" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <p class="text-muted mb-0">Manage dashboard users and their permissions</p>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                        <i class="fas fa-plus"></i> Add User
+                    </button>
+                </div>
+
+                <!-- Users Table -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="users-table">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Last Login</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-tbody">
+                                    <tr>
+                                        <td colspan="7" class="text-center">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sessions Panel -->
+            <div class="tab-pane fade" id="sessions-panel" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <p class="text-muted mb-0">Manage your active sessions</p>
+                    <button class="btn btn-warning" onclick="logoutAllSessions()">
+                        <i class="fas fa-sign-out-alt"></i> Logout All Other Sessions
+                    </button>
+                </div>
+
+                <!-- Sessions Table -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="sessions-table">
+                                <thead>
+                                    <tr>
+                                        <th>Device</th>
+                                        <th>Browser</th>
+                                        <th>IP Address</th>
+                                        <th>Location</th>
+                                        <th>Last Activity</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sessions-tbody">
+                                    <tr>
+                                        <td colspan="6" class="text-center">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -261,9 +320,89 @@ function showToast(message, type) {
     alert(message);
 }
 
+// Load sessions
+async function loadSessions() {
+    try {
+        const response = await apiCall('/sessions');
+        if (response.success) {
+            renderSessions(response.sessions);
+        }
+    } catch (error) {
+        console.error('Failed to load sessions:', error);
+    }
+}
+
+function renderSessions(sessions) {
+    const tbody = $('#sessions-tbody');
+    if (sessions.length === 0) {
+        tbody.html('<tr><td colspan="6" class="text-center text-muted">No active sessions</td></tr>');
+        return;
+    }
+
+    let html = '';
+    sessions.forEach(session => {
+        const deviceIcon = session.device_type === 'mobile' ? 'fa-mobile-alt' :
+                          (session.device_type === 'tablet' ? 'fa-tablet-alt' : 'fa-desktop');
+
+        html += `
+            <tr>
+                <td>
+                    <i class="fas ${deviceIcon}"></i> ${session.device_type || 'Unknown'}
+                    ${session.os ? '<br><small class="text-muted">' + session.os + '</small>' : ''}
+                </td>
+                <td>${session.browser || '-'}</td>
+                <td>${session.ip_address || '-'}</td>
+                <td>-</td>
+                <td>${formatTimeAgo(session.last_activity)}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-danger" onclick="logoutSession(${session.id})">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.html(html);
+}
+
+// Logout specific session
+async function logoutSession(sessionId) {
+    if (!confirm('Are you sure you want to logout this session?')) return;
+
+    try {
+        const response = await apiCall(`/sessions/${sessionId}`, 'DELETE');
+        if (response.success) {
+            loadSessions();
+            showToast('Session logged out successfully', 'success');
+        }
+    } catch (error) {
+        showToast('Failed to logout session: ' + error.message, 'danger');
+    }
+}
+
+// Logout all sessions except current
+async function logoutAllSessions() {
+    if (!confirm('Are you sure you want to logout all other sessions? You will remain logged in on this device.')) return;
+
+    try {
+        const response = await apiCall('/sessions/logout-all', 'POST');
+        if (response.success) {
+            loadSessions();
+            showToast(response.message, 'success');
+        }
+    } catch (error) {
+        showToast('Failed to logout sessions: ' + error.message, 'danger');
+    }
+}
+
 // Load on page ready
 $(document).ready(function() {
     loadUsers();
+
+    // Load sessions when tab is clicked
+    $('#sessions-tab').on('click', function() {
+        loadSessions();
+    });
 });
 </script>
 {% endblock %}

@@ -20,6 +20,7 @@ from . import query
 from . import installer
 from . import health
 from . import users
+from . import sessions
 
 __all__ = [
     'api',
@@ -33,5 +34,6 @@ __all__ = [
     'query',
     'installer',
     'health',
-    'users'
+    'users',
+    'sessions'
 ]

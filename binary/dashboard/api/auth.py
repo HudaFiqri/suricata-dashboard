@@ -269,6 +269,16 @@ def login():
     # Generate token
     token = generate_jwt(user)
 
+    # Create session record
+    try:
+        from binary.dashboard.api.sessions import create_session
+        ip_address = request.remote_addr
+        user_agent = request.headers.get('User-Agent')
+        create_session(user['id'], token, ip_address, user_agent)
+    except Exception as e:
+        print(f"Failed to create session record: {e}")
+        # Continue even if session creation fails
+
     return jsonify({
         'success': True,
         'token': token,

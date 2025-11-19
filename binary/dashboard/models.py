@@ -316,3 +316,51 @@ class AuditLog(Base):
             'user_agent': self.user_agent,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
+# ============================================================================
+# USER SESSION MODEL
+# ============================================================================
+
+class UserSession(Base):
+    __tablename__ = 'user_sessions'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+
+    # Session Info
+    session_token = Column(String(512), unique=True, nullable=False, index=True)
+
+    # Client Info
+    ip_address = Column(INET)
+    user_agent = Column(Text)
+    device_type = Column(String(50))  # 'desktop', 'mobile', 'tablet'
+    browser = Column(String(100))
+    os = Column(String(100))
+
+    # Status
+    is_active = Column(Boolean, default=True, index=True)
+
+    # Timing
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    last_activity = Column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    expires_at = Column(DateTime(timezone=True), index=True)
+    logged_out_at = Column(DateTime(timezone=True))
+
+    def __repr__(self):
+        return f"<UserSession(id={self.id}, user_id={self.user_id}, active={self.is_active})>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'ip_address': str(self.ip_address) if self.ip_address else None,
+            'user_agent': self.user_agent,
+            'device_type': self.device_type,
+            'browser': self.browser,
+            'os': self.os,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_activity': self.last_activity.isoformat() if self.last_activity else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'logged_out_at': self.logged_out_at.isoformat() if self.logged_out_at else None
+        }
