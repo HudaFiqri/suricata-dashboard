@@ -592,17 +592,28 @@ $('#discord-test-btn').click(function() {
 
 // Initialize when document is ready
 $(document).ready(function() {
+    console.log('Config page: Document ready!');
+    console.log('Found config cards:', $('.config-card').length);
+
     // Card click handlers
     $('.config-card').click(function() {
         const searchTerm = $(this).data('search');
+        console.log('Card clicked! Search term:', searchTerm);
 
         if (searchTerm === 'packet-capture') {
+            console.log('Opening Packet Capture modal...');
             openPacketCaptureModal();
         } else if (searchTerm === 'af-packet') {
             // Backward compatibility - redirect to packet capture
+            console.log('Opening AF-Packet modal...');
             openPacketCaptureModal('af-packet');
         } else if (searchTerm === 'app-layer') {
-            openAppLayerModal();
+            console.log('Opening App Layer modal...');
+            if (typeof openAppLayerModal === 'function') {
+                openAppLayerModal();
+            } else {
+                console.error('openAppLayerModal function not found!');
+            }
         } else if (searchTerm === 'outputs') {
             openOutputsModal();
         } else if (searchTerm === 'logging') {

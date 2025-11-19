@@ -60,7 +60,7 @@ def configs():
 @web.route('/configs/<agent_id>')
 def agent_config(agent_id):
     """Agent configuration editor"""
-    return render_template('config_editor.html', agent_id=agent_id)
+    return render_template('config.html', agent_id=agent_id)
 
 @web.route('/users')
 def users():
