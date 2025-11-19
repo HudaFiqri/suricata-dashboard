@@ -24,17 +24,17 @@
         {% if enable_auth %}
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-4" role="tablist">
-            <li class="nav-item" role="presentation">
+            <li class="nav-item" role="presentation" data-permission="users.view">
                 <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-panel" type="button" role="tab">
                     <i class="fas fa-users"></i> Users
                 </button>
             </li>
-            <li class="nav-item" role="presentation">
+            <li class="nav-item" role="presentation" data-permission="users.view">
                 <button class="nav-link" id="roles-tab" data-bs-toggle="tab" data-bs-target="#roles-panel" type="button" role="tab">
                     <i class="fas fa-user-shield"></i> Roles & Permissions
                 </button>
             </li>
-            <li class="nav-item" role="presentation">
+            <li class="nav-item" role="presentation" data-permission="sessions.view">
                 <button class="nav-link" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions-panel" type="button" role="tab">
                     <i class="fas fa-desktop"></i> Sessions
                 </button>
@@ -47,7 +47,7 @@
             <div class="tab-pane fade show active" id="users-panel" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <p class="text-muted mb-0">Manage dashboard users and their permissions</p>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                    <button class="btn btn-primary" data-permission="users.manage" data-bs-toggle="modal" data-bs-target="#addUserModal">
                         <i class="fas fa-plus"></i> Add User
                     </button>
                 </div>
@@ -323,7 +323,7 @@
                     <div class="card-header">
                         <div class="d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Custom Roles</h5>
-                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addRoleModal">
+                            <button class="btn btn-sm btn-primary" data-permission="users.manage" data-bs-toggle="modal" data-bs-target="#addRoleModal">
                                 <i class="fas fa-plus"></i> Create Custom Role
                             </button>
                         </div>
@@ -360,7 +360,7 @@
             <div class="tab-pane fade" id="sessions-panel" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <p class="text-muted mb-0">Manage your active sessions</p>
-                    <button class="btn btn-warning" onclick="logoutAllSessions()">
+                    <button class="btn btn-warning" data-permission="sessions.manage" onclick="logoutAllSessions()">
                         <i class="fas fa-sign-out-alt"></i> Logout All Other Sessions
                     </button>
                 </div>
@@ -809,10 +809,10 @@ function renderUsers(users) {
                 <td>${user.last_login ? formatTimeAgo(user.last_login) : 'Never'}</td>
                 <td>${formatDate(user.created_at)}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick="editUser('${user.id}')">
+                    <button class="btn btn-sm btn-outline-primary" data-permission="users.manage" onclick="editUser('${user.id}')">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUser('${user.id}', '${user.username}')">
+                    <button class="btn btn-sm btn-outline-danger" data-permission="users.manage" onclick="deleteUser('${user.id}', '${user.username}')">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
@@ -820,6 +820,11 @@ function renderUsers(users) {
         `;
     });
     tbody.html(html);
+
+    // Apply permission restrictions to dynamically loaded elements
+    if (typeof applyPermissionRestrictions === 'function') {
+        applyPermissionRestrictions();
+    }
 }
 
 // Create user
@@ -1014,7 +1019,7 @@ function renderSessions(sessions) {
                 <td>-</td>
                 <td>${formatTimeAgo(session.last_activity)}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-danger" onclick="logoutSession(${session.id})">
+                    <button class="btn btn-sm btn-outline-danger" data-permission="sessions.manage" onclick="logoutSession(${session.id})">
                         <i class="fas fa-sign-out-alt"></i> Logout
                     </button>
                 </td>
@@ -1022,6 +1027,11 @@ function renderSessions(sessions) {
         `;
     });
     tbody.html(html);
+
+    // Apply permission restrictions to dynamically loaded elements
+    if (typeof applyPermissionRestrictions === 'function') {
+        applyPermissionRestrictions();
+    }
 }
 
 // Logout specific session
@@ -1122,10 +1132,10 @@ function renderRoles(roles) {
 
         const actions = role.is_system ?
             '<span class="text-muted"><i class="fas fa-lock"></i> Protected</span>' :
-            `<button class="btn btn-sm btn-outline-primary" onclick="editRole('${role.id}')">
+            `<button class="btn btn-sm btn-outline-primary" data-permission="users.manage" onclick="editRole('${role.id}')">
                 <i class="fas fa-edit"></i>
             </button>
-            <button class="btn btn-sm btn-outline-danger" onclick="deleteRole('${role.id}', '${role.name}')">
+            <button class="btn btn-sm btn-outline-danger" data-permission="users.manage" onclick="deleteRole('${role.id}', '${role.name}')">
                 <i class="fas fa-trash"></i>
             </button>`;
 
@@ -1140,6 +1150,11 @@ function renderRoles(roles) {
         `;
     });
     tbody.html(html);
+
+    // Apply permission restrictions to dynamically loaded elements
+    if (typeof applyPermissionRestrictions === 'function') {
+        applyPermissionRestrictions();
+    }
 }
 
 // Get selected role permissions from checkboxes

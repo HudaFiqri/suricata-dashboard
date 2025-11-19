@@ -229,6 +229,95 @@
             return await response.json();
         }
 
+        // Decode JWT token to get permissions
+        function decodeJWT(token) {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            } catch (e) {
+                console.error('Failed to decode JWT:', e);
+                return null;
+            }
+        }
+
+        // Get current user with permissions from JWT
+        function getCurrentUser() {
+            const token = localStorage.getItem('jwt_token');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+            if (token) {
+                const payload = decodeJWT(token);
+                if (payload) {
+                    user.permissions = payload.custom_permissions;
+                    user.role = payload.role;
+                }
+            }
+
+            return user;
+        }
+
+        // Check if user has permission
+        function hasPermission(permission) {
+            const user = getCurrentUser();
+
+            // Admin always has all permissions
+            if (user.role === 'admin') {
+                return true;
+            }
+
+            // Check custom permissions first (they override role permissions)
+            if (user.permissions && user.permissions.custom_permissions) {
+                return user.permissions.custom_permissions.includes(permission);
+            }
+
+            // Check role-based permissions
+            const rolePermissions = {
+                'admin': ['agents.view', 'agents.manage', 'events.view', 'events.export',
+                          'configs.view', 'configs.edit', 'users.view', 'users.manage',
+                          'sessions.view', 'sessions.manage', 'stats.view', 'logs.view'],
+                'operator': ['agents.view', 'agents.manage', 'events.view', 'events.export',
+                             'configs.view', 'configs.edit', 'stats.view', 'logs.view'],
+                'analyst': ['agents.view', 'events.view', 'events.export',
+                            'configs.view', 'stats.view', 'logs.view'],
+                'viewer': ['agents.view', 'events.view', 'stats.view', 'logs.view']
+            };
+
+            const perms = rolePermissions[user.role] || [];
+            return perms.includes(permission);
+        }
+
+        // Apply permission-based UI restrictions
+        function applyPermissionRestrictions() {
+            const user = getCurrentUser();
+
+            // Hide/disable elements based on permissions
+            $('[data-permission]').each(function() {
+                const required = $(this).data('permission');
+                if (!hasPermission(required)) {
+                    // Check if it should be hidden or just disabled
+                    if ($(this).data('permission-action') === 'disable') {
+                        $(this).prop('disabled', true).addClass('disabled');
+                        $(this).attr('title', 'You do not have permission for this action');
+                    } else {
+                        $(this).hide();
+                    }
+                }
+            });
+
+            // Special handling for navigation
+            if (!hasPermission('configs.edit')) {
+                $('.sidebar .nav-link[href="/configs"]').hide();
+            }
+
+            if (!hasPermission('users.view')) {
+                $('.nav-item:contains("Users")').hide();
+            }
+        }
+
         // Logout function
         function doLogout() {
             // Clear localStorage
@@ -246,17 +335,12 @@
 
             {% if enable_auth %}
             // Check auth and update username
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const user = getCurrentUser();
             if (user.username) {
                 $('#username-display').text(user.username);
 
-                // Hide admin-only elements for viewer role
-                if (user.role === 'viewer') {
-                    // Hide Configurations menu
-                    $('.sidebar .nav-link[href="/configs"]').hide();
-                    // Hide admin buttons (will be applied by other pages)
-                    $('body').addClass('viewer-mode');
-                }
+                // Apply permission-based restrictions
+                applyPermissionRestrictions();
             } else {
                 // Not logged in, redirect to login (unless already on login page)
                 if (window.location.pathname !== '/login') {
