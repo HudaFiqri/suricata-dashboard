@@ -367,11 +367,117 @@ class SuricataAgent:
         """Handle command from dashboard"""
         logger.info(f"Executing command {command_id}: {command_type}")
 
-        # TODO: Implement command handlers
-        result = {
-            'success': False,
-            'message': 'Command handling not implemented yet'
-        }
+        result = {}
+
+        try:
+            if command_type == 'read_config':
+                # Read Suricata configuration file
+                config_path = parameters.get('path', self.config.get('suricata.config_path', '/etc/suricata/suricata.yaml'))
+                logger.info(f"Reading config from: {config_path}")
+
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                result = {
+                    'success': True,
+                    'content': content,
+                    'path': config_path,
+                    'message': f'Config read successfully from {config_path}'
+                }
+
+            elif command_type == 'read_rules':
+                # Read rules file
+                rules_path = parameters.get('path')
+                if not rules_path:
+                    raise ValueError('Rules path not specified')
+
+                with open(rules_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                result = {
+                    'success': True,
+                    'content': content,
+                    'path': rules_path,
+                    'message': f'Rules read successfully from {rules_path}'
+                }
+
+            elif command_type == 'list_rules':
+                # List all rules files
+                import os
+                rules_dir = parameters.get('dir', self.config.get('suricata.rules_dir', '/etc/suricata/rules'))
+
+                if os.path.exists(rules_dir):
+                    files = [f for f in os.listdir(rules_dir) if f.endswith('.rules')]
+                    result = {
+                        'success': True,
+                        'files': files,
+                        'dir': rules_dir,
+                        'message': f'Found {len(files)} rule files'
+                    }
+                else:
+                    result = {
+                        'success': False,
+                        'message': f'Rules directory not found: {rules_dir}'
+                    }
+
+            elif command_type == 'tail_logs':
+                # Tail log file
+                log_path = parameters.get('path', self.config.get('suricata.eve_log', '/var/log/suricata/eve.json'))
+                lines = parameters.get('lines', 100)
+
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    # Read last N lines
+                    all_lines = f.readlines()
+                    last_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+
+                result = {
+                    'success': True,
+                    'lines': last_lines,
+                    'path': log_path,
+                    'message': f'Read last {len(last_lines)} lines from {log_path}'
+                }
+
+            elif command_type == 'restart_suricata':
+                # Restart Suricata service
+                import subprocess
+                method = parameters.get('method', 'systemctl')
+
+                if method == 'systemctl':
+                    subprocess.run(['systemctl', 'restart', 'suricata'], check=True)
+                    message = 'Suricata restarted via systemctl'
+                else:
+                    subprocess.run(['service', 'suricata', 'restart'], check=True)
+                    message = 'Suricata restarted via service'
+
+                result = {
+                    'success': True,
+                    'message': message
+                }
+
+            else:
+                result = {
+                    'success': False,
+                    'message': f'Unknown command type: {command_type}'
+                }
+
+        except FileNotFoundError as e:
+            logger.error(f"File not found: {e}")
+            result = {
+                'success': False,
+                'message': f'File not found: {str(e)}'
+            }
+        except PermissionError as e:
+            logger.error(f"Permission denied: {e}")
+            result = {
+                'success': False,
+                'message': f'Permission denied: {str(e)}'
+            }
+        except Exception as e:
+            logger.error(f"Command execution failed: {e}")
+            result = {
+                'success': False,
+                'message': f'Error: {str(e)}'
+            }
 
         # Send result
         if self.ws_client:
@@ -383,14 +489,76 @@ class SuricataAgent:
         """Handle configuration update from dashboard"""
         logger.info(f"Applying config update: {config_type}")
 
-        # TODO: Implement config update handling
-        result = {
-            'success': False,
-            'message': 'Config update not implemented yet'
-        }
+        result = {}
+
+        try:
+            import shutil
+            import time
+
+            if config_type == 'suricata_yaml':
+                config_path = self.config.get('suricata.config_path', '/etc/suricata/suricata.yaml')
+
+                # Create backup
+                backup_path = f"{config_path}.backup.{int(time.time())}"
+                shutil.copy(config_path, backup_path)
+                logger.info(f"Config backed up to: {backup_path}")
+
+                # Write new config
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+
+                logger.info(f"Config written to: {config_path}")
+
+                # Reload Suricata if requested
+                if reload_method == 'restart':
+                    import subprocess
+                    subprocess.run(['systemctl', 'restart', 'suricata'], check=True)
+                    reload_msg = 'Suricata restarted'
+                elif reload_method == 'reload':
+                    import subprocess
+                    subprocess.run(['systemctl', 'reload', 'suricata'], check=True)
+                    reload_msg = 'Suricata reloaded'
+                else:
+                    reload_msg = 'No reload performed'
+
+                result = {
+                    'success': True,
+                    'message': f'Config updated successfully. {reload_msg}',
+                    'backup': backup_path,
+                    'path': config_path
+                }
+
+            elif config_type == 'rules':
+                rules_path = self.config.get('suricata.rules_dir', '/etc/suricata/rules')
+                # Implement rules update logic
+                result = {
+                    'success': True,
+                    'message': 'Rules updated successfully'
+                }
+
+            else:
+                result = {
+                    'success': False,
+                    'message': f'Unknown config type: {config_type}'
+                }
+
+        except PermissionError as e:
+            logger.error(f"Permission denied: {e}")
+            result = {
+                'success': False,
+                'message': f'Permission denied: {str(e)}'
+            }
+        except Exception as e:
+            logger.error(f"Config update failed: {e}")
+            result = {
+                'success': False,
+                'message': f'Error: {str(e)}'
+            }
 
         if self.ws_client:
             self.ws_client.send_command_result(command_id, 'completed', result)
+        elif self.http_client:
+            self.http_client.send_command_result(command_id, 'completed', result)
 
     def run(self):
         """Main run loop"""

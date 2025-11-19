@@ -213,3 +213,46 @@ def apply_config(agent_id):
         'command_id': command.id,
         'message': 'Config deployment initiated'
     })
+
+@api.route('/configs/<int:agent_id>/fetch', methods=['POST'])
+@require_auth
+def fetch_config_from_agent(agent_id):
+    """Fetch current configuration FROM agent (real-time)"""
+    data = request.get_json() or {}
+
+    session = get_pg_session()
+
+    # Verify agent exists
+    agent = session.query(Agent).filter_by(id=agent_id).first()
+    if not agent:
+        return jsonify({'success': False, 'error': 'Agent not found'}), 404
+
+    # Check if agent is online
+    if agent.status != 'online':
+        return jsonify({'success': False, 'error': 'Agent is offline'}), 503
+
+    config_path = data.get('path', '/etc/suricata/suricata.yaml')
+
+    # Create command to read config from agent
+    from binary.dashboard.models import AgentCommand
+
+    command = AgentCommand(
+        agent_id=agent_id,
+        command_type='read_config',
+        parameters={'path': config_path},
+        created_by=request.username,
+        priority=2  # High priority for interactive requests
+    )
+
+    session.add(command)
+    session.commit()
+
+    logger.info(f"Config fetch initiated: agent={agent_id}, path={config_path}")
+
+    # Return command ID so client can poll for result
+    return jsonify({
+        'success': True,
+        'command_id': command.id,
+        'status': 'pending',
+        'message': 'Config fetch initiated. Poll command status to get result.'
+    }), 202
