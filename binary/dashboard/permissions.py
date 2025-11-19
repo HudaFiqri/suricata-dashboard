@@ -87,21 +87,28 @@ def get_role_permissions(role: str) -> list:
     return ROLE_PERMISSIONS.get(role, [])
 
 
-def has_permission(user_role: str, permission: str, custom_permissions: list = None) -> bool:
+def has_permission(user_role: str, permission: str, custom_permissions = None) -> bool:
     """
     Check if a user has a specific permission
 
     Args:
         user_role: User's role (admin, operator, analyst, viewer)
         permission: Permission to check (e.g., 'agents.manage')
-        custom_permissions: Optional custom permissions list for user
+        custom_permissions: Optional custom permissions (dict or list)
 
     Returns:
         bool: True if user has permission
     """
-    # Custom permissions override role permissions
+    # Handle custom permissions (can be dict with 'custom_permissions' key or direct list)
     if custom_permissions:
-        return permission in custom_permissions
+        if isinstance(custom_permissions, dict):
+            perm_list = custom_permissions.get('custom_permissions', [])
+        else:
+            perm_list = custom_permissions
+
+        # If custom permissions exist, use them instead of role
+        if perm_list:
+            return permission in perm_list
 
     # Check role-based permissions
     role_perms = get_role_permissions(user_role)

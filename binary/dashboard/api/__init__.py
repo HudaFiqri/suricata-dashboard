@@ -22,6 +22,7 @@ from . import health
 from . import users
 from . import sessions
 from . import permissions_api
+from . import roles
 
 __all__ = [
     'api',
@@ -37,5 +38,6 @@ __all__ = [
     'health',
     'users',
     'sessions',
-    'permissions_api'
+    'permissions_api',
+    'roles'
 ]

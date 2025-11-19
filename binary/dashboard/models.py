@@ -364,3 +364,34 @@ class UserSession(Base):
             'expires_at': self.expires_at.isoformat() if self.expires_at else None,
             'logged_out_at': self.logged_out_at.isoformat() if self.logged_out_at else None
         }
+
+# ============================================================================
+# CUSTOM ROLE MODEL
+# ============================================================================
+
+class CustomRole(Base):
+    __tablename__ = 'custom_roles'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    display_name = Column(String(255))
+    description = Column(Text)
+    permissions = Column(JSONB, default=[])
+    is_system = Column(Boolean, default=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<CustomRole(id={self.id}, name='{self.name}')>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'display_name': self.display_name,
+            'description': self.description,
+            'permissions': self.permissions or [],
+            'is_system': self.is_system,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

@@ -198,6 +198,8 @@ def update_user(user_id):
             user.is_active = data['is_active']
         if 'password' in data and data['password']:
             user.password_hash = bcrypt.hashpw(data['password'].encode(), bcrypt.gensalt()).decode()
+        if 'permissions' in data:
+            user.permissions = data['permissions']
 
         user.updated_at = datetime.utcnow()
         session.commit()
@@ -229,6 +231,8 @@ def update_user(user_id):
             update_data['is_active'] = data['is_active']
         if 'password' in data and data['password']:
             update_data['password_hash'] = bcrypt.hashpw(data['password'].encode(), bcrypt.gensalt()).decode()
+        if 'permissions' in data:
+            update_data['permissions'] = data['permissions']
 
         result = db.users.update_one(
             {'_id': ObjectId(user_id)},

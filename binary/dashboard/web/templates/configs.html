@@ -317,6 +317,43 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Custom Roles Management -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Custom Roles</h5>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addRoleModal">
+                                <i class="fas fa-plus"></i> Create Custom Role
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">Create custom roles with specific permissions beyond the default roles.</p>
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="roles-table">
+                                <thead>
+                                    <tr>
+                                        <th>Role Name</th>
+                                        <th>Description</th>
+                                        <th>Permissions</th>
+                                        <th>Type</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="roles-tbody">
+                                    <tr>
+                                        <td colspan="5" class="text-center">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Sessions Panel -->
@@ -410,7 +447,7 @@
 
 <!-- Edit User Modal -->
 <div class="modal fade" id="editUserModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Edit User</h5>
@@ -419,32 +456,312 @@
             <div class="modal-body">
                 <form id="editUserForm">
                     <input type="hidden" id="editUserId">
-                    <div class="mb-3">
-                        <label for="editUsername" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="editUsername" required>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editUsername" class="form-label">Username</label>
+                                <input type="text" class="form-control" id="editUsername" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="editEmail" required>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="editEmail" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="editEmail" required>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editRole" class="form-label">Role</label>
+                                <select class="form-select" id="editRole" required>
+                                    <option value="viewer">Viewer - Read-only access</option>
+                                    <option value="analyst">Analyst - Read + Export</option>
+                                    <option value="operator">Operator - Manage agents & configs</option>
+                                    <option value="admin">Admin - Full access</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Status</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="editIsActive">
+                                    <label class="form-check-label" for="editIsActive">Active</label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="editRole" class="form-label">Role</label>
-                        <select class="form-select" id="editRole" required>
-                            <option value="viewer">Viewer - Read-only access</option>
-                            <option value="analyst">Analyst - Read + Export</option>
-                            <option value="operator">Operator - Manage agents & configs</option>
-                            <option value="admin">Admin - Full access</option>
-                        </select>
-                    </div>
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="editIsActive">
-                        <label class="form-check-label" for="editIsActive">Active</label>
+
+                    <!-- Custom Permissions Section -->
+                    <div class="mt-3">
+                        <hr>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">Custom Permissions</label>
+                            <small class="text-muted">Override role permissions</small>
+                        </div>
+                        <p class="text-muted small">Enable custom permissions to grant or deny specific access beyond the user's role.</p>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="enableCustomPermissions" onchange="toggleCustomPermissions()">
+                            <label class="form-check-label" for="enableCustomPermissions">
+                                <strong>Enable Custom Permissions</strong>
+                            </label>
+                        </div>
+
+                        <div id="customPermissionsSection" style="display: none;">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <!-- Agents -->
+                                        <div class="col-md-6 mb-3">
+                                            <h6 class="text-muted mb-2"><i class="fas fa-server"></i> Agents</h6>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_agents_view" value="agents.view">
+                                                <label class="form-check-label" for="perm_agents_view">View agents</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_agents_manage" value="agents.manage">
+                                                <label class="form-check-label" for="perm_agents_manage">Manage agents</label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Events -->
+                                        <div class="col-md-6 mb-3">
+                                            <h6 class="text-muted mb-2"><i class="fas fa-bell"></i> Events</h6>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_events_view" value="events.view">
+                                                <label class="form-check-label" for="perm_events_view">View events</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_events_export" value="events.export">
+                                                <label class="form-check-label" for="perm_events_export">Export events</label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Configuration -->
+                                        <div class="col-md-6 mb-3">
+                                            <h6 class="text-muted mb-2"><i class="fas fa-cog"></i> Configuration</h6>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_configs_view" value="configs.view">
+                                                <label class="form-check-label" for="perm_configs_view">View configurations</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_configs_edit" value="configs.edit">
+                                                <label class="form-check-label" for="perm_configs_edit">Edit configurations</label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Users -->
+                                        <div class="col-md-6 mb-3">
+                                            <h6 class="text-muted mb-2"><i class="fas fa-users"></i> User Management</h6>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_users_view" value="users.view">
+                                                <label class="form-check-label" for="perm_users_view">View users</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_users_manage" value="users.manage">
+                                                <label class="form-check-label" for="perm_users_manage">Manage users</label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Sessions -->
+                                        <div class="col-md-6 mb-3">
+                                            <h6 class="text-muted mb-2"><i class="fas fa-desktop"></i> Sessions</h6>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_sessions_view" value="sessions.view">
+                                                <label class="form-check-label" for="perm_sessions_view">View sessions</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_sessions_manage" value="sessions.manage">
+                                                <label class="form-check-label" for="perm_sessions_manage">Manage sessions</label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Monitoring -->
+                                        <div class="col-md-6 mb-3">
+                                            <h6 class="text-muted mb-2"><i class="fas fa-chart-line"></i> Monitoring</h6>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_stats_view" value="stats.view">
+                                                <label class="form-check-label" for="perm_stats_view">View statistics</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="perm_logs_view" value="logs.view">
+                                                <label class="form-check-label" for="perm_logs_view">View logs</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="updateUser">Update User</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Role Modal -->
+<div class="modal fade" id="addRoleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Custom Role</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addRoleForm">
+                    <div class="mb-3">
+                        <label for="roleName" class="form-label">Role Name *</label>
+                        <input type="text" class="form-control" id="roleName" required placeholder="e.g., security_auditor">
+                        <small class="text-muted">Use lowercase letters, numbers, and underscores only</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="roleDisplayName" class="form-label">Display Name</label>
+                        <input type="text" class="form-control" id="roleDisplayName" placeholder="e.g., Security Auditor">
+                    </div>
+                    <div class="mb-3">
+                        <label for="roleDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="roleDescription" rows="2" placeholder="Describe what this role can do"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Permissions *</label>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Agents -->
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted mb-2"><i class="fas fa-server"></i> Agents</h6>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_agents_view" value="agents.view">
+                                            <label class="form-check-label" for="role_perm_agents_view">View agents</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_agents_manage" value="agents.manage">
+                                            <label class="form-check-label" for="role_perm_agents_manage">Manage agents</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Events -->
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted mb-2"><i class="fas fa-bell"></i> Events</h6>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_events_view" value="events.view">
+                                            <label class="form-check-label" for="role_perm_events_view">View events</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_events_export" value="events.export">
+                                            <label class="form-check-label" for="role_perm_events_export">Export events</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Configuration -->
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted mb-2"><i class="fas fa-cog"></i> Configuration</h6>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_configs_view" value="configs.view">
+                                            <label class="form-check-label" for="role_perm_configs_view">View configurations</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_configs_edit" value="configs.edit">
+                                            <label class="form-check-label" for="role_perm_configs_edit">Edit configurations</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Users -->
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted mb-2"><i class="fas fa-users"></i> User Management</h6>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_users_view" value="users.view">
+                                            <label class="form-check-label" for="role_perm_users_view">View users</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_users_manage" value="users.manage">
+                                            <label class="form-check-label" for="role_perm_users_manage">Manage users</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Sessions -->
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted mb-2"><i class="fas fa-desktop"></i> Sessions</h6>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_sessions_view" value="sessions.view">
+                                            <label class="form-check-label" for="role_perm_sessions_view">View sessions</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_sessions_manage" value="sessions.manage">
+                                            <label class="form-check-label" for="role_perm_sessions_manage">Manage sessions</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Monitoring -->
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted mb-2"><i class="fas fa-chart-line"></i> Monitoring</h6>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_stats_view" value="stats.view">
+                                            <label class="form-check-label" for="role_perm_stats_view">View statistics</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="role_perm_logs_view" value="logs.view">
+                                            <label class="form-check-label" for="role_perm_logs_view">View logs</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveRole">Create Role</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Role Modal -->
+<div class="modal fade" id="editRoleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Custom Role</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editRoleForm">
+                    <input type="hidden" id="editRoleId">
+                    <div class="mb-3">
+                        <label for="editRoleName" class="form-label">Role Name</label>
+                        <input type="text" class="form-control" id="editRoleName" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editRoleDisplayName" class="form-label">Display Name</label>
+                        <input type="text" class="form-control" id="editRoleDisplayName" placeholder="e.g., Security Auditor">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editRoleDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="editRoleDescription" rows="2" placeholder="Describe what this role can do"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Permissions</label>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row" id="editRolePermissions">
+                                    <!-- Will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="updateRole">Update Role</button>
             </div>
         </div>
     </div>
@@ -533,10 +850,106 @@ $('#saveUser').click(async function() {
     }
 });
 
-// Edit user
-function editUser(userId) {
-    // TODO: Implement edit user
+// Toggle custom permissions section
+function toggleCustomPermissions() {
+    const enabled = $('#enableCustomPermissions').is(':checked');
+    $('#customPermissionsSection').toggle(enabled);
 }
+
+// Get selected permissions from checkboxes
+function getSelectedPermissions() {
+    const permissions = [];
+    $('#customPermissionsSection input[type="checkbox"]:checked').each(function() {
+        permissions.push($(this).val());
+    });
+    return permissions;
+}
+
+// Set permissions checkboxes based on array
+function setPermissionsCheckboxes(permissions) {
+    // Clear all first
+    $('#customPermissionsSection input[type="checkbox"]').prop('checked', false);
+
+    // Set the ones in the array
+    if (permissions && permissions.length > 0) {
+        permissions.forEach(perm => {
+            $(`#customPermissionsSection input[value="${perm}"]`).prop('checked', true);
+        });
+        $('#enableCustomPermissions').prop('checked', true);
+        $('#customPermissionsSection').show();
+    } else {
+        $('#enableCustomPermissions').prop('checked', false);
+        $('#customPermissionsSection').hide();
+    }
+}
+
+// Edit user
+async function editUser(userId) {
+    try {
+        // Fetch user data
+        const response = await apiCall('/users');
+        if (!response.success) {
+            showToast('Failed to load user data', 'danger');
+            return;
+        }
+
+        const user = response.users.find(u => u.id == userId);
+        if (!user) {
+            showToast('User not found', 'danger');
+            return;
+        }
+
+        // Populate form
+        $('#editUserId').val(user.id);
+        $('#editUsername').val(user.username);
+        $('#editEmail').val(user.email || '');
+        $('#editRole').val(user.role);
+        $('#editIsActive').prop('checked', user.is_active);
+
+        // Set custom permissions if any
+        const customPerms = user.permissions?.custom_permissions || [];
+        setPermissionsCheckboxes(customPerms);
+
+        // Show modal
+        $('#editUserModal').modal('show');
+    } catch (error) {
+        showToast('Failed to load user: ' + error.message, 'danger');
+    }
+}
+
+// Update user
+$('#updateUser').click(async function() {
+    const userId = $('#editUserId').val();
+    const customPermEnabled = $('#enableCustomPermissions').is(':checked');
+
+    const userData = {
+        username: $('#editUsername').val(),
+        email: $('#editEmail').val(),
+        role: $('#editRole').val(),
+        is_active: $('#editIsActive').is(':checked')
+    };
+
+    // Add custom permissions if enabled
+    if (customPermEnabled) {
+        userData.permissions = {
+            custom_permissions: getSelectedPermissions()
+        };
+    } else {
+        // Clear custom permissions
+        userData.permissions = {};
+    }
+
+    try {
+        const response = await apiCall(`/users/${userId}`, 'PUT', userData);
+        if (response.success) {
+            $('#editUserModal').modal('hide');
+            loadUsers();
+            showToast('User updated successfully', 'success');
+        }
+    } catch (error) {
+        showToast('Failed to update user: ' + error.message, 'danger');
+    }
+});
 
 // Delete user
 async function deleteUser(userId, username) {
@@ -647,6 +1060,202 @@ async function logoutAllSessions() {
     }
 }
 
+// Load custom roles
+async function loadRoles() {
+    try {
+        const response = await apiCall('/roles');
+        if (response.success) {
+            renderRoles(response.roles);
+        }
+    } catch (error) {
+        console.error('Failed to load roles:', error);
+    }
+}
+
+function renderRoles(roles) {
+    const tbody = $('#roles-tbody');
+    if (roles.length === 0) {
+        tbody.html('<tr><td colspan="5" class="text-center text-muted">No custom roles found</td></tr>');
+        return;
+    }
+
+    let html = '';
+    roles.forEach(role => {
+        const typeBadge = role.is_system ?
+            '<span class="badge bg-secondary">System</span>' :
+            '<span class="badge bg-info">Custom</span>';
+
+        const permCount = Array.isArray(role.permissions) ? role.permissions.length : 0;
+        const permBadge = `<span class="badge bg-light text-dark">${permCount} permissions</span>`;
+
+        const actions = role.is_system ?
+            '<span class="text-muted"><i class="fas fa-lock"></i> Protected</span>' :
+            `<button class="btn btn-sm btn-outline-primary" onclick="editRole('${role.id}')">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteRole('${role.id}', '${role.name}')">
+                <i class="fas fa-trash"></i>
+            </button>`;
+
+        html += `
+            <tr>
+                <td><strong>${role.display_name || role.name}</strong></td>
+                <td>${role.description || '-'}</td>
+                <td>${permBadge}</td>
+                <td>${typeBadge}</td>
+                <td>${actions}</td>
+            </tr>
+        `;
+    });
+    tbody.html(html);
+}
+
+// Get selected role permissions from checkboxes
+function getRolePermissions() {
+    const permissions = [];
+    $('#addRoleForm input[type="checkbox"]:checked').each(function() {
+        permissions.push($(this).val());
+    });
+    return permissions;
+}
+
+// Create custom role
+$('#saveRole').click(async function() {
+    const roleData = {
+        name: $('#roleName').val(),
+        display_name: $('#roleDisplayName').val(),
+        description: $('#roleDescription').val(),
+        permissions: getRolePermissions()
+    };
+
+    if (!roleData.name) {
+        showToast('Role name is required', 'danger');
+        return;
+    }
+
+    if (roleData.permissions.length === 0) {
+        showToast('Please select at least one permission', 'danger');
+        return;
+    }
+
+    try {
+        const response = await apiCall('/roles', 'POST', roleData);
+        if (response.success) {
+            $('#addRoleModal').modal('hide');
+            $('#addRoleForm')[0].reset();
+            $('#addRoleForm input[type="checkbox"]').prop('checked', false);
+            loadRoles();
+            showToast('Custom role created successfully', 'success');
+        }
+    } catch (error) {
+        showToast('Failed to create role: ' + error.message, 'danger');
+    }
+});
+
+// Edit custom role
+async function editRole(roleId) {
+    try {
+        const response = await apiCall('/roles');
+        if (!response.success) {
+            showToast('Failed to load role data', 'danger');
+            return;
+        }
+
+        const role = response.roles.find(r => r.id == roleId);
+        if (!role) {
+            showToast('Role not found', 'danger');
+            return;
+        }
+
+        if (role.is_system) {
+            showToast('System roles cannot be edited', 'warning');
+            return;
+        }
+
+        // Populate form
+        $('#editRoleId').val(role.id);
+        $('#editRoleName').val(role.name);
+        $('#editRoleDisplayName').val(role.display_name || '');
+        $('#editRoleDescription').val(role.description || '');
+
+        // Build permissions checkboxes
+        const perms = [
+            {cat: 'Agents', icon: 'fa-server', items: ['agents.view', 'agents.manage']},
+            {cat: 'Events', icon: 'fa-bell', items: ['events.view', 'events.export']},
+            {cat: 'Configuration', icon: 'fa-cog', items: ['configs.view', 'configs.edit']},
+            {cat: 'User Management', icon: 'fa-users', items: ['users.view', 'users.manage']},
+            {cat: 'Sessions', icon: 'fa-desktop', items: ['sessions.view', 'sessions.manage']},
+            {cat: 'Monitoring', icon: 'fa-chart-line', items: ['stats.view', 'logs.view']}
+        ];
+
+        let permHtml = '';
+        perms.forEach(cat => {
+            permHtml += `<div class="col-md-6 mb-3"><h6 class="text-muted mb-2"><i class="fas ${cat.icon}"></i> ${cat.cat}</h6>`;
+            cat.items.forEach(perm => {
+                const checked = role.permissions.includes(perm) ? 'checked' : '';
+                const label = perm.split('.')[1].replace('_', ' ');
+                permHtml += `
+                    <div class="form-check">
+                        <input class="form-check-input edit-role-perm" type="checkbox" value="${perm}" ${checked}>
+                        <label class="form-check-label">${label.charAt(0).toUpperCase() + label.slice(1)}</label>
+                    </div>`;
+            });
+            permHtml += '</div>';
+        });
+
+        $('#editRolePermissions').html(permHtml);
+        $('#editRoleModal').modal('show');
+    } catch (error) {
+        showToast('Failed to load role: ' + error.message, 'danger');
+    }
+}
+
+// Update custom role
+$('#updateRole').click(async function() {
+    const roleId = $('#editRoleId').val();
+    const permissions = [];
+    $('.edit-role-perm:checked').each(function() {
+        permissions.push($(this).val());
+    });
+
+    const roleData = {
+        display_name: $('#editRoleDisplayName').val(),
+        description: $('#editRoleDescription').val(),
+        permissions: permissions
+    };
+
+    if (permissions.length === 0) {
+        showToast('Please select at least one permission', 'danger');
+        return;
+    }
+
+    try {
+        const response = await apiCall(`/roles/${roleId}`, 'PUT', roleData);
+        if (response.success) {
+            $('#editRoleModal').modal('hide');
+            loadRoles();
+            showToast('Role updated successfully', 'success');
+        }
+    } catch (error) {
+        showToast('Failed to update role: ' + error.message, 'danger');
+    }
+});
+
+// Delete custom role
+async function deleteRole(roleId, roleName) {
+    if (!confirm(`Are you sure you want to delete role "${roleName}"?\n\nUsers with this role will need to be reassigned.`)) return;
+
+    try {
+        const response = await apiCall(`/roles/${roleId}`, 'DELETE');
+        if (response.success) {
+            loadRoles();
+            showToast('Role deleted successfully', 'success');
+        }
+    } catch (error) {
+        showToast('Failed to delete role: ' + error.message, 'danger');
+    }
+}
+
 // Load on page ready
 $(document).ready(function() {
     loadUsers();
@@ -654,6 +1263,11 @@ $(document).ready(function() {
     // Load sessions when tab is clicked
     $('#sessions-tab').on('click', function() {
         loadSessions();
+    });
+
+    // Load roles when roles tab is clicked
+    $('#roles-tab').on('click', function() {
+        loadRoles();
     });
 });
 </script>
