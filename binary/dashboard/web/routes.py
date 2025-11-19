@@ -55,7 +55,7 @@ def statistics():
 @web.route('/configs')
 def configs():
     """Configuration management"""
-    return render_template('configs.html')
+    return render_template('config.html', enable_auth=ENABLE_AUTH)
 
 @web.route('/configs/<agent_id>')
 def agent_config(agent_id):
