@@ -21,12 +21,42 @@ def get_all_roles():
     """List all roles (system + custom)"""
     roles = []
 
-    # Try PostgreSQL first
+    # First, always add system roles with proper descriptions
+    system_role_info = {
+        'admin': {
+            'display_name': 'Administrator',
+            'description': 'Full access to all features'
+        },
+        'operator': {
+            'display_name': 'Operator',
+            'description': 'Manage agents & configurations'
+        },
+        'analyst': {
+            'display_name': 'Analyst',
+            'description': 'View and export events'
+        },
+        'viewer': {
+            'display_name': 'Viewer',
+            'description': 'Read-only access'
+        }
+    }
+
+    for role_name, perms in ROLE_PERMISSIONS.items():
+        info = system_role_info.get(role_name, {})
+        roles.append({
+            'name': role_name,
+            'display_name': info.get('display_name', role_name.capitalize()),
+            'description': info.get('description', ''),
+            'permissions': perms,
+            'is_system': True
+        })
+
+    # Try PostgreSQL first for custom roles
     try:
         session = get_pg_session()
         from binary.dashboard.models import CustomRole
 
-        db_roles = session.query(CustomRole).all()
+        db_roles = session.query(CustomRole).filter_by(is_system=False).all()
         for role in db_roles:
             roles.append(role.to_dict())
 
@@ -39,10 +69,10 @@ def get_all_roles():
     except RuntimeError:
         pass
 
-    # Fallback to MongoDB
+    # Fallback to MongoDB for custom roles
     try:
         db = get_mongo_db()
-        mongo_roles = db.custom_roles.find()
+        mongo_roles = db.custom_roles.find({'is_system': False})
 
         for role in mongo_roles:
             roles.append({
@@ -51,7 +81,7 @@ def get_all_roles():
                 'display_name': role.get('display_name'),
                 'description': role.get('description'),
                 'permissions': role.get('permissions', []),
-                'is_system': role.get('is_system', False),
+                'is_system': False,
                 'created_at': role.get('created_at').isoformat() if role.get('created_at') else None,
                 'updated_at': role.get('updated_at').isoformat() if role.get('updated_at') else None
             })
@@ -65,19 +95,10 @@ def get_all_roles():
     except RuntimeError:
         pass
 
-    # If both failed, return hardcoded system roles
-    system_roles = []
-    for role_name, perms in ROLE_PERMISSIONS.items():
-        system_roles.append({
-            'name': role_name,
-            'display_name': role_name.capitalize(),
-            'permissions': perms,
-            'is_system': True
-        })
-
+    # If both failed, return just system roles
     return jsonify({
         'success': True,
-        'roles': system_roles,
+        'roles': roles,
         'db_type': 'fallback'
     })
 
