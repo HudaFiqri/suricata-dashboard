@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 @api.route('/roles', methods=['GET'])
 @require_auth
 @require_permission('users.view')
-def list_roles():
+def get_all_roles():
     """List all roles (system + custom)"""
     roles = []
 
