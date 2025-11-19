@@ -163,9 +163,10 @@
 {% include 'config/modals/vars.html' %}
 
 {% endblock %}
-{% block scripts %}
+{% block extra_js %}
 <!-- Configuration Module Scripts -->
 <script src="{{ url_for('static', filename='js/config/utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/config/remote-fetch.js') }}"></script>
 <script src="{{ url_for('static', filename='js/config/app-layer.js') }}"></script>
 <script src="{{ url_for('static', filename='js/config/outputs.js') }}"></script>
 <script src="{{ url_for('static', filename='js/config/stream.js') }}"></script>
