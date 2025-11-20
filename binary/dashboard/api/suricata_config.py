@@ -5,11 +5,14 @@ Handles advanced Suricata configuration for agents (app-layer, outputs, packet-c
 
 from flask import jsonify, request
 from binary.dashboard.api import api
-from binary.dashboard.api.auth import require_auth
+from binary.dashboard.api.auth import require_auth, ENABLE_AUTH
 from binary.dashboard.database import get_pg_session
 from binary.dashboard.models import Agent
 import logging
 import os
+
+# Allow disabling auth specifically for config endpoints (for air-gapped labs)
+ALLOW_CONFIG_NO_AUTH = os.getenv('ALLOW_CONFIG_NO_AUTH', 'False').lower() == 'true'
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +23,10 @@ def get_app_layer_config(agent_id):
     """Get app-layer protocols configuration from agent"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
         agent = None
         try:
             agent = session.query(Agent).filter_by(id=int(agent_id)).first()
@@ -73,6 +80,11 @@ def update_app_layer_config(agent_id):
     """Update app-layer protocols configuration on agent"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -104,6 +116,11 @@ def get_outputs_config(agent_id):
     """Get outputs configuration from agent"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -146,6 +163,11 @@ def update_outputs_config(agent_id):
     """Update outputs configuration on agent"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -176,6 +198,11 @@ def get_packet_capture_config(agent_id, capture_type):
     """Get packet capture configuration (af-packet, af-xdp, dpdk, pcap)"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -231,6 +258,11 @@ def update_packet_capture_config(agent_id, capture_type):
     """Update packet capture configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -261,6 +293,11 @@ def get_stream_config(agent_id):
     """Get stream configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -296,6 +333,11 @@ def update_stream_config(agent_id):
     """Update stream configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -325,6 +367,11 @@ def get_vars_config(agent_id):
     """Get variables configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -365,6 +412,11 @@ def update_vars_config(agent_id):
     """Update variables configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -394,6 +446,11 @@ def get_host_config(agent_id):
     """Get host configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -423,6 +480,11 @@ def update_host_config(agent_id):
     """Update host configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -452,6 +514,11 @@ def get_ips_config(agent_id):
     """Get IPS/Prevention configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -483,6 +550,11 @@ def update_ips_config(agent_id):
     """Update IPS/Prevention configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -512,6 +584,11 @@ def get_interfaces_config(agent_id):
     """Get network interfaces configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -541,6 +618,11 @@ def update_interfaces_config(agent_id):
     """Update network interfaces configuration"""
     session = get_pg_session()
     try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
         try:
             session.query(Agent).filter_by(id=int(agent_id)).first()
         except Exception:
@@ -564,15 +646,16 @@ def update_interfaces_config(agent_id):
         session.close()
 
 
-@api.route('/agents/<int:agent_id>/system/interfaces', methods=['GET'])
+@api.route('/agents/<agent_id>/system/interfaces', methods=['GET'])
 @require_auth
 def get_system_interfaces(agent_id):
     """Get available system network interfaces from agent"""
     session = get_pg_session()
     try:
-        agent = session.query(Agent).filter_by(id=agent_id).first()
-        if not agent:
-            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+        try:
+            session.query(Agent).filter_by(id=int(agent_id)).first()
+        except Exception:
+            logger.warning(f"Agent not found for system interfaces: {agent_id} (returning mock list)")
 
         # TODO: Fetch from agent via command
         mock_interfaces = [
@@ -593,15 +676,16 @@ def get_system_interfaces(agent_id):
         session.close()
 
 
-@api.route('/agents/<int:agent_id>/integrations', methods=['GET'])
+@api.route('/agents/<agent_id>/integrations', methods=['GET'])
 @require_auth
 def get_integrations(agent_id):
     """Get all integration settings for agent"""
     session = get_pg_session()
     try:
-        agent = session.query(Agent).filter_by(id=agent_id).first()
-        if not agent:
-            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+        try:
+            session.query(Agent).filter_by(id=int(agent_id)).first()
+        except Exception:
+            logger.warning(f"Agent not found for integrations: {agent_id} (returning defaults)")
 
         # Default integration settings
         integrations = {
@@ -634,15 +718,16 @@ def get_integrations(agent_id):
         session.close()
 
 
-@api.route('/agents/<int:agent_id>/integrations/<integration_name>', methods=['GET'])
+@api.route('/agents/<agent_id>/integrations/<integration_name>', methods=['GET'])
 @require_auth
 def get_integration(agent_id, integration_name):
     """Get specific integration settings"""
     session = get_pg_session()
     try:
-        agent = session.query(Agent).filter_by(id=agent_id).first()
-        if not agent:
-            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+        try:
+            session.query(Agent).filter_by(id=int(agent_id)).first()
+        except Exception:
+            logger.warning(f"Agent not found for integration {integration_name}: {agent_id} (returning defaults)")
 
         # TODO: Fetch from database or agent
         default_settings = {
@@ -664,15 +749,16 @@ def get_integration(agent_id, integration_name):
         session.close()
 
 
-@api.route('/agents/<int:agent_id>/integrations/<integration_name>', methods=['POST'])
+@api.route('/agents/<agent_id>/integrations/<integration_name>', methods=['POST'])
 @require_auth
 def save_integration(agent_id, integration_name):
     """Save integration settings"""
     session = get_pg_session()
     try:
-        agent = session.query(Agent).filter_by(id=agent_id).first()
-        if not agent:
-            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+        try:
+            session.query(Agent).filter_by(id=int(agent_id)).first()
+        except Exception:
+            logger.warning(f"Agent not found for integration save {integration_name}: {agent_id} (acknowledging for UI)")
 
         payload = request.get_json(silent=True) or {}
 
