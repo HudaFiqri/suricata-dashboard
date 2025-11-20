@@ -6,8 +6,6 @@ Handles advanced Suricata configuration for agents (app-layer, outputs, packet-c
 from flask import jsonify, request
 from binary.dashboard.api import api
 from binary.dashboard.api.auth import require_auth, ENABLE_AUTH
-from binary.dashboard.database import get_pg_session
-from binary.dashboard.models import Agent
 import logging
 import os
 
@@ -21,20 +19,13 @@ logger = logging.getLogger(__name__)
 @require_auth
 def get_app_layer_config(agent_id):
     """Get app-layer protocols configuration from agent"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
-        agent = None
-        try:
-            agent = session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            agent = None
 
-        if not agent:
-            logger.warning(f"Agent not found for app-layer config: {agent_id} (returning defaults)")
+        logger.info(f"Config request for agent {agent_id} (returning defaults - agent communication not yet implemented)")
 
         # Default protocols if config not available
         default_protocols = {
@@ -61,7 +52,6 @@ def get_app_layer_config(agent_id):
         }
 
         # TODO: Fetch actual config from agent via command
-        # For now return defaults
         return jsonify({
             'success': True,
             'protocols': default_protocols
@@ -70,25 +60,17 @@ def get_app_layer_config(agent_id):
     except Exception as e:
         logger.error(f"Error getting app-layer config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/app-layer', methods=['POST'])
 @require_auth
 def update_app_layer_config(agent_id):
     """Update app-layer protocols configuration on agent"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
-
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for app-layer update: {agent_id} (acknowledging for UI)")
 
         payload = request.get_json(silent=True) or {}
         updates = payload.get('protocols', {})
@@ -96,8 +78,9 @@ def update_app_layer_config(agent_id):
         if not updates:
             return jsonify({'success': False, 'error': 'No protocol updates provided'}), 400
 
+        logger.info(f"App-layer config update for agent {agent_id} (acknowledged - agent communication not yet implemented)")
+
         # TODO: Send command to agent to update config
-        # For now just return success
         return jsonify({
             'success': True,
             'message': 'App-layer configuration updated successfully'
@@ -106,25 +89,19 @@ def update_app_layer_config(agent_id):
     except Exception as e:
         logger.error(f"Error updating app-layer config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/outputs', methods=['GET'])
 @require_auth
 def get_outputs_config(agent_id):
     """Get outputs configuration from agent"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for outputs config: {agent_id} (returning defaults)")
+        logger.info(f"Outputs config request for agent {agent_id} (returning defaults)")
 
         # Default outputs configuration
         default_outputs = {
@@ -153,31 +130,25 @@ def get_outputs_config(agent_id):
     except Exception as e:
         logger.error(f"Error getting outputs config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/outputs', methods=['POST'])
 @require_auth
 def update_outputs_config(agent_id):
     """Update outputs configuration on agent"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for outputs update: {agent_id} (acknowledging for UI)")
-
         payload = request.get_json(silent=True) or {}
         updates = payload.get('outputs', {})
 
         if not updates:
             return jsonify({'success': False, 'error': 'No output updates provided'}), 400
+
+        logger.info(f"Outputs config update for agent {agent_id} (acknowledged)")
 
         # TODO: Send command to agent to update config
         return jsonify({
@@ -188,25 +159,19 @@ def update_outputs_config(agent_id):
     except Exception as e:
         logger.error(f"Error updating outputs config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/packet-capture/<capture_type>', methods=['GET'])
 @require_auth
 def get_packet_capture_config(agent_id, capture_type):
     """Get packet capture configuration (af-packet, af-xdp, dpdk, pcap)"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for packet-capture config: {agent_id} (returning defaults)")
+        logger.info(f"Packet-capture ({capture_type}) config request for agent {agent_id} (returning defaults)")
 
         # Default configurations per capture type
         default_configs = {
@@ -248,31 +213,25 @@ def get_packet_capture_config(agent_id, capture_type):
     except Exception as e:
         logger.error(f"Error getting packet capture config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/packet-capture/<capture_type>', methods=['POST'])
 @require_auth
 def update_packet_capture_config(agent_id, capture_type):
     """Update packet capture configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for packet-capture update: {agent_id} (acknowledging for UI)")
-
         payload = request.get_json(silent=True) or {}
         config = payload.get('config', {})
 
         if not config:
             return jsonify({'success': False, 'error': 'No configuration provided'}), 400
+
+        logger.info(f"Packet-capture ({capture_type}) config update for agent {agent_id} (acknowledged)")
 
         # TODO: Send command to agent to update config
         return jsonify({
@@ -283,25 +242,19 @@ def update_packet_capture_config(agent_id, capture_type):
     except Exception as e:
         logger.error(f"Error updating packet capture config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/stream', methods=['GET'])
 @require_auth
 def get_stream_config(agent_id):
     """Get stream configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for stream config: {agent_id} (returning defaults)")
+        logger.info(f"Stream config request for agent {agent_id} (returning defaults)")
 
         default_config = {
             'memcap': '64mb',
@@ -323,31 +276,25 @@ def get_stream_config(agent_id):
     except Exception as e:
         logger.error(f"Error getting stream config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/stream', methods=['POST'])
 @require_auth
 def update_stream_config(agent_id):
     """Update stream configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for stream update: {agent_id} (acknowledging for UI)")
-
         payload = request.get_json(silent=True) or {}
         config = payload.get('config', {})
 
         if not config:
             return jsonify({'success': False, 'error': 'No configuration provided'}), 400
+
+        logger.info(f"Stream config update for agent {agent_id} (acknowledged)")
 
         return jsonify({
             'success': True,
@@ -357,25 +304,19 @@ def update_stream_config(agent_id):
     except Exception as e:
         logger.error(f"Error updating stream config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/vars', methods=['GET'])
 @require_auth
 def get_vars_config(agent_id):
     """Get variables configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for vars config: {agent_id} (returning defaults)")
+        logger.info(f"Vars config request for agent {agent_id} (returning defaults)")
 
         default_vars = {
             'HOME_NET': '[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]',
@@ -402,31 +343,25 @@ def get_vars_config(agent_id):
     except Exception as e:
         logger.error(f"Error getting vars config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/vars', methods=['POST'])
 @require_auth
 def update_vars_config(agent_id):
     """Update variables configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for vars update: {agent_id} (acknowledging for UI)")
-
         payload = request.get_json(silent=True) or {}
         vars_data = payload.get('vars', {})
 
         if not vars_data:
             return jsonify({'success': False, 'error': 'No variables provided'}), 400
+
+        logger.info(f"Vars config update for agent {agent_id} (acknowledged)")
 
         return jsonify({
             'success': True,
@@ -436,25 +371,19 @@ def update_vars_config(agent_id):
     except Exception as e:
         logger.error(f"Error updating vars config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/host', methods=['GET'])
 @require_auth
 def get_host_config(agent_id):
     """Get host configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for host config: {agent_id} (returning defaults)")
+        logger.info(f"Host config request for agent {agent_id} (returning defaults)")
 
         default_config = {
             'memcap': '32mb',
@@ -470,31 +399,25 @@ def get_host_config(agent_id):
     except Exception as e:
         logger.error(f"Error getting host config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/host', methods=['POST'])
 @require_auth
 def update_host_config(agent_id):
     """Update host configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for host update: {agent_id} (acknowledging for UI)")
-
         payload = request.get_json(silent=True) or {}
         config = payload.get('config', {})
 
         if not config:
             return jsonify({'success': False, 'error': 'No configuration provided'}), 400
+
+        logger.info(f"Host config update for agent {agent_id} (acknowledged)")
 
         return jsonify({
             'success': True,
@@ -504,25 +427,19 @@ def update_host_config(agent_id):
     except Exception as e:
         logger.error(f"Error updating host config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/ips', methods=['GET'])
 @require_auth
 def get_ips_config(agent_id):
     """Get IPS/Prevention configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for IPS config: {agent_id} (returning defaults)")
+        logger.info(f"IPS config request for agent {agent_id} (returning defaults)")
 
         default_config = {
             'mode': 'ids',  # ids or ips
@@ -540,31 +457,25 @@ def get_ips_config(agent_id):
     except Exception as e:
         logger.error(f"Error getting IPS config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/ips', methods=['POST'])
 @require_auth
 def update_ips_config(agent_id):
     """Update IPS/Prevention configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for IPS update: {agent_id} (acknowledging for UI)")
-
         payload = request.get_json(silent=True) or {}
         config = payload.get('config', {})
 
         if not config:
             return jsonify({'success': False, 'error': 'No configuration provided'}), 400
+
+        logger.info(f"IPS config update for agent {agent_id} (acknowledged)")
 
         return jsonify({
             'success': True,
@@ -574,25 +485,19 @@ def update_ips_config(agent_id):
     except Exception as e:
         logger.error(f"Error updating IPS config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/interfaces', methods=['GET'])
 @require_auth
 def get_interfaces_config(agent_id):
     """Get network interfaces configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for interfaces config: {agent_id} (returning defaults)")
+        logger.info(f"Interfaces config request for agent {agent_id} (returning defaults)")
 
         # TODO: Get actual interfaces from agent
         default_interfaces = [
@@ -608,31 +513,25 @@ def get_interfaces_config(agent_id):
     except Exception as e:
         logger.error(f"Error getting interfaces config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/config/interfaces', methods=['POST'])
 @require_auth
 def update_interfaces_config(agent_id):
     """Update network interfaces configuration"""
-    session = get_pg_session()
     try:
         if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
             request.user_id = 'public'
             request.username = 'public'
             request.user_role = 'admin'
 
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for interfaces update: {agent_id} (acknowledging for UI)")
-
         payload = request.get_json(silent=True) or {}
         interfaces = payload.get('interfaces', [])
 
         if not interfaces:
             return jsonify({'success': False, 'error': 'No interfaces provided'}), 400
+
+        logger.info(f"Interfaces config update for agent {agent_id} (acknowledged)")
 
         return jsonify({
             'success': True,
@@ -642,20 +541,14 @@ def update_interfaces_config(agent_id):
     except Exception as e:
         logger.error(f"Error updating interfaces config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/system/interfaces', methods=['GET'])
 @require_auth
 def get_system_interfaces(agent_id):
     """Get available system network interfaces from agent"""
-    session = get_pg_session()
     try:
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for system interfaces: {agent_id} (returning mock list)")
+        logger.info(f"System interfaces request for agent {agent_id} (returning mock list)")
 
         # TODO: Fetch from agent via command
         mock_interfaces = [
@@ -672,20 +565,14 @@ def get_system_interfaces(agent_id):
     except Exception as e:
         logger.error(f"Error getting system interfaces: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/integrations', methods=['GET'])
 @require_auth
 def get_integrations(agent_id):
     """Get all integration settings for agent"""
-    session = get_pg_session()
     try:
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for integrations: {agent_id} (returning defaults)")
+        logger.info(f"Integrations request for agent {agent_id} (returning defaults)")
 
         # Default integration settings
         integrations = {
@@ -714,20 +601,14 @@ def get_integrations(agent_id):
     except Exception as e:
         logger.error(f"Error getting integrations: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/integrations/<integration_name>', methods=['GET'])
 @require_auth
 def get_integration(agent_id, integration_name):
     """Get specific integration settings"""
-    session = get_pg_session()
     try:
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for integration {integration_name}: {agent_id} (returning defaults)")
+        logger.info(f"Integration {integration_name} request for agent {agent_id} (returning defaults)")
 
         # TODO: Fetch from database or agent
         default_settings = {
@@ -745,22 +626,16 @@ def get_integration(agent_id, integration_name):
     except Exception as e:
         logger.error(f"Error getting integration: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
 
 
 @api.route('/agents/<agent_id>/integrations/<integration_name>', methods=['POST'])
 @require_auth
 def save_integration(agent_id, integration_name):
     """Save integration settings"""
-    session = get_pg_session()
     try:
-        try:
-            session.query(Agent).filter_by(id=int(agent_id)).first()
-        except Exception:
-            logger.warning(f"Agent not found for integration save {integration_name}: {agent_id} (acknowledging for UI)")
-
         payload = request.get_json(silent=True) or {}
+
+        logger.info(f"Integration {integration_name} save for agent {agent_id} (acknowledged)")
 
         # TODO: Save to database or send to agent
         return jsonify({
@@ -771,5 +646,3 @@ def save_integration(agent_id, integration_name):
     except Exception as e:
         logger.error(f"Error saving integration: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session.close()
