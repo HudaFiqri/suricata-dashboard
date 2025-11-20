@@ -23,6 +23,7 @@ from . import users
 from . import sessions
 from . import permissions_api
 from . import roles
+from . import suricata_config
 
 __all__ = [
     'api',
@@ -39,5 +40,6 @@ __all__ = [
     'users',
     'sessions',
     'permissions_api',
-    'roles'
+    'roles',
+    'suricata_config'
 ]
