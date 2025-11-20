@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from binary.dashboard.api import api
 from binary.dashboard.api.auth import require_auth, require_agent_auth
 from binary.dashboard.models import AgentCommand, AuditLog
-from binary.dashboard.database import get_pg_session
+from binary.dashboard.database import get_pg_session, get_mongo_db
+from bson.objectid import ObjectId
 import logging
 
 logger = logging.getLogger(__name__)
@@ -112,7 +113,7 @@ def list_commands():
 @api.route('/commands/<int:command_id>/result', methods=['POST'])
 @require_agent_auth
 def receive_command_result(command_id):
-    """Receive command execution result from agent"""
+    """Receive command execution result from agent (PostgreSQL version)"""
     data = request.get_json()
 
     session = get_pg_session()
@@ -131,5 +132,48 @@ def receive_command_result(command_id):
     session.commit()
 
     logger.info(f"Command result received: {command_id} - {command.status}")
+
+    return jsonify({'success': True})
+
+
+@api.route('/commands/<command_id>/result', methods=['POST'])
+@require_agent_auth
+def receive_command_result_mongo(command_id):
+    """Receive command execution result from agent (MongoDB version)"""
+    data = request.get_json()
+
+    try:
+        db = get_mongo_db()
+    except Exception as e:
+        logger.error(f"MongoDB error: {e}")
+        return jsonify({'success': False, 'error': 'Database not available'}), 500
+
+    try:
+        # Convert string ID to ObjectId
+        obj_id = ObjectId(command_id)
+    except Exception as e:
+        logger.error(f"Invalid ObjectId: {command_id}")
+        return jsonify({'success': False, 'error': 'Invalid command ID'}), 400
+
+    # Find command
+    command = db.agent_commands.find_one({'_id': obj_id})
+
+    if not command:
+        return jsonify({'success': False, 'error': 'Command not found'}), 404
+
+    # Update command
+    update_data = {
+        'status': data.get('status', 'completed'),
+        'result': data.get('result', {}),
+        'error_message': data.get('error_message'),
+        'completed_at': datetime.utcnow()
+    }
+
+    db.agent_commands.update_one(
+        {'_id': obj_id},
+        {'$set': update_data}
+    )
+
+    logger.info(f"Command result received (MongoDB): {command_id} - {update_data['status']}")
 
     return jsonify({'success': True})

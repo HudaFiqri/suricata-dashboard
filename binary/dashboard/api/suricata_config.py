@@ -6,9 +6,9 @@ Handles advanced Suricata configuration for agents (app-layer, outputs, packet-c
 from flask import jsonify, request
 from binary.dashboard.api import api
 from binary.dashboard.api.auth import require_auth, ENABLE_AUTH
-from binary.dashboard.models import AgentCommand
-from binary.dashboard.database import get_pg_session
+from binary.dashboard.database import get_mongo_db
 from datetime import datetime, timedelta
+from bson.objectid import ObjectId
 import logging
 import os
 import time
@@ -22,35 +22,39 @@ logger = logging.getLogger(__name__)
 
 def send_config_command_sync(agent_id, command_type, parameters, timeout_seconds=30):
     """
-    Send command to agent and wait for response synchronously
+    Send command to agent and wait for response synchronously (MongoDB version)
     Returns (success, result_data, error_message)
     """
     try:
-        session = get_pg_session()
+        db = get_mongo_db()
     except Exception as e:
-        logger.warning(f"PostgreSQL error: {e} - cannot send command to agent {agent_id}")
+        logger.warning(f"MongoDB error: {e} - cannot send command to agent {agent_id}")
         return (False, None, f"Database error: {str(e)}")
 
-    # If PostgreSQL not configured, return None to use defaults
-    if session is None:
-        logger.warning(f"PostgreSQL not configured - cannot send command to agent {agent_id}")
+    # If MongoDB not configured, return error to use defaults
+    if db is None:
+        logger.warning(f"MongoDB not configured - cannot send command to agent {agent_id}")
         return (False, None, "Database not configured")
 
     try:
-        # Create command
-        command = AgentCommand(
-            agent_id=int(agent_id),
-            command_type=command_type,
-            parameters=parameters,
-            status='pending',
-            timeout_at=datetime.utcnow() + timedelta(seconds=timeout_seconds),
-            created_by='system',
-            priority=10  # High priority for config fetches
-        )
+        # Create command document in MongoDB
+        command_doc = {
+            'agent_id': agent_id,
+            'command_type': command_type,
+            'parameters': parameters,
+            'status': 'pending',
+            'created_at': datetime.utcnow(),
+            'timeout_at': datetime.utcnow() + timedelta(seconds=timeout_seconds),
+            'created_by': 'system',
+            'priority': 10,  # High priority for config fetches
+            'result': None,
+            'error_message': None,
+            'completed_at': None
+        }
 
-        session.add(command)
-        session.commit()
-        command_id = command.id
+        # Insert into agent_commands collection
+        result = db.agent_commands.insert_one(command_doc)
+        command_id = result.inserted_id
 
         logger.info(f"Config command sent: {command_type} to agent {agent_id} (command_id: {command_id})")
 
@@ -59,19 +63,24 @@ def send_config_command_sync(agent_id, command_type, parameters, timeout_seconds
         poll_interval = 0.5  # Poll every 500ms
 
         while time.time() - start_time < timeout_seconds:
-            session.refresh(command)
+            # Fetch updated command
+            command = db.agent_commands.find_one({'_id': command_id})
 
-            if command.status == 'completed':
-                if command.result and command.result.get('success'):
+            if not command:
+                logger.error(f"Command {command_id} not found")
+                return (False, None, "Command disappeared from database")
+
+            if command['status'] == 'completed':
+                if command.get('result') and command['result'].get('success'):
                     logger.info(f"Command {command_id} completed successfully")
-                    return (True, command.result, None)
+                    return (True, command['result'], None)
                 else:
-                    error_msg = command.result.get('message') if command.result else 'Command failed'
+                    error_msg = command['result'].get('message') if command.get('result') else 'Command failed'
                     logger.error(f"Command {command_id} failed: {error_msg}")
                     return (False, None, error_msg)
 
-            elif command.status == 'failed':
-                error_msg = command.error_message or 'Command execution failed'
+            elif command['status'] == 'failed':
+                error_msg = command.get('error_message') or 'Command execution failed'
                 logger.error(f"Command {command_id} failed: {error_msg}")
                 return (False, None, error_msg)
 
@@ -84,12 +93,6 @@ def send_config_command_sync(agent_id, command_type, parameters, timeout_seconds
     except Exception as e:
         logger.error(f"Error sending config command: {e}")
         return (False, None, str(e))
-    finally:
-        if session:
-            try:
-                session.close()
-            except:
-                pass
 
 
 @api.route('/agents/<agent_id>/config/app-layer', methods=['GET'])
