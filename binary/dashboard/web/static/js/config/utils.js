@@ -138,9 +138,16 @@ function setButtonLoading($button, isLoading, originalHtml = null) {
  * @param {Function} onError - Error callback
  */
 function apiGet(url, onSuccess, onError) {
+    const headers = {};
+    const token = localStorage.getItem('jwt_token');
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     $.ajax({
         url: url,
         method: 'GET',
+        headers,
         success: onSuccess,
         error: function(xhr) {
             const message = (xhr.responseJSON && xhr.responseJSON.message)
@@ -158,10 +165,18 @@ function apiGet(url, onSuccess, onError) {
  * @param {Function} onError - Error callback
  */
 function apiPost(url, data, onSuccess, onError) {
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    const token = localStorage.getItem('jwt_token');
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     $.ajax({
         url: url,
         method: 'POST',
-        contentType: 'application/json',
+        headers,
         data: JSON.stringify(data),
         success: onSuccess,
         error: function(xhr) {
