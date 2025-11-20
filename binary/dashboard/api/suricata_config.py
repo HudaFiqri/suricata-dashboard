@@ -7,7 +7,7 @@ from flask import jsonify, request
 from binary.dashboard.api import api
 from binary.dashboard.api.auth import require_auth
 from binary.dashboard.database import get_pg_session
-from binary.models import Agent
+from binary.dashboard.models import Agent
 import logging
 import os
 
