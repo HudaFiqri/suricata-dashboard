@@ -6,7 +6,7 @@ Handles advanced Suricata configuration for agents (app-layer, outputs, packet-c
 from flask import jsonify, request
 from binary.dashboard.api import api
 from binary.dashboard.api.auth import require_auth
-from binary.dashboard.database import get_session
+from binary.dashboard.database import get_pg_session
 from binary.models import Agent
 import logging
 import os
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 @require_auth
 def get_app_layer_config(agent_id):
     """Get app-layer protocols configuration from agent"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -66,7 +66,7 @@ def get_app_layer_config(agent_id):
 @require_auth
 def update_app_layer_config(agent_id):
     """Update app-layer protocols configuration on agent"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -96,7 +96,7 @@ def update_app_layer_config(agent_id):
 @require_auth
 def get_outputs_config(agent_id):
     """Get outputs configuration from agent"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -137,7 +137,7 @@ def get_outputs_config(agent_id):
 @require_auth
 def update_outputs_config(agent_id):
     """Update outputs configuration on agent"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -166,7 +166,7 @@ def update_outputs_config(agent_id):
 @require_auth
 def get_packet_capture_config(agent_id, capture_type):
     """Get packet capture configuration (af-packet, af-xdp, dpdk, pcap)"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -220,7 +220,7 @@ def get_packet_capture_config(agent_id, capture_type):
 @require_auth
 def update_packet_capture_config(agent_id, capture_type):
     """Update packet capture configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -249,7 +249,7 @@ def update_packet_capture_config(agent_id, capture_type):
 @require_auth
 def get_stream_config(agent_id):
     """Get stream configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -283,7 +283,7 @@ def get_stream_config(agent_id):
 @require_auth
 def update_stream_config(agent_id):
     """Update stream configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -311,7 +311,7 @@ def update_stream_config(agent_id):
 @require_auth
 def get_vars_config(agent_id):
     """Get variables configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -350,7 +350,7 @@ def get_vars_config(agent_id):
 @require_auth
 def update_vars_config(agent_id):
     """Update variables configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -378,7 +378,7 @@ def update_vars_config(agent_id):
 @require_auth
 def get_host_config(agent_id):
     """Get host configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -406,7 +406,7 @@ def get_host_config(agent_id):
 @require_auth
 def update_host_config(agent_id):
     """Update host configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -434,7 +434,7 @@ def update_host_config(agent_id):
 @require_auth
 def get_ips_config(agent_id):
     """Get IPS/Prevention configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -464,7 +464,7 @@ def get_ips_config(agent_id):
 @require_auth
 def update_ips_config(agent_id):
     """Update IPS/Prevention configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -492,7 +492,7 @@ def update_ips_config(agent_id):
 @require_auth
 def get_interfaces_config(agent_id):
     """Get network interfaces configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -520,7 +520,7 @@ def get_interfaces_config(agent_id):
 @require_auth
 def update_interfaces_config(agent_id):
     """Update network interfaces configuration"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -548,7 +548,7 @@ def update_interfaces_config(agent_id):
 @require_auth
 def get_system_interfaces(agent_id):
     """Get available system network interfaces from agent"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -577,7 +577,7 @@ def get_system_interfaces(agent_id):
 @require_auth
 def get_integrations(agent_id):
     """Get all integration settings for agent"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -618,7 +618,7 @@ def get_integrations(agent_id):
 @require_auth
 def get_integration(agent_id, integration_name):
     """Get specific integration settings"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
@@ -648,7 +648,7 @@ def get_integration(agent_id, integration_name):
 @require_auth
 def save_integration(agent_id, integration_name):
     """Save integration settings"""
-    session = get_session()
+    session = get_pg_session()
     try:
         agent = session.query(Agent).filter_by(id=agent_id).first()
         if not agent:
