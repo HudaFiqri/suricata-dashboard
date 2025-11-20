@@ -32,7 +32,7 @@ const PacketCaptureConfig = (function() {
      */
     function loadConfig(captureType) {
         apiGet(
-            `/api/suricata-config/packet-capture/${captureType}`,
+            `/api/v1/agents/${window.AGENT_ID}/config/packet-capture/${captureType}`,
             function(data) {
                 if (data.success) {
                     if (data.warning) {
@@ -944,7 +944,7 @@ const PacketCaptureConfig = (function() {
         }
 
         apiPost(
-            `/api/suricata-config/packet-capture/${captureType}`,
+            `/api/v1/agents/${window.AGENT_ID}/config/packet-capture/${captureType}`,
             { config: payload },
             function(data) {
                 if (data.success) {

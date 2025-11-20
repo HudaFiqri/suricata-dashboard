@@ -16,7 +16,7 @@ function openVarsModal() {
 
 function loadVarsConfig() {
     $.ajax({
-        url: '/api/suricata-config/vars',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/vars`,
         method: 'GET',
         success: function(data) {
             if (data.success) {
@@ -167,7 +167,7 @@ function saveVarsConfig() {
     }
 
     $.ajax({
-        url: '/api/suricata-config/vars',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/vars`,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ vars: result }),

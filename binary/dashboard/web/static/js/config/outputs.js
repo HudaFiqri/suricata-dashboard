@@ -18,7 +18,7 @@ function openOutputsModal() {
 function loadOutputsConfig() {
     $('#outputs-container').html('<p class="text-muted"><i class="fas fa-spinner fa-spin"></i> Loading outputs...</p>');
 
-    $.get('/api/suricata-config/outputs', function(data) {
+    $.get('/api/v1/agents/${window.AGENT_ID}/config/outputs', function(data) {
         if (data.success) {
             outputsConfig = data.outputs || {};
 
@@ -130,7 +130,7 @@ function saveOutputsConfig() {
     });
 
     $.ajax({
-        url: '/api/suricata-config/outputs',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/outputs`,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ outputs: outputs }),
@@ -168,7 +168,7 @@ function loadLoggingConfig() {
     $('#logging-container').html('<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><p class="mt-2">Loading logging configuration...</p></div>');
 
     $.ajax({
-        url: '/api/suricata-config/logging',
+        url: '/api/v1/agents/${window.AGENT_ID}/config/logging',
         method: 'GET',
         success: function(data) {
             if (data.success) {
@@ -294,7 +294,7 @@ function saveLoggingConfig() {
     });
 
     $.ajax({
-        url: '/api/suricata-config/logging',
+        url: '/api/v1/agents/${window.AGENT_ID}/config/logging',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ logging: config }),
@@ -332,7 +332,7 @@ function loadDetectionConfig() {
     $('#detection-container').html('<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><p class="mt-2">Loading detection configuration...</p></div>');
 
     $.ajax({
-        url: '/api/suricata-config/detection',
+        url: '/api/v1/agents/${window.AGENT_ID}/config/detection',
         method: 'GET',
         success: function(data) {
             if (data.success) {
@@ -444,7 +444,7 @@ function saveDetectionConfig() {
     };
 
     $.ajax({
-        url: '/api/suricata-config/detection',
+        url: '/api/v1/agents/${window.AGENT_ID}/config/detection',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ detection: config }),

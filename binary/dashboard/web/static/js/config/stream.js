@@ -16,7 +16,7 @@ function openStreamModal() {
 
 function loadStreamConfig() {
     $.ajax({
-        url: '/api/suricata-config/stream',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/stream`,
         method: 'GET',
         success: function(data) {
             if (data.success) {
@@ -173,7 +173,7 @@ function saveStreamConfig() {
     payload.reassembly = reassemblyPayload;
 
     $.ajax({
-        url: '/api/suricata-config/stream',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/stream`,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ stream: payload }),

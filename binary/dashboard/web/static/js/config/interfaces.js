@@ -21,7 +21,7 @@ function loadInterfaceConfig() {
     // Load both system interfaces and configured interfaces
     Promise.all([
         $.get('/api/system/interfaces'),
-        $.get('/api/suricata-config/interfaces')
+        $.get('/api/v1/agents/${window.AGENT_ID}/config/interfaces')
     ]).then(function([sysResult, configResult]) {
         if (sysResult.success) {
             systemInterfaces = sysResult.interfaces || [];
@@ -222,7 +222,7 @@ function saveInterfaceConfig() {
     });
 
     $.ajax({
-        url: '/api/suricata-config/interfaces',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/interfaces`,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ interfaces: interfaces }),

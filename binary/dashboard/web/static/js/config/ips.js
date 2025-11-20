@@ -18,7 +18,7 @@ function openIpsModal() {
 
 function loadIpsConfig() {
     $.ajax({
-        url: '/api/suricata-config/ips',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/ips`,
         method: 'GET',
         success: function(data) {
             if (data.success) {
@@ -153,7 +153,7 @@ function saveIpsConfig() {
     }
 
     $.ajax({
-        url: '/api/suricata-config/ips',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/ips`,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ ips: payload }),

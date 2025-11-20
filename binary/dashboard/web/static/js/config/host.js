@@ -18,7 +18,7 @@ function openHostModal() {
 
 function loadHostConfig() {
     $.ajax({
-        url: '/api/suricata-config/host',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/host`,
         method: 'GET',
         success: function(data) {
             if (data.success) {
@@ -127,7 +127,7 @@ function saveHostConfig() {
     }
 
     $.ajax({
-        url: '/api/suricata-config/host',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/host`,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ host: payload }),

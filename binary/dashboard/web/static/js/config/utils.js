@@ -204,8 +204,8 @@ function runConfigSelfCheck() {
 
     // Minimal API pings
     const endpoints = [
-        '/api/suricata-config/app-layer',
-        '/api/suricata-config/outputs'
+        `/api/v1/agents/${window.AGENT_ID}/config/app-layer`,
+        `/api/v1/agents/${window.AGENT_ID}/config/outputs`
     ];
 
     const requests = endpoints.map(url =>

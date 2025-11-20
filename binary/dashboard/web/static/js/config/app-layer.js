@@ -18,7 +18,7 @@ function openAppLayerModal() {
 function loadAppLayerConfig() {
     $('#app-layer-protocols-container').html('<p class="text-muted"><i class="fas fa-spinner fa-spin"></i> Loading protocols...</p>');
 
-    $.get('/api/suricata-config/app-layer', function(data) {
+    $.get(`/api/v1/agents/${window.AGENT_ID}/config/app-layer`, function(data) {
         if (data.success) {
             appLayerProtocols = data.protocols || {};
 
@@ -86,7 +86,7 @@ function saveAppLayerConfig() {
     });
 
     $.ajax({
-        url: '/api/suricata-config/app-layer',
+        url: `/api/v1/agents/${window.AGENT_ID}/config/app-layer`,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ protocols: protocols }),

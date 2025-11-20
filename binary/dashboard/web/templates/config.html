@@ -177,6 +177,11 @@
 <script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/packet-capture.js') }}"></script>
 
 <script>
+// Inject agent_id as global variable for config API calls
+window.AGENT_ID = '{{ agent_id }}';
+</script>
+
+<script>
 const integrationDefaults = {
     discord: {
         enabled: false,
@@ -206,7 +211,7 @@ let varsConfig = {};
 // See: static/js/config/utils.js
 
 function loadIntegrationSettings() {
-    $.get('/api/integration', function(response) {
+    $.get(`/api/v1/agents/${window.AGENT_ID}/integrations`, function(response) {
         if (response.success && response.settings) {
             integrationSettings = response.settings;
             integrationHashes = response.hashes || {};
@@ -322,7 +327,7 @@ function saveIntegration() {
     setIntegrationSaving(true);
     resetIntegrationFeedback();
     $.ajax({
-        url: '/api/integration/' + name,
+        url: `/api/v1/agents/${window.AGENT_ID}/integrations/${name}`,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(payload),
@@ -409,7 +414,7 @@ function testSendMessage(integration) {
     const savePayload = collectIntegrationPayload(name);
 
     $.ajax({
-        url: '/api/integration/' + name,
+        url: `/api/v1/agents/${window.AGENT_ID}/integrations/${name}`,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(savePayload),
