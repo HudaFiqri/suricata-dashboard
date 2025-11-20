@@ -5,7 +5,7 @@ Handles advanced Suricata configuration for agents (app-layer, outputs, packet-c
 
 from flask import jsonify, request
 from binary.dashboard.api import api
-from binary.dashboard.auth import require_auth
+from binary.dashboard.api.auth import require_auth
 from binary.dashboard.database import get_session
 from binary.models import Agent
 import logging
