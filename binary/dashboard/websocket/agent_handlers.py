@@ -279,23 +279,47 @@ def handle_command_result(data):
     status = data.get('status')
     result = data.get('result', {})
 
-    # Update command
-    db = get_pg_session()
-    cmd = db.query(AgentCommand).filter_by(id=command_id).first()
+    logger.info(f"Received command result: {command_id} - {status}")
 
-    if cmd:
-        cmd.status = status
-        cmd.result = result
-        cmd.completed_at = datetime.utcnow()
-        db.commit()
+    # Check if this is an in-memory command (UUID format)
+    # Import here to avoid circular dependency
+    from binary.dashboard.api.suricata_config import pending_commands
+
+    if command_id in pending_commands:
+        # Update in-memory command
+        pending_commands[command_id]['status'] = status
+        pending_commands[command_id]['result'] = result
+        pending_commands[command_id]['completed_at'] = datetime.utcnow()
+        logger.info(f"Updated in-memory command {command_id}: {status}")
 
         # Notify UI
         if socketio:
+            agent_id = pending_commands[command_id]['agent_id']
             socketio.emit('command_completed', {
                 'command_id': command_id,
                 'status': status,
                 'result': result
-            }, namespace='/ws/v1/ui', room=f'agent_{cmd.agent_id}')
+            }, namespace='/ws/v1/ui', room=f'agent_{agent_id}')
+        return
+
+    # Otherwise, try database (backward compatibility)
+    db = get_pg_session()
+    if db:
+        cmd = db.query(AgentCommand).filter_by(id=command_id).first()
+
+        if cmd:
+            cmd.status = status
+            cmd.result = result
+            cmd.completed_at = datetime.utcnow()
+            db.commit()
+
+            # Notify UI
+            if socketio:
+                socketio.emit('command_completed', {
+                    'command_id': command_id,
+                    'status': status,
+                    'result': result
+                }, namespace='/ws/v1/ui', room=f'agent_{cmd.agent_id}')
 
 @socketio.on('disconnect', namespace='/ws/v1/agent')
 def handle_agent_disconnect():

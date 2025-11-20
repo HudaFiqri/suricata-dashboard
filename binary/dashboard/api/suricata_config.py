@@ -7,91 +7,104 @@ from flask import jsonify, request
 from binary.dashboard.api import api
 from binary.dashboard.api.auth import require_auth, ENABLE_AUTH
 from binary.dashboard.database import get_mongo_db
+from binary.dashboard.websocket import socketio
 from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 import logging
 import os
 import time
 import yaml
+import uuid
 
 # Allow disabling auth specifically for config endpoints (for air-gapped labs)
 ALLOW_CONFIG_NO_AUTH = os.getenv('ALLOW_CONFIG_NO_AUTH', 'False').lower() == 'true'
 
 logger = logging.getLogger(__name__)
 
+# In-memory command storage (WebSocket-based, no database required)
+# {command_id: {agent_id, command_type, parameters, status, result, error_message, created_at, timeout_at}}
+pending_commands = {}
+
 
 def send_config_command_sync(agent_id, command_type, parameters, timeout_seconds=30):
     """
-    Send command to agent and wait for response synchronously (MongoDB version)
+    Send command to agent via WebSocket and wait for response (in-memory, no database)
     Returns (success, result_data, error_message)
     """
-    try:
-        db = get_mongo_db()
-    except Exception as e:
-        logger.warning(f"MongoDB error: {e} - cannot send command to agent {agent_id}")
-        return (False, None, f"Database error: {str(e)}")
+    # Generate unique command ID
+    command_id = str(uuid.uuid4())
 
-    # If MongoDB not configured, return error to use defaults
-    if db is None:
-        logger.warning(f"MongoDB not configured - cannot send command to agent {agent_id}")
-        return (False, None, "Database not configured")
+    # Store command in memory
+    pending_commands[command_id] = {
+        'agent_id': agent_id,
+        'command_type': command_type,
+        'parameters': parameters,
+        'status': 'pending',
+        'created_at': datetime.utcnow(),
+        'timeout_at': datetime.utcnow() + timedelta(seconds=timeout_seconds),
+        'result': None,
+        'error_message': None
+    }
+
+    logger.info(f"Config command created: {command_type} for agent {agent_id} (ID: {command_id})")
 
     try:
-        # Create command document in MongoDB
-        command_doc = {
-            'agent_id': agent_id,
+        # Send command via WebSocket to agent's room
+        socketio.emit('command', {
+            'command_id': command_id,
             'command_type': command_type,
-            'parameters': parameters,
-            'status': 'pending',
-            'created_at': datetime.utcnow(),
-            'timeout_at': datetime.utcnow() + timedelta(seconds=timeout_seconds),
-            'created_by': 'system',
-            'priority': 10,  # High priority for config fetches
-            'result': None,
-            'error_message': None,
-            'completed_at': None
-        }
+            'parameters': parameters
+        }, namespace='/ws/v1/agent', room=f'agent_{agent_id}')
 
-        # Insert into agent_commands collection
-        result = db.agent_commands.insert_one(command_doc)
-        command_id = result.inserted_id
+        logger.info(f"Command {command_id} sent via WebSocket to agent {agent_id}")
 
-        logger.info(f"Config command sent: {command_type} to agent {agent_id} (command_id: {command_id})")
-
-        # Poll for result
+        # Poll for result in memory
         start_time = time.time()
-        poll_interval = 0.5  # Poll every 500ms
+        poll_interval = 0.3  # Poll every 300ms
 
         while time.time() - start_time < timeout_seconds:
-            # Fetch updated command
-            command = db.agent_commands.find_one({'_id': command_id})
+            # Check if command still exists (might be cleaned up)
+            if command_id not in pending_commands:
+                logger.error(f"Command {command_id} disappeared from memory")
+                return (False, None, "Command disappeared from memory")
 
-            if not command:
-                logger.error(f"Command {command_id} not found")
-                return (False, None, "Command disappeared from database")
+            command = pending_commands[command_id]
 
+            # Check if completed
             if command['status'] == 'completed':
-                if command.get('result') and command['result'].get('success'):
+                result = command.get('result', {})
+                if result.get('success'):
                     logger.info(f"Command {command_id} completed successfully")
-                    return (True, command['result'], None)
+                    # Clean up
+                    del pending_commands[command_id]
+                    return (True, result, None)
                 else:
-                    error_msg = command['result'].get('message') if command.get('result') else 'Command failed'
+                    error_msg = result.get('message', 'Command failed')
                     logger.error(f"Command {command_id} failed: {error_msg}")
+                    # Clean up
+                    del pending_commands[command_id]
                     return (False, None, error_msg)
 
             elif command['status'] == 'failed':
-                error_msg = command.get('error_message') or 'Command execution failed'
+                error_msg = command.get('error_message', 'Command execution failed')
                 logger.error(f"Command {command_id} failed: {error_msg}")
+                # Clean up
+                del pending_commands[command_id]
                 return (False, None, error_msg)
 
+            # Wait before next poll
             time.sleep(poll_interval)
 
-        # Timeout
+        # Timeout - clean up
         logger.warning(f"Command {command_id} timeout after {timeout_seconds}s")
+        del pending_commands[command_id]
         return (False, None, f"Agent did not respond within {timeout_seconds} seconds")
 
     except Exception as e:
-        logger.error(f"Error sending config command: {e}")
+        logger.error(f"Error sending config command via WebSocket: {e}")
+        # Clean up on error
+        if command_id in pending_commands:
+            del pending_commands[command_id]
         return (False, None, str(e))
 
 
