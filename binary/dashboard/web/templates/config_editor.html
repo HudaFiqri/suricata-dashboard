@@ -165,15 +165,15 @@
 {% endblock %}
 {% block scripts %}
 <!-- Configuration Module Scripts -->
-<script src="{{ url_for('static', filename='js/config/utils.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/app-layer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/outputs.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/stream.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/vars.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/host.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/ips.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/interfaces.js') }}"></script>
-<script src="{{ url_for('static', filename='js/config/packet-capture.js') }}"></script>
+<script src="{{ url_for('web.static', filename='js/config/utils.js') }}"></script>
+<script src="{{ url_for('web.static', filename='js/config/app-layer.js') }}"></script>
+<script src="{{ url_for('web.static', filename='js/config/outputs.js') }}"></script>
+<script src="{{ url_for('web.static', filename='js/config/stream.js') }}"></script>
+<script src="{{ url_for('web.static', filename='js/config/vars.js') }}"></script>
+<script src="{{ url_for('web.static', filename='js/config/host.js') }}"></script>
+<script src="{{ url_for('web.static', filename='js/config/ips.js') }}"></script>
+<script src="{{ url_for('web.static', filename='js/config/interfaces.js') }}"></script>
+<script src="{{ url_for('web.static', filename='js/config/packet-capture.js') }}"></script>
 
 <script>
 const integrationDefaults = {
