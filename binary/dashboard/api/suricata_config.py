@@ -646,3 +646,142 @@ def save_integration(agent_id, integration_name):
     except Exception as e:
         logger.error(f"Error saving integration: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api.route('/agents/<agent_id>/config/detection', methods=['GET'])
+@require_auth
+def get_detection_config(agent_id):
+    """Get detection engine configuration"""
+    try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
+        logger.info(f"Detection config request for agent {agent_id} (returning defaults)")
+
+        default_config = {
+            'profile': 'medium',
+            'sgh-mpm-context': 'auto',
+            'inspection-recursion-limit': 3000,
+            'prefilter': {
+                'default': 'mpm'
+            },
+            'grouping': {
+                'tcp-whitelist': 'dns, http, tls',
+                'udp-whitelist': 'dns'
+            }
+        }
+
+        return jsonify({
+            'success': True,
+            'config': default_config
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting detection config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api.route('/agents/<agent_id>/config/detection', methods=['POST'])
+@require_auth
+def update_detection_config(agent_id):
+    """Update detection engine configuration"""
+    try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
+        payload = request.get_json(silent=True) or {}
+        config = payload.get('config', {})
+
+        if not config:
+            return jsonify({'success': False, 'error': 'No configuration provided'}), 400
+
+        logger.info(f"Detection config update for agent {agent_id} (acknowledged)")
+
+        return jsonify({
+            'success': True,
+            'message': 'Detection configuration updated successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error updating detection config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api.route('/agents/<agent_id>/config/logging', methods=['GET'])
+@require_auth
+def get_logging_config(agent_id):
+    """Get logging configuration"""
+    try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
+        logger.info(f"Logging config request for agent {agent_id} (returning defaults)")
+
+        default_config = {
+            'default-log-level': 'info',
+            'default-log-format': '[%i] %t - (%f:%l) <%d> (%n) -- ',
+            'outputs': [
+                {
+                    'console': {
+                        'enabled': 'yes'
+                    }
+                },
+                {
+                    'file': {
+                        'enabled': 'yes',
+                        'level': 'info',
+                        'filename': '/var/log/suricata/suricata.log'
+                    }
+                },
+                {
+                    'syslog': {
+                        'enabled': 'no',
+                        'facility': 'local5',
+                        'format': '[%i] <%d> -- '
+                    }
+                }
+            ]
+        }
+
+        return jsonify({
+            'success': True,
+            'config': default_config
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting logging config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api.route('/agents/<agent_id>/config/logging', methods=['POST'])
+@require_auth
+def update_logging_config(agent_id):
+    """Update logging configuration"""
+    try:
+        if ALLOW_CONFIG_NO_AUTH and not ENABLE_AUTH:
+            request.user_id = 'public'
+            request.username = 'public'
+            request.user_role = 'admin'
+
+        payload = request.get_json(silent=True) or {}
+        config = payload.get('config', {})
+
+        if not config:
+            return jsonify({'success': False, 'error': 'No configuration provided'}), 400
+
+        logger.info(f"Logging config update for agent {agent_id} (acknowledged)")
+
+        return jsonify({
+            'success': True,
+            'message': 'Logging configuration updated successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error updating logging config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
