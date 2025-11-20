@@ -3,7 +3,7 @@ Web UI Routes
 Dashboard pages for multi-agent management
 """
 
-from flask import render_template, redirect, url_for, session, request
+from flask import render_template, redirect, url_for, session, request, send_from_directory
 from binary.dashboard.web import web
 import logging
 import os
@@ -61,6 +61,12 @@ def configs():
 def agent_config(agent_id):
     """Agent configuration editor"""
     return render_template('config.html', agent_id=agent_id)
+
+
+@web.route('/configs/<agent_id>/static/<path:filename>')
+def agent_config_static(agent_id, filename):
+    """Serve static assets under agent-specific config path"""
+    return send_from_directory(web.static_folder, filename)
 
 @web.route('/users')
 def users():

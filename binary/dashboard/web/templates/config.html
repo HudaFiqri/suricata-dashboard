@@ -165,16 +165,16 @@
 {% endblock %}
 {% block extra_js %}
 <!-- Configuration Module Scripts -->
-<script src="{{ url_for('web.static', filename='js/config/utils.js') }}"></script>
-<script src="{{ url_for('web.static', filename='js/config/remote-fetch.js') }}"></script>
-<script src="{{ url_for('web.static', filename='js/config/app-layer.js') }}"></script>
-<script src="{{ url_for('web.static', filename='js/config/outputs.js') }}"></script>
-<script src="{{ url_for('web.static', filename='js/config/stream.js') }}"></script>
-<script src="{{ url_for('web.static', filename='js/config/vars.js') }}"></script>
-<script src="{{ url_for('web.static', filename='js/config/host.js') }}"></script>
-<script src="{{ url_for('web.static', filename='js/config/ips.js') }}"></script>
-<script src="{{ url_for('web.static', filename='js/config/interfaces.js') }}"></script>
-<script src="{{ url_for('web.static', filename='js/config/packet-capture.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/utils.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/remote-fetch.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/app-layer.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/outputs.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/stream.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/vars.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/host.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/ips.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/interfaces.js') }}"></script>
+<script src="{{ url_for('web.agent_config_static', agent_id=agent_id, filename='js/config/packet-capture.js') }}"></script>
 
 <script>
 const integrationDefaults = {
