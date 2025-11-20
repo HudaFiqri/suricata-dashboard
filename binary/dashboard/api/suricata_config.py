@@ -25,7 +25,11 @@ def send_config_command_sync(agent_id, command_type, parameters, timeout_seconds
     Send command to agent and wait for response synchronously
     Returns (success, result_data, error_message)
     """
-    session = get_pg_session()
+    try:
+        session = get_pg_session()
+    except Exception as e:
+        logger.warning(f"PostgreSQL error: {e} - cannot send command to agent {agent_id}")
+        return (False, None, f"Database error: {str(e)}")
 
     # If PostgreSQL not configured, return None to use defaults
     if session is None:
@@ -82,7 +86,10 @@ def send_config_command_sync(agent_id, command_type, parameters, timeout_seconds
         return (False, None, str(e))
     finally:
         if session:
-            session.close()
+            try:
+                session.close()
+            except:
+                pass
 
 
 @api.route('/agents/<agent_id>/config/app-layer', methods=['GET'])
