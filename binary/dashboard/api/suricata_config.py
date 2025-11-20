@@ -6,13 +6,83 @@ Handles advanced Suricata configuration for agents (app-layer, outputs, packet-c
 from flask import jsonify, request
 from binary.dashboard.api import api
 from binary.dashboard.api.auth import require_auth, ENABLE_AUTH
+from binary.dashboard.models import AgentCommand
+from binary.dashboard.database import get_pg_session
+from datetime import datetime, timedelta
 import logging
 import os
+import time
+import yaml
 
 # Allow disabling auth specifically for config endpoints (for air-gapped labs)
 ALLOW_CONFIG_NO_AUTH = os.getenv('ALLOW_CONFIG_NO_AUTH', 'False').lower() == 'true'
 
 logger = logging.getLogger(__name__)
+
+
+def send_config_command_sync(agent_id, command_type, parameters, timeout_seconds=30):
+    """
+    Send command to agent and wait for response synchronously
+    Returns (success, result_data, error_message)
+    """
+    session = get_pg_session()
+
+    # If PostgreSQL not configured, return None to use defaults
+    if session is None:
+        logger.warning(f"PostgreSQL not configured - cannot send command to agent {agent_id}")
+        return (False, None, "Database not configured")
+
+    try:
+        # Create command
+        command = AgentCommand(
+            agent_id=int(agent_id),
+            command_type=command_type,
+            parameters=parameters,
+            status='pending',
+            timeout_at=datetime.utcnow() + timedelta(seconds=timeout_seconds),
+            created_by='system',
+            priority=10  # High priority for config fetches
+        )
+
+        session.add(command)
+        session.commit()
+        command_id = command.id
+
+        logger.info(f"Config command sent: {command_type} to agent {agent_id} (command_id: {command_id})")
+
+        # Poll for result
+        start_time = time.time()
+        poll_interval = 0.5  # Poll every 500ms
+
+        while time.time() - start_time < timeout_seconds:
+            session.refresh(command)
+
+            if command.status == 'completed':
+                if command.result and command.result.get('success'):
+                    logger.info(f"Command {command_id} completed successfully")
+                    return (True, command.result, None)
+                else:
+                    error_msg = command.result.get('message') if command.result else 'Command failed'
+                    logger.error(f"Command {command_id} failed: {error_msg}")
+                    return (False, None, error_msg)
+
+            elif command.status == 'failed':
+                error_msg = command.error_message or 'Command execution failed'
+                logger.error(f"Command {command_id} failed: {error_msg}")
+                return (False, None, error_msg)
+
+            time.sleep(poll_interval)
+
+        # Timeout
+        logger.warning(f"Command {command_id} timeout after {timeout_seconds}s")
+        return (False, None, f"Agent did not respond within {timeout_seconds} seconds")
+
+    except Exception as e:
+        logger.error(f"Error sending config command: {e}")
+        return (False, None, str(e))
+    finally:
+        if session:
+            session.close()
 
 
 @api.route('/agents/<agent_id>/config/app-layer', methods=['GET'])
@@ -171,9 +241,32 @@ def get_packet_capture_config(agent_id, capture_type):
             request.username = 'public'
             request.user_role = 'admin'
 
-        logger.info(f"Packet-capture ({capture_type}) config request for agent {agent_id} (returning defaults)")
+        logger.info(f"Packet-capture ({capture_type}) config request for agent {agent_id}")
 
-        # Default configurations per capture type
+        # Try to fetch from agent
+        success, result, error = send_config_command_sync(
+            agent_id,
+            'read_config_section',
+            {'section': capture_type},
+            timeout_seconds=10
+        )
+
+        if success and result:
+            # Parse YAML content from agent
+            try:
+                config_data = result.get('config', {})
+                return jsonify({
+                    'success': True,
+                    'config': config_data,
+                    'capture_type': capture_type,
+                    'source': 'agent'
+                })
+            except Exception as parse_error:
+                logger.warning(f"Failed to parse config from agent: {parse_error}")
+
+        # Fallback to defaults if agent communication failed
+        logger.info(f"Using default config for {capture_type} (agent communication failed: {error})")
+
         default_configs = {
             'af-packet': {
                 'interface': 'eth0',
@@ -203,11 +296,11 @@ def get_packet_capture_config(agent_id, capture_type):
 
         config = default_configs.get(capture_type, {})
 
-        # TODO: Fetch actual config from agent
         return jsonify({
             'success': True,
             'config': config,
-            'capture_type': capture_type
+            'capture_type': capture_type,
+            'source': 'default'
         })
 
     except Exception as e:

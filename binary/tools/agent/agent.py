@@ -454,6 +454,28 @@ class SuricataAgent:
                     'message': message
                 }
 
+            elif command_type == 'read_config_section':
+                # Read specific section from suricata.yaml
+                import yaml
+                section = parameters.get('section', 'af-packet')
+                config_path = self.config.get('suricata.config_path', '/etc/suricata/suricata.yaml')
+
+                logger.info(f"Reading config section '{section}' from {config_path}")
+
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config_data = yaml.safe_load(f)
+
+                # Extract requested section
+                section_data = config_data.get(section, {})
+
+                result = {
+                    'success': True,
+                    'config': section_data,
+                    'section': section,
+                    'path': config_path,
+                    'message': f'Config section {section} read successfully'
+                }
+
             else:
                 result = {
                     'success': False,
